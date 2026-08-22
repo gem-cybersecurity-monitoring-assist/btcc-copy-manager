@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { getLiveConfigurationStatus, prepareLiveOrder, signBtccParameters, verifyConfirmationToken } from "../src/lib/btcc-live.ts";
+
+const keys = ["BTCC_API_BASE_URL", "BTCC_API_KEY", "BTCC_SECRET_KEY", "BTCC_USERNAME", "BTCC_PASSWORD", "BTCC_ACCOUNT_ID", "LIVE_CONFIRMATION_SECRET", "BTCC_LIVE_EXECUTION", "BTCC_MAX_LEVERAGE", "BTCC_MAX_ORDER_NOTIONAL_USDT"];
+const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+function restore() { for (const key of keys) { const value = original[key]; if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+function configure() { process.env.BTCC_API_BASE_URL = "https://example.invalid"; process.env.BTCC_API_KEY = "access"; process.env.BTCC_SECRET_KEY = "secret"; process.env.BTCC_USERNAME = "owner"; process.env.BTCC_PASSWORD = "password"; process.env.BTCC_ACCOUNT_ID = "42"; process.env.LIVE_CONFIRMATION_SECRET = "confirmation-secret-with-enough-entropy"; process.env.BTCC_LIVE_EXECUTION = "true"; process.env.BTCC_MAX_LEVERAGE = "5"; process.env.BTCC_MAX_ORDER_NOTIONAL_USDT = "10"; }
+
+test("live configuration fails closed when secrets are missing", { concurrency: false }, () => { for (const key of keys) delete process.env[key]; const status = getLiveConfigurationStatus(); assert.equal(status.ready, false); assert.ok(status.missing.includes("BTCC_API_KEY")); restore(); });
+test("signature is stable regardless of parameter insertion order", { concurrency: false }, () => { const left = signBtccParameters({ token: "abc", accountid: 42 }, "secret"); const right = signBtccParameters({ accountid: 42, token: "abc" }, "secret"); assert.equal(left, right); assert.match(left, /^[a-f0-9]{32}$/); });
+test("prepared order requires exact bounded live configuration", { concurrency: false }, () => { configure(); const prepared = prepareLiveOrder({ idempotencyKey: "12345678-abc", symbol: "BTCUSDT", direction: "LONG", volume: 0.0001, referencePrice: 60000, leverage: 5, stopLoss: 59000, takeProfit: 62000 }); assert.equal(prepared.notionalUsdt, 6); assert.equal(prepared.confirmationPhrase, "EXECUTE LIVE ORDER"); assert.equal(verifyConfirmationToken(prepared.confirmationToken).intent.symbol, "BTCUSDT"); restore(); });
+test("order beyond notional limit is blocked before exchange submission", { concurrency: false }, () => { configure(); assert.throws(() => prepareLiveOrder({ idempotencyKey: "12345678-abc", symbol: "BTCUSDT", direction: "LONG", volume: 0.01, referencePrice: 60000, leverage: 5, stopLoss: 59000, takeProfit: 62000 }), /notional exceeds/); restore(); });
