@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { createInterface } from "node:readline/promises";
 
 import {
   extractBtccEvidence,
@@ -24,30 +24,19 @@ type CdpMessage = {
   error?: { message?: string };
 };
 
-type CdpTarget = {
-  type: string;
-  url: string;
-  webSocketDebuggerUrl?: string;
-};
+type CdpTarget = { type: string; url: string; webSocketDebuggerUrl?: string };
+type PendingResponse = { url: string; mimeType: string; resourceType: string; status: number };
 
-type PendingResponse = {
-  url: string;
-  mimeType: string;
-  resourceType: string;
-  status: number;
-};
-
-const CDP_PORT = 9222;
-const CDP_BASE = `http://127.0.0.1:${CDP_PORT}`;
 const PROFILE_DIR = resolve(process.cwd(), ".btcc-browser-profile");
 const DATA_DIR = resolve(process.cwd(), "data", "btcc-browser");
+const ACTIVE_PORT_FILE = resolve(PROFILE_DIR, "DevToolsActivePort");
 const BTCC_HOME = "https://www.btcc.com/";
 
 const checkpoints: Array<{ name: BtccAuditCheckpointName; instruction: string }> = [
   { name: "account-overview", instruction: "Open BTCC Assets / Account Overview so total account value and wallet balances are visible." },
   { name: "futures", instruction: "Open the Futures assets/positions page so balance, free margin, risk status, positions and PnL are visible." },
   { name: "copy-traders", instruction: "Open Copy Trading > My Copy Traders so active relationships and current copy status are visible." },
-  { name: "copy-history", instruction: "Open Copy Trading history / closed copy positions. Show the historical PnL and trader attribution if BTCC provides it." },
+  { name: "copy-history", instruction: "Open Copy Trading history / closed copy positions. Show historical PnL and trader attribution if BTCC provides it." },
   { name: "earn", instruction: "Open BTCC Earn. Show available products, your subscriptions, APR/APY, accrued interest and redemption terms." },
   { name: "benefits-rewards", instruction: "Open Benefits / Rewards / Coupons / Trading Funds and show available balances, restrictions and expiration dates." },
   { name: "funding-history", instruction: "Open Futures funding history and show funding received and paid." },
@@ -65,12 +54,16 @@ async function fetchJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function cdpAvailable() {
+async function activeProfileBase() {
   try {
-    await fetchJson(`${CDP_BASE}/json/version`);
-    return true;
+    const contents = await readFile(ACTIVE_PORT_FILE, "utf8");
+    const port = Number(contents.split(/\r?\n/, 1)[0]);
+    if (!Number.isInteger(port) || port < 1 || port > 65_535) return null;
+    const base = `http://127.0.0.1:${port}`;
+    await fetchJson(`${base}/json/version`);
+    return base;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -89,15 +82,14 @@ function chromeCandidates() {
 }
 
 async function launchChrome() {
-  if (await cdpAvailable()) return;
+  const existing = await activeProfileBase();
+  if (existing) return existing;
 
   const chrome = chromeCandidates().find((candidate) => existsSync(candidate));
-  if (!chrome) {
-    throw new Error("Google Chrome was not found. Install Chrome or set up a Chrome executable in a standard location, then run the audit again.");
-  }
+  if (!chrome) throw new Error("Google Chrome was not found in a standard location.");
 
   const child = spawn(chrome, [
-    `--remote-debugging-port=${CDP_PORT}`,
+    "--remote-debugging-port=0",
     `--user-data-dir=${PROFILE_DIR}`,
     "--no-first-run",
     "--no-default-browser-check",
@@ -106,16 +98,17 @@ async function launchChrome() {
   ], { detached: true, stdio: "ignore" });
   child.unref();
 
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (await cdpAvailable()) return;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const base = await activeProfileBase();
+    if (base) return base;
     await delay(500);
   }
-  throw new Error("Chrome started, but the local DevTools endpoint did not become available.");
+  throw new Error("Chrome started, but its dedicated local DevTools endpoint did not become available.");
 }
 
-async function findBtccTarget() {
+async function findBtccTarget(cdpBase: string) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    const targets = await fetchJson<CdpTarget[]>(`${CDP_BASE}/json/list`);
+    const targets = await fetchJson<CdpTarget[]>(`${cdpBase}/json/list`);
     const btcc = targets.find((target) => target.type === "page" && target.url.includes("btcc.com") && target.webSocketDebuggerUrl);
     if (btcc?.webSocketDebuggerUrl) return btcc.webSocketDebuggerUrl;
     await delay(500);
@@ -149,7 +142,7 @@ class CdpClient {
     const socket = new WebSocket(url);
     await new Promise<void>((resolveOpen, rejectOpen) => {
       socket.addEventListener("open", () => resolveOpen(), { once: true });
-      socket.addEventListener("error", () => rejectOpen(new Error("Could not connect to the local Chrome DevTools endpoint.")), { once: true });
+      socket.addEventListener("error", () => rejectOpen(new Error("Could not connect to the dedicated local Chrome DevTools endpoint.")), { once: true });
     });
     return new CdpClient(socket);
   }
@@ -259,17 +252,8 @@ async function captureCheckpoint(client: CdpClient, name: BtccAuditCheckpointNam
     evaluatedString(client, "document.title"),
     evaluatedString(client, "document.body ? document.body.innerText : ''")
   ]);
-
   if (!url.includes("btcc.com")) throw new Error(`The active audit tab is not on BTCC (${sanitizeBtccUrl(url)}).`);
-
-  return {
-    name,
-    capturedAt: new Date().toISOString(),
-    url: sanitizeBtccUrl(url),
-    title,
-    evidence: extractBtccEvidence(bodyText),
-    network
-  };
+  return { name, capturedAt: new Date().toISOString(), url: sanitizeBtccUrl(url), title, evidence: extractBtccEvidence(bodyText), network };
 }
 
 async function main() {
@@ -278,8 +262,8 @@ async function main() {
   console.log("Credentials stay in Chrome. Never enter a BTCC password or MFA code in this terminal.\n");
 
   await mkdir(DATA_DIR, { recursive: true });
-  await launchChrome();
-  const targetUrl = await findBtccTarget();
+  const cdpBase = await launchChrome();
+  const targetUrl = await findBtccTarget(cdpBase);
   const client = await CdpClient.connect(targetUrl);
   await client.send("Runtime.enable");
   await client.send("Network.enable", { maxTotalBufferSize: 5_000_000, maxResourceBufferSize: 1_000_000 });
@@ -290,7 +274,6 @@ async function main() {
 
   try {
     await rl.question("Log in to BTCC in the Chrome window and keep using that same tab. When the authenticated account is visible, press Enter here. ");
-
     for (const checkpoint of checkpoints) {
       networkCapture.start();
       console.log(`\n[${checkpoint.name}] ${checkpoint.instruction}`);
@@ -312,7 +295,6 @@ async function main() {
       source: "local-chrome-cdp",
       checkpoints: results
     };
-
     const timestamp = snapshot.capturedAt.replace(/[:.]/g, "-");
     const archivePath = resolve(DATA_DIR, `snapshot-${timestamp}.json`);
     const latestPath = resolve(DATA_DIR, "latest.json");
