@@ -7,3 +7,5 @@ node_modules
 coverage
 dist
 *.tsbuildinfo
+.btcc-browser-profile/
+data/btcc-browser/
