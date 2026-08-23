@@ -18,7 +18,7 @@ pnpm install
 pnpm btcc:audit
 ```
 
-The command opens Chrome with a dedicated local profile at `.btcc-browser-profile/` and attaches through Chrome DevTools Protocol on `127.0.0.1:9222`.
+The command opens Chrome with a dedicated local profile at `.btcc-browser-profile/` and asks Chrome to choose an isolated local DevTools port automatically. The runner reads that port only from the dedicated profile's `DevToolsActivePort` file, so it does not attach to an unrelated Chrome debugging session.
 
 Log in to the official BTCC website in the Chrome window. Enter credentials, MFA, CAPTCHA, and any device confirmation only in the BTCC web page. Never enter BTCC credentials in Windows Terminal.
 
@@ -54,7 +54,7 @@ The snapshot contains:
 - source URL without query parameters;
 - capture timestamps and checkpoint provenance.
 
-Sensitive fields such as passwords, tokens, cookies, API keys, MFA values, secrets, and credential-like values are redacted before snapshot output.
+Sensitive fields such as passwords, tokens, cookies, API keys, MFA values, secrets, email/phone identifiers, account/user IDs, and credential-like values are redacted before snapshot output.
 
 ## Safety boundary
 
@@ -66,4 +66,4 @@ The existing guarded futures execution path remains separate.
 
 Chrome uses `.btcc-browser-profile/`, so an authenticated session may persist locally according to BTCC and Chrome session rules. Treat this directory as sensitive local data. Do not upload, commit, share, or copy it to another machine.
 
-If the local Chrome DevTools endpoint is already running on port 9222, the audit reuses it. Keep the BTCC audit in the same BTCC tab during the guided capture.
+If the dedicated audit Chrome profile is already running, the runner may reuse that profile's own DevTools endpoint. Keep the BTCC audit in the same BTCC tab during the guided capture.
