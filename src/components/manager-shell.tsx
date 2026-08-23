@@ -5,7 +5,7 @@ import type { AuditEvent } from "@/lib/types";
 import type { LiveConfigurationStatus, LiveDirection, LiveOrderIntent, PreparedLiveOrder } from "@/lib/live-types";
 import { PwaRegister } from "./pwa-register";
 
-type View = "overview" | "live" | "positions" | "connection" | "audit";
+type View = "overview" | "live" | "positions" | "connection" | "audit" | "opportunities";
 type PositionPayload = { positions?: Array<Record<string, unknown>>; error?: string; [key: string]: unknown };
 
 const nav: { id: View; label: string; icon: string }[] = [
@@ -13,7 +13,8 @@ const nav: { id: View; label: string; icon: string }[] = [
   { id: "live", label: "Live order", icon: "↗" },
   { id: "positions", label: "Positions", icon: "◫" },
   { id: "connection", label: "Connection", icon: "⛓" },
-  { id: "audit", label: "Audit log", icon: "≡" }
+  { id: "audit", label: "Audit log", icon: "≡" },
+  { id: "opportunities", label: "Opportunities", icon: "◈" }
 ];
 
 const initialStatus: LiveConfigurationStatus = {
