@@ -3,6 +3,13 @@ import type { LiveConfigurationStatus, LiveOrderIntent, PreparedLiveOrder } from
 
 type BtccResponse = { code: number; msg?: string; [key: string]: unknown };
 
+function allowedSymbols() {
+  return (process.env.ALLOWED_SYMBOLS || "")
+    .split(",")
+    .map((symbol) => symbol.trim().toUpperCase())
+    .filter(Boolean);
+}
+
 function numericEnv(name: string, fallback: number) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
@@ -21,8 +28,8 @@ export function getLiveConfigurationStatus(): LiveConfigurationStatus {
     missing,
     blockers,
     policy: {
-      maxLeverage: numericEnv("BTCC_MAX_LEVERAGE", 5),
-      maxOrderNotionalUsdt: numericEnv("BTCC_MAX_ORDER_NOTIONAL_USDT", 10),
+      maxLeverage: numericEnv("MAX_LEVERAGE", numericEnv("BTCC_MAX_LEVERAGE", 5)),
+      maxOrderNotionalUsdt: numericEnv("MAX_ORDER_NOTIONAL_USDT", numericEnv("BTCC_MAX_ORDER_NOTIONAL_USDT", 10)),
       stopLossRequired: true,
       withdrawals: false
     }
@@ -54,7 +61,11 @@ export function prepareLiveOrder(intent: LiveOrderIntent): PreparedLiveOrder {
   const status = getLiveConfigurationStatus();
   const problems: string[] = [];
   if (!intent.idempotencyKey || intent.idempotencyKey.length < 8) problems.push("A valid idempotency key is required.");
-  if (!intent.symbol.trim()) problems.push("The exact BTCC API symbol is required.");
+  const symbol = intent.symbol.trim().toUpperCase();
+  if (!symbol) problems.push("The exact BTCC API symbol is required.");
+  const symbols = allowedSymbols();
+  if (symbols.length > 0 && !symbols.includes(symbol)) problems.push("Symbol is not in the configured ALLOWED_SYMBOLS list.");
+  if (intent.direction !== "LONG" && intent.direction !== "SHORT") problems.push("Direction must be LONG or SHORT.");
   for (const [name, value] of Object.entries({ volume: intent.volume, referencePrice: intent.referencePrice, leverage: intent.leverage, stopLoss: intent.stopLoss, takeProfit: intent.takeProfit })) {
     if (!Number.isFinite(value) || value <= 0) problems.push(`${name} must be greater than zero.`);
   }
@@ -63,6 +74,8 @@ export function prepareLiveOrder(intent: LiveOrderIntent): PreparedLiveOrder {
   const estimatedStopLossUsdt = intent.direction === "LONG"
     ? Math.max(0, intent.referencePrice - intent.stopLoss) * intent.volume
     : Math.max(0, intent.stopLoss - intent.referencePrice) * intent.volume;
+  const maxQuantity = numericEnv("MAX_ORDER_QUANTITY", Number.POSITIVE_INFINITY);
+  if (intent.volume > maxQuantity) problems.push(`Order quantity exceeds the configured ${maxQuantity} maximum.`);
   if (intent.leverage > status.policy.maxLeverage) problems.push(`Leverage exceeds the configured ${status.policy.maxLeverage}× maximum.`);
   if (notionalUsdt > status.policy.maxOrderNotionalUsdt) problems.push(`Order notional exceeds the configured ${status.policy.maxOrderNotionalUsdt} USDT maximum.`);
   if (intent.direction === "LONG" && intent.stopLoss >= intent.referencePrice) problems.push("A long stop loss must be below the reference price.");
