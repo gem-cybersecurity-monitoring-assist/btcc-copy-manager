@@ -35,51 +35,17 @@ export type BtccBrowserAuditSnapshot = {
   checkpoints: BtccAuditCheckpoint[];
 };
 
-const SENSITIVE_KEY = /(?:pass(?:word)?|secret|token|cookie|authorization|auth(?:entication)?|session|credential|private.?key|seed|mnemonic|recovery|otp|mfa|2fa|api.?key|access.?key|refresh.?key|client.?secret|signature|sign)$/i;
-const SENSITIVE_LINE = /(?:password|passcode|seed phrase|private key|recovery code|authenticator code|api secret|session cookie|bearer\s+[a-z0-9._-]+)/i;
+const SENSITIVE_KEY = /(?:pass(?:word)?|secret|token|cookie|authorization|auth(?:entication)?|session(?:.?id)?|credential|private.?key|seed|mnemonic|recovery|otp|mfa|2fa|api.?key|access.?key|refresh.?key|client.?secret|signature|sign|email|phone|mobile|(?:account|user).?id|uid)$/i;
+const SENSITIVE_LINE = /(?:password|passcode|seed phrase|private key|recovery code|authenticator code|api secret|session cookie|bearer\s+[a-z0-9._-]|\b(?:account|user)\s*(?:id|uid)\b)/i;
 const EMAIL = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 const PHONE = /(?:\+?\d[\d\s().-]{8,}\d)/;
 const LONG_SECRET = /\b(?:eyJ[a-zA-Z0-9_-]{20,}|[a-f0-9]{48,}|[A-Za-z0-9_-]{64,})\b/;
 
 const EVIDENCE_TERMS = [
-  "account value",
-  "total value",
-  "total asset",
-  "total assets",
-  "equity",
-  "available",
-  "balance",
-  "margin",
-  "risk",
-  "safe",
-  "pnl",
-  "profit",
-  "loss",
-  "fee",
-  "funding",
-  "copy",
-  "trader",
-  "roi",
-  "drawdown",
-  "win rate",
-  "leverage",
-  "position",
-  "order",
-  "apr",
-  "apy",
-  "earn",
-  "reward",
-  "voucher",
-  "trading fund",
-  "coupon",
-  "vip",
-  "referral",
-  "affiliate",
-  "commission",
-  "usdt",
-  "btc",
-  "closed",
-  "open"
+  "account value", "total value", "total asset", "total assets", "equity", "available", "balance",
+  "margin", "risk", "safe", "pnl", "profit", "loss", "fee", "funding", "copy", "trader", "roi",
+  "drawdown", "win rate", "leverage", "position", "order", "apr", "apy", "earn", "reward", "voucher",
+  "trading fund", "coupon", "vip", "referral", "affiliate", "commission", "usdt", "btc", "closed", "open"
 ];
 
 export function sanitizeBtccUrl(input: string) {
@@ -142,7 +108,7 @@ export function extractBtccEvidence(text: string, limit = 120) {
 export function isBtccJsonResponse(input: { url: string; mimeType?: string; resourceType?: string }) {
   try {
     const host = new URL(input.url).hostname.toLowerCase();
-    const isBtcc = host === "btcc.com" || host.endsWith(".btcc.com");
+    const isBtcc = /^([a-z0-9-]+\.)*btcc[a-z0-9-]*\.[a-z]{2,}$/i.test(host);
     const mime = (input.mimeType || "").toLowerCase();
     const resource = (input.resourceType || "").toLowerCase();
     return isBtcc && (mime.includes("json") || resource === "xhr" || resource === "fetch");
