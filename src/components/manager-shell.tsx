@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { AuditEvent } from "@/lib/types";
 import type { LiveConfigurationStatus, LiveDirection, LiveOrderIntent, PreparedLiveOrder } from "@/lib/live-types";
 import { PwaRegister } from "./pwa-register";
+import { OpportunitiesDashboard } from "./opportunities-dashboard";
 
 type View = "overview" | "live" | "positions" | "connection" | "audit" | "opportunities";
 type PositionPayload = { positions?: Array<Record<string, unknown>>; error?: string; [key: string]: unknown };
@@ -62,6 +63,7 @@ export function ManagerShell() {
       {view === "positions" && <Positions status={status} record={record}/>} 
       {view === "connection" && <Connection status={status} refresh={refreshStatus}/>} 
       {view === "audit" && <Audit events={events}/>} 
+      {view === "opportunities" && <OpportunitiesDashboard />}
     </main>
   </div>;
 }
