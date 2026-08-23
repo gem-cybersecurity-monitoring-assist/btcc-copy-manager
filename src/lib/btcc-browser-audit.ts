@@ -44,8 +44,8 @@ const LONG_SECRET = /\b(?:eyJ[a-zA-Z0-9_-]{20,}|[a-f0-9]{48,}|[A-Za-z0-9_-]{64,}
 const EVIDENCE_TERMS = [
   "account value", "total value", "total asset", "total assets", "equity", "available", "balance",
   "margin", "risk", "safe", "pnl", "profit", "loss", "fee", "funding", "copy", "trader", "roi",
-  "drawdown", "win rate", "leverage", "position", "order", "apr", "apy", "earn", "reward", "voucher",
-  "trading fund", "coupon", "vip", "referral", "affiliate", "commission", "usdt", "btc", "closed", "open"
+  "drawdown", "win rate", "leverage", "position", "open position", "closed position", "order", "apr", "apy",
+  "earn", "reward", "voucher", "trading fund", "coupon", "vip", "referral", "affiliate", "commission", "usdt"
 ];
 
 export function sanitizeBtccUrl(input: string) {
