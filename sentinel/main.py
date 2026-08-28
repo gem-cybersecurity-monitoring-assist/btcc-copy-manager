@@ -31,7 +31,8 @@ from workflow import (
     side_effect_allowed,
 )
 
-DB_PATH = os.getenv("SENTINEL_DB", "data/sentinel.db")
+DEFAULT_DB_PATH = "/tmp/sentinel.db" if os.getenv("VERCEL") else "data/sentinel.db"
+DB_PATH = os.getenv("SENTINEL_DB", DEFAULT_DB_PATH)
 SCAN_INTERVAL = int(os.getenv("SENTINEL_SCAN_INTERVAL", "60"))
 store = EventStore(DB_PATH)
 service = SentinelService(store, SCAN_INTERVAL)
