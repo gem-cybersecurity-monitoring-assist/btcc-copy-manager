@@ -12,6 +12,7 @@
     "browser:scan": "node scripts/btcc-browser-worker.mjs",
     "browser:scan:once": "node scripts/btcc-browser-worker.mjs --once",
     "browser:scan:dry": "node scripts/btcc-browser-worker.mjs --once --dry-run",
+    "btcc:audit": "node scripts/btcc-browser-audit.ts",
     "connect:btcc": "pnpm browser:doctor && pnpm browser:scan:once",
     "monitor:btcc": "pnpm browser:doctor && pnpm browser:scan",
     "typecheck": "tsc --noEmit",
