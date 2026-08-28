@@ -9,4 +9,6 @@ dist
 *.tsbuildinfo
 .btcc-browser-profile/
 .btcc-sentinel-chrome/
+.sentinel-venv/
 data/btcc-browser/
+sentinel/data/
