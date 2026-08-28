@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+import asyncio
+
+from models import Alert, CollectorBatch
+from monitor import TraderMonitor
+from storage import EventStore
+from workflow import propose_copy_configuration
+
+
+class SentinelService:
+    def __init__(self, store: EventStore, scan_interval_seconds: int = 60):
+        self.store = store
+        self.scan_interval_seconds = max(10, scan_interval_seconds)
+        self.monitor = TraderMonitor()
+        self._stop = asyncio.Event()
+
+    def ingest(self, batch: CollectorBatch) -> dict:
+        inserted = self.store.save_batch(batch)
+        ranked = self.monitor.rank(batch.traders, batch.account)
+        action_ids: list[int] = []
+        if inserted:
+            self._emit_material_alerts(ranked)
+            action_ids = self._prepare_workflows(batch, ranked)
+        return {"stored": inserted, "ranked": ranked, "prepared_action_ids": action_ids}
+
+    def _emit_material_alerts(self, ranked: list[dict]) -> None:
+        for row in ranked:
+            verdict = row["verdict"]
+            if verdict in {"COPY", "SMALL_TEST"}:
+                self.store.add_alert(Alert(
+                    kind="trader_opportunity",
+                    key=row["trader_id"] or row["trader"],
+                    severity="opportunity",
+                    message=f"{row['trader']} classified {verdict} with score {row['score']}",
+                    data=row,
+                ))
+            elif verdict == "REJECT" and any("hard reject" in r.lower() or "lost" in r.lower() for r in row["reasons"]):
+                self.store.add_alert(Alert(
+                    kind="trader_risk",
+                    key=row["trader_id"] or row["trader"],
+                    severity="warning",
+                    message=f"{row['trader']} rejected by hard risk evidence",
+                    data=row,
+                ))
+
+    def _prepare_workflows(self, batch: CollectorBatch, ranked: list[dict]) -> list[int]:
+        by_key = {(t.trader_id or t.name): t for t in batch.traders}
+        ids: list[int] = []
+        for row in ranked:
+            if row["verdict"] not in {"COPY", "SMALL_TEST"}:
+                continue
+            trader = by_key.get(row["trader_id"] or row["trader"])
+            if not trader:
+                continue
+            action = propose_copy_configuration(trader, batch.account)
+            ids.append(self.store.save_action(action))
+        return ids
+
+    def scan_latest(self) -> dict:
+        batch = self.store.latest_batch()
+        if not batch:
+            return {"status": "no_data", "ranked": []}
+        ranked = self.monitor.rank(batch.traders, batch.account)
+        self._emit_material_alerts(ranked)
+        action_ids = self._prepare_workflows(batch, ranked)
+        return {
+            "status": "ok",
+            "captured_at": batch.captured_at.isoformat(),
+            "ranked": ranked,
+            "prepared_action_ids": action_ids,
+        }
+
+    async def run_forever(self) -> None:
+        while not self._stop.is_set():
+            self.scan_latest()
+            try:
+                await asyncio.wait_for(self._stop.wait(), timeout=self.scan_interval_seconds)
+            except asyncio.TimeoutError:
+                pass
+
+    def stop(self) -> None:
+        self._stop.set()
