@@ -7,6 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "browser:scan": "node scripts/btcc-browser-worker.mjs",
+    "browser:scan:once": "node scripts/btcc-browser-worker.mjs --once",
+    "browser:scan:dry": "node scripts/btcc-browser-worker.mjs --once --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts",
     "check": "pnpm typecheck && pnpm test && pnpm build"
