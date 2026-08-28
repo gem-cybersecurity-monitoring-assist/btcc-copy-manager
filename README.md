@@ -1,6 +1,6 @@
 # BTCC Live Trading Manager
 
-A mobile-first live execution control room for BTCC futures. The current build prepares, signs, confirms, and submits real futures positions through BTCC's documented TradeOpenAPI shape. It also reads live positions, enforces limits, supports a browser-scoped emergency stop, and records a local audit trail.
+A mobile-first live execution control room for BTCC futures. The current build prepares, signs, confirms, and submits real futures positions through BTCC's documented TradeOpenAPI shape. It also reads live positions, enforces limits, supports a browser-scoped emergency stop, records a local audit trail, and can forward authenticated read-only BTCC observations into BTCC Sentinel.
 
 ## Supported live operations
 
@@ -39,6 +39,83 @@ POST /api/v1/sentinel/collector
 ```
 
 The manager forwards them to Sentinel `/collector/batch`. A recursive credential guard rejects payloads containing fields that look like passwords, cookies, API keys, tokens, sessions, authorization headers, OTPs or 2FA values. Authentication remains inside the BTCC session/client and must never be included in collector payloads.
+
+## Authenticated read-only browser worker
+
+`scripts/btcc-browser-worker.mjs` attaches to a dedicated Chrome/Chromium instance through the local Chrome DevTools Protocol. You log into BTCC manually in that browser. The worker then reads visible DOM text and safe links, discovers trader/profile pages, extracts account/trader/trade observations, and forwards normalized snapshots through the Sentinel collector bridge.
+
+The worker does **not** read cookies, local/session storage, passwords, API keys, request authorization headers, OTP/2FA values, or form values. It does **not** click buttons, fill forms, transfer assets, start/stop copy trading, place orders, or withdraw funds. Navigation is limited to `btcc.com` pages.
+
+Launch a **dedicated** Chrome profile with local remote debugging enabled. Close that dedicated Chrome window when you want to stop browser access.
+
+macOS example:
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$HOME/.btcc-sentinel-chrome"
+```
+
+Linux example:
+
+```bash
+google-chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir="$HOME/.btcc-sentinel-chrome"
+```
+
+Windows PowerShell example:
+
+```powershell
+& "$env:ProgramFiles\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9222 `
+  --user-data-dir="$env:USERPROFILE\.btcc-sentinel-chrome"
+```
+
+In that dedicated Chrome window:
+
+1. Open BTCC.
+2. Log in yourself and complete any 2FA yourself.
+3. Navigate to the BTCC page you want scanned, preferably Assets or Copy Trading / Recommended traders.
+4. Leave the BTCC tab open.
+
+Then run a dry read first:
+
+```bash
+pnpm browser:scan:dry
+```
+
+This prints the normalized snapshot locally and does not send it to Sentinel. If the values look correct, run one real push:
+
+```bash
+pnpm browser:scan:once
+```
+
+Then check:
+
+```bash
+curl http://127.0.0.1:8421/state/latest
+curl http://127.0.0.1:8421/alerts
+curl http://127.0.0.1:8421/scan
+```
+
+For continuous scanning:
+
+```bash
+pnpm browser:scan
+```
+
+Defaults can be changed without code changes:
+
+```env
+BTCC_CDP_HTTP=http://127.0.0.1:9222
+BTCC_MANAGER_URL=http://127.0.0.1:3000
+BTCC_SCAN_INTERVAL_MS=60000
+BTCC_MAX_TRADER_PAGES=25
+BTCC_NAVIGATION_DELAY_MS=1800
+```
+
+Important: the worker can only extract data actually rendered in the authenticated BTCC web UI. When BTCC changes its labels/layout, the parser may lower confidence or miss a field rather than inventing a value. Low-confidence observations should remain informational until verified.
 
 A minimal collector payload is:
 
@@ -108,9 +185,11 @@ pnpm dev
 
 1. Start BTCC Sentinel and verify `http://127.0.0.1:8421/health`.
 2. Start this manager with `SENTINEL_URL=http://127.0.0.1:8421` and verify `/api/v1/sentinel/health`.
-3. Connect the authenticated browser/XHR collector and send one normalized read-only batch through `/api/v1/sentinel/collector`.
-4. Confirm Sentinel `/state/latest`, `/alerts`, and `/scan` reflect the same account snapshot.
-5. Only after the read pipeline is trustworthy, enable paper actions and later bounded live execution.
+3. Launch the dedicated remote-debugging Chrome profile, log into BTCC manually, and leave a BTCC page open.
+4. Run `pnpm browser:scan:dry` and confirm the extracted values are correct.
+5. Run `pnpm browser:scan:once` and confirm Sentinel `/state/latest`, `/alerts`, and `/scan` reflect the same account snapshot.
+6. Run `pnpm browser:scan` for continuous read-only monitoring.
+7. Only after the read pipeline is trustworthy, enable paper actions and later bounded live execution.
 
 For direct live futures execution, separately obtain a current BTCC TradeOpenAPI base URL and a trade-enabled key from the authenticated API Management area/support, confirm the account owner authorizes automated futures execution, add encrypted environment variables and redeploy, sync positions, prepare a very small instruction, review the exchange symbol and calculated notional, type `EXECUTE LIVE ORDER`, and submit.
 
