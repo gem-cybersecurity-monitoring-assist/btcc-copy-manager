@@ -16,6 +16,49 @@ A mobile-first live execution control room for BTCC futures. The current build p
 
 The application intentionally contains no withdrawal, transfer, address-management, or deposit API route.
 
+## BTCC Sentinel bridge
+
+The app can forward normalized, read-only account/trader snapshots to BTCC Sentinel v0.3 without exposing BTCC authentication material.
+
+Set:
+
+```env
+SENTINEL_URL=http://127.0.0.1:8421
+```
+
+Then verify the connection while both services are running:
+
+```bash
+curl http://127.0.0.1:3000/api/v1/sentinel/health
+```
+
+Browser/XHR collectors should POST normalized batches to:
+
+```text
+POST /api/v1/sentinel/collector
+```
+
+The manager forwards them to Sentinel `/collector/batch`. A recursive credential guard rejects payloads containing fields that look like passwords, cookies, API keys, tokens, sessions, authorization headers, OTPs or 2FA values. Authentication remains inside the BTCC session/client and must never be included in collector payloads.
+
+A minimal collector payload is:
+
+```json
+{
+  "account": {
+    "total_usdt": 54.74,
+    "futures_free_usdt": 1.34,
+    "wallet_usdt": 53.40,
+    "open_margin_usdt": 0,
+    "active_positions": 0,
+    "provenance": { "source": "dom", "confidence": 0.99 }
+  },
+  "traders": [],
+  "collector_id": "btcc-browser-adapter"
+}
+```
+
+This bridge is read-only. It does not create an undocumented BTCC copy-trading enrollment endpoint and does not bypass Sentinel's approval/risk workflow.
+
 ## Important BTCC distinction
 
 BTCC publishes a native futures copy-trading product. The available TradeOpenAPI material documents ordinary futures positions and identifies copy-follower positions in returned data, but it does not document an endpoint to follow or unfollow a lead trader. Native lead-trader enrollment therefore remains in BTCC. This service manages live API futures execution and position visibility; it does not invent an undocumented copy-enrollment endpoint.
@@ -35,6 +78,7 @@ LIVE_CONFIRMATION_SECRET=<independent random 32+ byte secret>
 BTCC_MAX_LEVERAGE=5
 BTCC_MAX_ORDER_NOTIONAL_USDT=10
 BTCC_LIVE_EXECUTION=true
+SENTINEL_URL=http://127.0.0.1:8421
 ```
 
 The user's previously described read-only API key cannot execute real orders. BTCC must issue/allow a trade-enabled key. The base URL must come from current authenticated BTCC documentation or support because the public support page no longer exposes it clearly.
@@ -57,14 +101,17 @@ pnpm dev
 - `GET /api/v1/live/positions` — retrieve live positions.
 - `POST /api/v1/live/kill-switch` — pause/re-arm submissions for the current browser.
 - `GET /api/v1/capabilities` — evidence-based capability registry.
+- `GET /api/v1/sentinel/health` — verify the Sentinel service is reachable.
+- `POST /api/v1/sentinel/collector` — forward normalized read-only snapshots to Sentinel.
 
 ## Activation order
 
-1. Obtain a current BTCC TradeOpenAPI base URL and a trade-enabled key from the authenticated API Management area/support.
-2. Confirm the account owner authorizes automated futures execution.
-3. Add encrypted environment variables and redeploy.
-4. Open Connection and confirm every item shows READY.
-5. Sync positions before creating an order.
-6. Prepare a very small instruction, review the exchange symbol and calculated notional, type `EXECUTE LIVE ORDER`, and submit.
+1. Start BTCC Sentinel and verify `http://127.0.0.1:8421/health`.
+2. Start this manager with `SENTINEL_URL=http://127.0.0.1:8421` and verify `/api/v1/sentinel/health`.
+3. Connect the authenticated browser/XHR collector and send one normalized read-only batch through `/api/v1/sentinel/collector`.
+4. Confirm Sentinel `/state/latest`, `/alerts`, and `/scan` reflect the same account snapshot.
+5. Only after the read pipeline is trustworthy, enable paper actions and later bounded live execution.
+
+For direct live futures execution, separately obtain a current BTCC TradeOpenAPI base URL and a trade-enabled key from the authenticated API Management area/support, confirm the account owner authorizes automated futures execution, add encrypted environment variables and redeploy, sync positions, prepare a very small instruction, review the exchange symbol and calculated notional, type `EXECUTE LIVE ORDER`, and submit.
 
 No code change is required after the live variables are configured unless BTCC's current contract differs from the April 2025 guide.
