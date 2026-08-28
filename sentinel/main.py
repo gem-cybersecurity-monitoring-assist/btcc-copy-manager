@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -87,6 +91,39 @@ def health():
         "version": "0.3.1",
         "has_data": latest is not None,
         "latest_capture": latest.captured_at.isoformat() if latest else None,
+    }
+
+
+@app.get("/browserbase/credential-check")
+def browserbase_credential_check():
+    api_key = os.getenv("BROWSERBASE_API_KEY")
+    project_id = os.getenv("BROWSERBASE_PROJECT_ID")
+    if not api_key or not project_id:
+        raise HTTPException(status_code=503, detail={"ok": False, "configured": False})
+
+    request = Request(
+        f"https://api.browserbase.com/v1/projects/{quote(project_id, safe='')}",
+        headers={"X-BB-API-Key": api_key},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8") or "{}")
+    except HTTPError as exc:
+        raise HTTPException(
+            status_code=exc.code,
+            detail={"ok": False, "configured": True, "browserbase_status": exc.code},
+        ) from None
+    except (URLError, TimeoutError):
+        raise HTTPException(
+            status_code=502,
+            detail={"ok": False, "configured": True, "browserbase_status": "unreachable"},
+        ) from None
+
+    return {
+        "ok": True,
+        "configured": True,
+        "project_matched": payload.get("id") == project_id,
     }
 
 
