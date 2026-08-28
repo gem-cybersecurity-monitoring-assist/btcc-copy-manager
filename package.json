@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "sentinel": "node scripts/start-btcc-sentinel.mjs",
     "browser:chrome": "node scripts/launch-btcc-chrome.mjs",
     "browser:doctor": "node scripts/btcc-browser-doctor.mjs",
     "browser:scan": "node scripts/btcc-browser-worker.mjs",
