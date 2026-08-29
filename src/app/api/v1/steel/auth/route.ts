@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     configured: config.ready,
-    authorized: isSteelAuthorized(request),
+    authorized: config.ready ? isSteelAuthorized(request) : false,
     missing: config.missing,
     controlSecretStrongEnough: config.controlSecretStrongEnough,
   }, { headers: { "cache-control": "no-store, max-age=0" } });
