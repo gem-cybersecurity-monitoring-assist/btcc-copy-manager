@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   let secret = "";
   try {
     const body = await request.json() as { secret?: unknown };
-    secret = typeof body.secret === "string" ? body.secret : "";
+    secret = typeof body.secret === "string" ? body.secret.trim() : "";
   } catch {
     return jsonError("Invalid request.", 400);
   }
