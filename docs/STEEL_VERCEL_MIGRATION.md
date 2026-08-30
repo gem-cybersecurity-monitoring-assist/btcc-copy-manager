@@ -18,6 +18,8 @@ Add these values only in Vercel's encrypted Environment Variables UI. Never comm
 
 The existing BTCC futures API variables are independent from this browser flow. The Steel controller deliberately does not read or accept a BTCC password.
 
+After adding or changing Steel environment variables, create a fresh Production deployment so the new deployment receives the updated environment snapshot. The `/api/v1/steel/auth` endpoint is the safe readiness check: it reports only whether configuration is present and never returns secret values.
+
 ## Production flow
 
 1. Open `/steel` on the deployed Vercel site.
