@@ -1,9 +1,18 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { steelConfigStatus, verifyControlSecret } from "@/lib/steel-browser";
 import { clearSteelAuth, isSteelAuthorized, jsonError, sameOrigin, setSteelAuth } from "@/lib/steel-route";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function verifyLegacyControlSecret(candidate: string) {
+  const legacy = process.env.STELL_CONTROL_SECRET?.trim();
+  if (!legacy) return false;
+  const expected = Buffer.from(legacy, "utf8");
+  const supplied = Buffer.from(candidate, "utf8");
+  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+}
 
 export async function GET(request: NextRequest) {
   const config = steelConfigStatus();
@@ -13,6 +22,7 @@ export async function GET(request: NextRequest) {
     authorized: config.ready ? isSteelAuthorized(request) : false,
     missing: config.missing,
     controlSecretStrongEnough: config.controlSecretStrongEnough,
+    legacyControlSecretPresent: Boolean(process.env.STELL_CONTROL_SECRET?.trim()),
   }, { headers: { "cache-control": "no-store, max-age=0" } });
 }
 
@@ -29,7 +39,7 @@ export async function POST(request: NextRequest) {
     return jsonError("Invalid request.", 400);
   }
 
-  if (!verifyControlSecret(secret)) {
+  if (!verifyControlSecret(secret) && !verifyLegacyControlSecret(secret)) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     return jsonError("Authorization failed.", 401);
   }
