@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+// Temporary recovery scan: probes existing READY Steel profiles without exposing profile identifiers.
 export const runtime="nodejs";export const dynamic="force-dynamic";export const maxDuration=60;
 const API="https://api.steel.dev/v1",CDP="wss://connect.steel.dev",ASSETS="https://www.btcc.com/en-US/user-center/assets";
 function key(){const v=process.env.STEEL_API_KEY?.trim();if(!v)throw new Error("steel key missing");return v}
