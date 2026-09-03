@@ -7,6 +7,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RECOVERY_PASSPHRASE_SHA256 = "31973d30418ba1da6ab119e321a092d1dce183db54fa248a4e52b85d67cedc8a";
+const RECOVERY_CANONICAL_SHA256 = "ecf999103c7f208a2d92c656b5c329b1f4009a9cc485789050883325fe26ef1c";
+
+function sameHex(left: string, right: string) {
+  const expected = Buffer.from(left, "utf8");
+  const supplied = Buffer.from(right, "utf8");
+  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
+}
 
 function verifyLegacyControlSecret(candidate: string) {
   const legacy = process.env.STELL_CONTROL_SECRET?.trim();
@@ -18,10 +25,14 @@ function verifyLegacyControlSecret(candidate: string) {
 
 function verifyRecoveryPassphrase(candidate: string) {
   if (!candidate) return false;
-  const supplied = createHash("sha256").update(candidate, "utf8").digest("hex");
-  const expected = Buffer.from(RECOVERY_PASSPHRASE_SHA256, "utf8");
-  const actual = Buffer.from(supplied, "utf8");
-  return expected.length === actual.length && timingSafeEqual(expected, actual);
+  const exact = createHash("sha256").update(candidate.trim(), "utf8").digest("hex");
+  if (sameHex(RECOVERY_PASSPHRASE_SHA256, exact)) return true;
+  const canonical = Array.from(candidate.normalize("NFKC"))
+    .filter((char) => /[A-Za-z0-9]/.test(char))
+    .join("")
+    .toLowerCase();
+  const normalized = createHash("sha256").update(canonical, "utf8").digest("hex");
+  return sameHex(RECOVERY_CANONICAL_SHA256, normalized);
 }
 
 export async function GET(request: NextRequest) {
