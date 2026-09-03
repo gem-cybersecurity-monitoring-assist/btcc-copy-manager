@@ -122,11 +122,14 @@ export function FinitePurchaseConsole() {
     setExecution(data as Execution);
   }
 
+  const badgeText = status === null ? "CHECKING" : status.ready ? "LIVE READY" : "SETUP REQUIRED";
+  const badgeClass = status?.ready ? "live-ready" : "setup-required";
+
   return <div className="page-grid review-grid">
     <section className="hero-card span-2">
       <div>
         <p className="eyebrow">Finite Bitcoin purchase controller</p>
-        <div className="title-line"><h2>One plan, exact purchase count, then stop</h2><span className={`badge badge-${status?.ready ? "live-ready" : "setup-required"}`}>{status?.ready ? "LIVE READY" : "SETUP REQUIRED"}</span></div>
+        <div className="title-line"><h2>One plan, exact purchase count, then stop</h2><span className={`badge badge-${badgeClass}`}>{badgeText}</span></div>
         <p className="subtle">Choose any supported amount per purchase and a finite execution count. The controller creates exactly that many uniquely identified BTC purchase orders and never schedules another one.</p>
       </div>
       <div className={`score ${status?.ready ? "score-low" : "score-critical"}`}><span>Total now</span><strong>{money(total, currency)}</strong><small>{numericCount || 0} × {money(numericAmount, currency)}</small></div>
@@ -147,10 +150,10 @@ export function FinitePurchaseConsole() {
         <div className="metric"><span>Per purchase</span><strong>{money(numericAmount, currency)}</strong></div>
         <div className="metric"><span>Execution count</span><strong>{numericCount || 0}</strong></div>
         <div className="metric"><span>Maximum authorized total</span><strong>{money(total, currency)}</strong></div>
-        <div className="metric"><span>Destination</span><strong>{status?.policy.destinationFingerprint || "Not configured"}</strong></div>
+        <div className="metric"><span>Destination</span><strong>{status === null ? "Checking…" : status.policy.destinationFingerprint || "Not configured"}</strong></div>
       </div>
       <label className="field"><span>Owner authorization disclosure</span><span className="subtle"><input type="checkbox" checked={acknowledged} onChange={(event) => { setAcknowledged(event.target.checked); resetPrepared(); }}/> I confirm the owner is being shown that this plan authorizes {numericCount || 0} separate BTC purchases for a maximum total of {money(total, currency)}.</span></label>
-      <div className="form-actions"><button className="button" disabled={busy || !acknowledged || numericAmount <= 0 || numericCount < 1} onClick={() => void prepare()}>{busy ? "Preparing…" : "Prepare finite purchase"}</button></div>
+      <div className="form-actions"><button className="button" disabled={busy || !status?.ready || !acknowledged || numericAmount <= 0 || numericCount < 1} onClick={() => void prepare()}>{busy ? "Preparing…" : "Prepare finite purchase"}</button></div>
       {message && <div className="notice inline"><span>{message}</span></div>}
     </section>
 
@@ -168,13 +171,16 @@ export function FinitePurchaseConsole() {
 
     {execution && <section className="panel span-2">
       <div className="panel-head"><div><p className="eyebrow">Provider orders</p><h2>{execution.status === "created" ? "Finite batch created" : "Partial batch — retry safely"}</h2></div><span className={`badge badge-${execution.status === "created" ? "pass" : "block"}`}>{execution.status.toUpperCase()}</span></div>
-      <p className="subtle">Each child uses a deterministic partner order ID. Retrying the same signed plan reuses existing Switchere orders instead of intentionally adding a third purchase.</p>
+      <p className="subtle">Each child uses a deterministic partner order ID. Retrying the same signed plan reuses existing Switchere orders instead of intentionally adding another purchase.</p>
       <div className="position-list">{execution.orders.map((order) => <article key={order.partnerOrderId}><strong>Purchase #{order.sequence}</strong><span>{order.status}{order.reused ? " · existing" : " · new"}</span><span>{order.clientOrderId || order.partnerOrderId}</span>{order.redirect && <a className="button" href={order.redirect} target="_blank" rel="noreferrer">Open Switchere payment</a>}</article>)}</div>
     </section>}
 
     <section className="panel span-2">
-      <p className="eyebrow">Activation state</p><h2>{status?.ready ? "Switchere → BTCC purchase path is armed" : "Configuration still required"}</h2>
-      {status?.blockers?.length ? <ul className="flag-list">{status.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <p className="subtle">Live execution is enabled, Switchere partner credentials are present, a fixed BTCC BTC deposit address is configured, and the finite total limit is active.</p>}
+      <p className="eyebrow">Activation state</p>
+      {status === null ? <><h2>Checking deployment configuration</h2><p className="subtle">Reading the Switchere → BTCC connector state…</p></> : <>
+        <h2>{status.ready ? "Switchere → BTCC purchase path is armed" : "Configuration still required"}</h2>
+        {status.blockers.length ? <ul className="flag-list">{status.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <p className="subtle">Live execution is enabled, Switchere partner credentials are present, a fixed BTCC BTC deposit address is configured, and the finite total limit is active.</p>}
+      </>}
       <p className="subtle">The controller is finite by construction: no cron, no recurring schedule, and no automatic execution beyond the signed child count.</p>
     </section>
   </div>;
