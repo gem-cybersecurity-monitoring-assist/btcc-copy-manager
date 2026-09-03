@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-export const STEEL_SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+export const STEEL_SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 export const BTCC_LOGIN_URL = "https://www.btcc.com/en-US/login?redirect=%2Fuser-center%2Fassets";
 export const BTCC_ASSETS_URL = "https://www.btcc.com/en-US/user-center/assets";
 export const STEEL_AUTH_COOKIE = "btcc_steel_auth";
@@ -46,7 +46,7 @@ export function steelConfigStatus() {
     missing,
     controlSecretStrongEnough: Boolean(control && control.length >= 16),
     timeoutMs: STEEL_SESSION_TIMEOUT_MS,
-    captchaSolving: true,
+    captchaSolving: false,
     inactivityTimeoutDisabled: true,
     persistentProfiles: true,
   };
@@ -123,7 +123,7 @@ function steelHeaders() {
 export async function createSteelSession(profileId?: string) {
   const body: Record<string, unknown> = {
     timeout: STEEL_SESSION_TIMEOUT_MS,
-    solveCaptcha: true,
+    solveCaptcha: false,
     blockAds: true,
     persistProfile: true,
     deviceConfig: { device: "mobile" },
