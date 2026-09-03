@@ -1,0 +1,42 @@
+/* Usability layer: keep controls readable and prevent dense service panels from colliding. */
+.app-shell main { min-width: 0; }
+.page-grid { align-items: start; }
+.panel,.hero-card,.metric { min-width: 0; overflow-wrap: anywhere; }
+.panel { overflow: hidden; }
+.form-grid > *, .metric-grid > *, .position-list article > * { min-width: 0; }
+.position-list article { overflow: hidden; }
+.position-list article a.button { justify-self: end; white-space: nowrap; }
+
+@media (max-width: 1180px) {
+  .app-shell { grid-template-columns: 210px minmax(0,1fr); }
+  main { padding-left: 24px; padding-right: 24px; }
+  .metric-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .position-list article { grid-template-columns: minmax(160px,1.5fr) minmax(100px,1fr); }
+  .position-list article a.button { justify-self: start; }
+}
+
+@media (max-width: 900px) {
+  main { padding: 0 16px 112px; }
+  .topbar { min-height: 82px; margin-bottom: 20px; gap: 12px; }
+  .page-grid { gap: 14px; }
+  .panel,.hero-card { border-radius: 13px; }
+  .mobile-nav { overflow-x: auto; grid-template-columns: repeat(6,minmax(68px,1fr)); scrollbar-width: none; }
+  .mobile-nav::-webkit-scrollbar { display:none; }
+  .mobile-nav button { min-width: 68px; padding: 4px 2px; }
+}
+
+@media (max-width: 620px) {
+  main { padding-left: 12px; padding-right: 12px; }
+  .topbar { align-items: flex-start; padding: 16px 0; min-height: auto; }
+  .top-actions { flex-shrink: 0; }
+  .hero-card { display:grid; grid-template-columns:1fr; gap:18px; }
+  .score { width:100%; min-width:0; border-left:0; border-top:1px solid var(--line); padding:16px 0 0; text-align:left; }
+  .metric-grid { grid-template-columns:1fr; gap:10px; }
+  .form-grid { gap:12px; }
+  .panel { padding:16px; }
+  .panel-head { gap:12px; margin-bottom:14px; }
+  .panel-head .button { width:100%; text-align:center; }
+  .position-list article { grid-template-columns:1fr; gap:8px; }
+  .position-list article a.button { width:100%; text-align:center; }
+  .critical-callout { line-height:1.5; }
+}
