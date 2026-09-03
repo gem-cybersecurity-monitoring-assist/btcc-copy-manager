@@ -1,3 +1,0 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export async function GET(){try{const r=await fetch("https://zaoqyzygptwbdelweskj.supabase.co/functions/v1/btcc-port-probe-6f4c2a91",{cache:"no-store",signal:AbortSignal.timeout(12000)});return new Response(await r.text(),{status:r.status,headers:{"content-type":r.headers.get("content-type")||"text/plain","cache-control":"no-store"}})}catch(e){return Response.json({error:e instanceof Error?`${e.name}:${e.message}`:String(e)},{status:500,headers:{"cache-control":"no-store"}})}}
