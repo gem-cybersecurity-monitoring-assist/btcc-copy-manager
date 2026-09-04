@@ -61,6 +61,7 @@ export interface PurchaseConfigurationStatus {
 
 const DEFAULT_MAX_EXECUTIONS = 10;
 const DEFAULT_TTL_SECONDS = 5 * 60;
+const DEFAULT_RECONCILE_MAX_AGE_SECONDS = 24 * 60 * 60;
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -100,6 +101,15 @@ function parseToken(token: string) {
   const right = Buffer.from(expected);
   if (left.length !== right.length || !timingSafeEqual(left, right)) throw new Error("Purchase confirmation token signature is invalid.");
   return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as PreparedFinitePurchase;
+}
+
+function validatePlanIntegrity(plan: PreparedFinitePurchase) {
+  const expectedTotal = roundMoney(plan.amountPerExecution * plan.executionCount);
+  if (expectedTotal !== plan.totalAuthorized) throw new Error("Purchase plan total is inconsistent.");
+  if (plan.children.length !== plan.executionCount) throw new Error("Purchase plan child count is inconsistent.");
+  const uniqueIds = new Set(plan.children.map((child) => child.partnerOrderId));
+  if (uniqueIds.size !== plan.children.length) throw new Error("Purchase plan contains duplicate child order IDs.");
+  return plan;
 }
 
 export function destinationFingerprint(address = process.env.BTCC_BTC_DEPOSIT_ADDRESS || "") {
@@ -201,13 +211,17 @@ export function prepareFinitePurchase(intent: FinitePurchaseIntent): PreparedFin
 }
 
 export function verifyFinitePurchaseToken(token: string) {
-  const plan = parseToken(token);
+  const plan = validatePlanIntegrity(parseToken(token));
   if (Date.parse(plan.expiresAt) <= Date.now()) throw new Error("Purchase confirmation token has expired.");
-  const expectedTotal = roundMoney(plan.amountPerExecution * plan.executionCount);
-  if (expectedTotal !== plan.totalAuthorized) throw new Error("Purchase plan total is inconsistent.");
-  if (plan.children.length !== plan.executionCount) throw new Error("Purchase plan child count is inconsistent.");
-  const uniqueIds = new Set(plan.children.map((child) => child.partnerOrderId));
-  if (uniqueIds.size !== plan.children.length) throw new Error("Purchase plan contains duplicate child order IDs.");
+  return plan;
+}
+
+export function verifyFinitePurchaseTokenForReconciliation(token: string) {
+  const plan = validatePlanIntegrity(parseToken(token));
+  const preparedAt = Date.parse(plan.preparedAt);
+  if (!Number.isFinite(preparedAt)) throw new Error("Purchase plan preparation time is invalid.");
+  const maxAgeSeconds = positiveInteger(process.env.PURCHASE_RECONCILE_MAX_AGE_SECONDS, DEFAULT_RECONCILE_MAX_AGE_SECONDS);
+  if (preparedAt + maxAgeSeconds * 1000 <= Date.now()) throw new Error("Purchase plan reconciliation window has expired.");
   return plan;
 }
 
