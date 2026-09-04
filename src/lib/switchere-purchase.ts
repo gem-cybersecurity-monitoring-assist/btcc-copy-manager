@@ -1,13 +1,26 @@
 import { getPurchaseConfigurationStatus, switchereSignature, type PreparedFinitePurchase, type PurchaseChildInstruction } from "./finite-purchase.ts";
 
+export type SwitchereLifecycle =
+  | "not_created"
+  | "awaiting_payment"
+  | "awaiting_auth"
+  | "awaiting_verification"
+  | "processing"
+  | "finished"
+  | "terminal_failure"
+  | "unknown";
+
 export interface SwitchereOrderResult {
   sequence: number;
   partnerOrderId: string;
   clientOrderId?: string;
   status: string;
+  subStatus?: string;
+  lifecycle: SwitchereLifecycle;
   redirect?: string;
   payinAmount?: string;
   payoutAmount?: string;
+  payoutTxid?: string;
   reused: boolean;
 }
 
@@ -23,8 +36,46 @@ export interface FinitePurchaseExecutionResult {
   noRecurrence: true;
 }
 
+export interface FinitePurchaseReconciliationResult {
+  planId: string;
+  batchStatus: "awaiting_action" | "processing" | "finished" | "partial_failure";
+  executionCount: number;
+  orders: SwitchereOrderResult[];
+  provider: "switchere";
+  destination: "BTCC_BTC_DEPOSIT";
+}
+
 function apiBase() {
   return (process.env.SWITCHERE_API_BASE_URL || "https://switchere.com").replace(/\/$/, "");
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readSubStatus(data: Record<string, unknown>) {
+  return asString(data.sub_status) || asString(data.substatus) || asString(data.order_sub_status) || asString(data.orderSubStatus);
+}
+
+export function classifySwitchereLifecycle(statusInput: string | undefined, subStatusInput?: string): SwitchereLifecycle {
+  const status = (statusInput || "").trim().toLowerCase();
+  const subStatus = (subStatusInput || "").trim().toLowerCase();
+
+  if (!status) return "unknown";
+  if (status === "finished") return "finished";
+  if (["canceled", "error", "expired", "refunded"].includes(status)) return "terminal_failure";
+  if (status === "confirmation_pending") return "awaiting_auth";
+  if (["auth_success", "processing", "processing_payout"].includes(status)) return "processing";
+
+  if (["email_pending", "verify_pending", "understanding_pending", "proof_pending", "address_pending", "video_pending", "identity_pending", "partner_approve_pending"].includes(subStatus)) {
+    return "awaiting_verification";
+  }
+
+  if (["payin_pending", "pending"].includes(status) || ["card_pending", "card_manual_pending"].includes(subStatus)) {
+    return "awaiting_payment";
+  }
+
+  return "unknown";
 }
 
 async function switchereRequest(path: string, options: { method?: "GET" | "POST"; body?: Record<string, unknown> } = {}) {
@@ -61,14 +112,19 @@ async function existingOrder(child: PurchaseChildInstruction) {
 }
 
 function normalizeOrder(child: PurchaseChildInstruction, data: Record<string, unknown>, reused: boolean): SwitchereOrderResult {
+  const status = asString(data.status) || "created";
+  const subStatus = readSubStatus(data);
   return {
     sequence: child.sequence,
     partnerOrderId: child.partnerOrderId,
-    clientOrderId: typeof data.client_order_id === "string" ? data.client_order_id : undefined,
-    status: typeof data.status === "string" ? data.status : "created",
-    redirect: typeof data.redirect === "string" ? data.redirect : undefined,
+    clientOrderId: asString(data.client_order_id),
+    status,
+    subStatus,
+    lifecycle: classifySwitchereLifecycle(status, subStatus),
+    redirect: asString(data.redirect),
     payinAmount: data.payin_amount == null ? undefined : String(data.payin_amount),
     payoutAmount: data.payout_amount == null ? undefined : String(data.payout_amount),
+    payoutTxid: asString(data.payout_txid),
     reused
   };
 }
@@ -98,6 +154,42 @@ async function ensureSwitchereOrder(plan: PreparedFinitePurchase, child: Purchas
     throw new Error(`Switchere order ${child.sequence} creation failed (${response.status}): ${JSON.stringify(data)}`);
   }
   return normalizeOrder(child, data as Record<string, unknown>, false);
+}
+
+function batchStatus(orders: SwitchereOrderResult[]): FinitePurchaseReconciliationResult["batchStatus"] {
+  if (orders.some((order) => order.lifecycle === "terminal_failure")) return "partial_failure";
+  if (orders.length > 0 && orders.every((order) => order.lifecycle === "finished")) return "finished";
+  if (orders.some((order) => ["awaiting_auth", "awaiting_payment", "awaiting_verification", "not_created"].includes(order.lifecycle))) return "awaiting_action";
+  return "processing";
+}
+
+export async function reconcileFinitePurchasePlan(plan: PreparedFinitePurchase): Promise<FinitePurchaseReconciliationResult> {
+  if (!process.env.SWITCHERE_PARTNER_API_KEY || !process.env.SWITCHERE_PARTNER_API_SECRET) {
+    throw new Error("Switchere partner credentials are required for purchase reconciliation.");
+  }
+
+  const orders: SwitchereOrderResult[] = [];
+  for (const child of plan.children) {
+    const existing = await existingOrder(child);
+    orders.push(existing
+      ? normalizeOrder(child, existing, true)
+      : {
+          sequence: child.sequence,
+          partnerOrderId: child.partnerOrderId,
+          status: "not_created",
+          lifecycle: "not_created",
+          reused: false
+        });
+  }
+
+  return {
+    planId: plan.planId,
+    batchStatus: batchStatus(orders),
+    executionCount: plan.executionCount,
+    orders,
+    provider: "switchere",
+    destination: "BTCC_BTC_DEPOSIT"
+  };
 }
 
 export async function executeFinitePurchasePlan(plan: PreparedFinitePurchase): Promise<FinitePurchaseExecutionResult> {
