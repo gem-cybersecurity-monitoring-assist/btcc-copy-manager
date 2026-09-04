@@ -1,4 +1,4 @@
-import { verifyFinitePurchaseToken, verifyPurchaseControlSecret } from "@/lib/finite-purchase";
+import { verifyFinitePurchaseTokenForReconciliation, verifyPurchaseControlSecret } from "@/lib/finite-purchase";
 import { reconcileFinitePurchasePlan } from "@/lib/switchere-purchase";
 
 export async function POST(request: Request) {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json() as { confirmationToken?: string };
-    const plan = verifyFinitePurchaseToken(String(body.confirmationToken || ""));
+    const plan = verifyFinitePurchaseTokenForReconciliation(String(body.confirmationToken || ""));
     const result = await reconcileFinitePurchasePlan(plan);
     return Response.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
