@@ -212,6 +212,22 @@ export default function CopyTradingPage() {
           </tr>)}</tbody>
         </table></div>
         <p className="footnote">*Illustrative values only. The score is a simple screening heuristic, not a forecast. Real evaluation must include verified history, fees, funding, profit share, slippage, leverage, data freshness, and drawdown across different market conditions.</p>
+        <div className="manual-entry-card">
+          <p className="eyebrow">ADD A REAL PROFILE FROM YOUR EXCHANGE</p><h3>Record a trader for comparison</h3>
+          <p className="muted">Open the trader profile on BTCC or Bitget, then transcribe the displayed figures here. This does not connect to the exchange or start copying.</p>
+          <form className="manual-entry-form" onSubmit={addManualTrader}>
+            <label>Trader name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name or profile ID" /></label>
+            <label>Exchange<select value={form.venue} onChange={(e) => setForm({ ...form, venue: e.target.value })}><option>BTCC</option><option>Bitget</option><option>MT5</option><option>Other</option></select></label>
+            <label>History period<select value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}><option>30 days</option><option>90 days</option><option>180 days</option><option>365 days</option><option>Unknown</option></select></label>
+            <label>ROI (%)<input required type="number" step="any" value={form.roi} onChange={(e) => setForm({ ...form, roi: e.target.value })} placeholder="e.g. 8.5" /></label>
+            <label>Max drawdown (%)<input required type="number" min="0" max="100" step="any" value={form.drawdown} onChange={(e) => setForm({ ...form, drawdown: e.target.value })} placeholder="e.g. 12" /></label>
+            <label>Win rate (%)<input required type="number" min="0" max="100" step="any" value={form.winRate} onChange={(e) => setForm({ ...form, winRate: e.target.value })} placeholder="e.g. 55" /></label>
+            <label>Trade count<input required type="number" min="0" step="1" value={form.trades} onChange={(e) => setForm({ ...form, trades: e.target.value })} placeholder="e.g. 120" /></label>
+            <label>Leverage profile<select value={form.leverage} onChange={(e) => setForm({ ...form, leverage: e.target.value })}><option>Unknown</option><option>Low</option><option>Low–moderate</option><option>Moderate</option><option>High</option></select></label>
+            <button type="submit" className="primary-btn">Save trader profile</button>
+          </form>
+          {formMessage && <p className="form-message" role="status">{formMessage}</p>}
+        </div>
       </section>
 
       <section className="section-block planner">
