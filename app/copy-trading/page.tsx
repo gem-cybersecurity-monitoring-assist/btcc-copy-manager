@@ -4,6 +4,8 @@ import "./styles.css";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+type Snapshot = { id: string; venue: string; capturedAt: string; equity: number; available: number; unrealizedPnl: number; note: string; source: string };
+
 type Trader = {
   name: string;
   venue: string;
@@ -50,14 +52,19 @@ export default function CopyTradingPage() {
   const [form, setForm] = useState({ name: "", venue: "BTCC", period: "90 days", roi: "", drawdown: "", winRate: "", trades: "", leverage: "Unknown" });
   const [formMessage, setFormMessage] = useState("");
   const [backupMessage, setBackupMessage] = useState("");
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [snapshotForm, setSnapshotForm] = useState({ venue: "BTCC", capturedAt: new Date().toISOString().slice(0, 16), equity: "", available: "", unrealizedPnl: "0", note: "" });
+  const [snapshotMessage, setSnapshotMessage] = useState("");
   const backupInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       const storedTraders = localStorage.getItem("gem-copy-center-traders-v1");
       const storedSaved = localStorage.getItem("gem-copy-center-saved-v1");
+      const storedSnapshots = localStorage.getItem("gem-copy-center-snapshots-v1");
       if (storedTraders) setManualTraders(JSON.parse(storedTraders) as Trader[]);
       if (storedSaved) setSaved(JSON.parse(storedSaved) as string[]);
+      if (storedSnapshots) setSnapshots(JSON.parse(storedSnapshots) as Snapshot[]);
     } catch { /* Ignore invalid local browser data and keep the dashboard usable. */ }
   }, []);
 
@@ -70,7 +77,7 @@ export default function CopyTradingPage() {
   }
 
   function exportBackup() {
-    const payload = { schema: "gem-copy-center-backup-v1", exportedAt: new Date().toISOString(), traders: manualTraders, savedReviews: saved };
+    const payload = { schema: "gem-copy-center-backup-v2", exportedAt: new Date().toISOString(), traders: manualTraders, savedReviews: saved, portfolioSnapshots: snapshots };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -85,24 +92,60 @@ export default function CopyTradingPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const parsed = JSON.parse(await file.text()) as { schema?: string; traders?: Trader[]; savedReviews?: string[] };
-      if (parsed.schema !== "gem-copy-center-backup-v1" || !Array.isArray(parsed.traders) || !Array.isArray(parsed.savedReviews)) {
+      const parsed = JSON.parse(await file.text()) as { schema?: string; traders?: Trader[]; savedReviews?: string[]; portfolioSnapshots?: Snapshot[] };
+      if (!["gem-copy-center-backup-v1", "gem-copy-center-backup-v2"].includes(parsed.schema || "") || !Array.isArray(parsed.traders) || !Array.isArray(parsed.savedReviews)) {
         throw new Error("This file is not a supported GEM Copy Center backup.");
       }
       const valid = parsed.traders.every((t) => t && typeof t.name === "string" && t.name.trim() && typeof t.venue === "string" && typeof t.period === "string" && Number.isFinite(t.roi) && Number.isFinite(t.drawdown) && t.drawdown >= 0 && t.drawdown <= 100 && Number.isFinite(t.winRate) && t.winRate >= 0 && t.winRate <= 100 && Number.isInteger(t.trades) && t.trades >= 0 && typeof t.leverage === "string" && typeof t.history === "string");
       if (!valid || !parsed.savedReviews.every((name) => typeof name === "string")) {
         throw new Error("Backup validation failed. Your current records were not changed.");
       }
+      const restoredSnapshots = parsed.portfolioSnapshots ?? [];
+      const validSnapshots = restoredSnapshots.every((s) => s && typeof s.id === "string" && typeof s.venue === "string" && typeof s.capturedAt === "string" && Number.isFinite(s.equity) && s.equity >= 0 && Number.isFinite(s.available) && s.available >= 0 && Number.isFinite(s.unrealizedPnl) && typeof s.note === "string" && typeof s.source === "string");
+      if (!validSnapshots) throw new Error("Portfolio snapshot validation failed. Your current records were not changed.");
       setManualTraders(parsed.traders);
       setSaved(parsed.savedReviews);
+      setSnapshots(restoredSnapshots);
       localStorage.setItem("gem-copy-center-traders-v1", JSON.stringify(parsed.traders));
       localStorage.setItem("gem-copy-center-saved-v1", JSON.stringify(parsed.savedReviews));
-      setBackupMessage(`Restored ${parsed.traders.length} trader records and ${parsed.savedReviews.length} review bookmarks in this browser.`);
+      localStorage.setItem("gem-copy-center-snapshots-v1", JSON.stringify(restoredSnapshots));
+      setBackupMessage(`Restored ${parsed.traders.length} trader records, ${parsed.savedReviews.length} review bookmarks, and ${restoredSnapshots.length} portfolio snapshots.`);
     } catch (error) {
       setBackupMessage(error instanceof Error ? error.message : "Import failed. Your current records were not changed.");
     } finally {
       event.target.value = "";
     }
+  }
+
+  function addSnapshot(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const equity = Number(snapshotForm.equity);
+    const available = Number(snapshotForm.available);
+    const unrealizedPnl = Number(snapshotForm.unrealizedPnl);
+    if (!snapshotForm.capturedAt || ![equity, available, unrealizedPnl].every(Number.isFinite) || equity < 0 || available < 0 || available > equity) {
+      setSnapshotMessage("Check the values: equity and available balance must be non-negative, and available balance cannot exceed equity.");
+      return;
+    }
+    const snapshot: Snapshot = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, venue: snapshotForm.venue, capturedAt: new Date(snapshotForm.capturedAt).toISOString(), equity, available, unrealizedPnl, note: snapshotForm.note.trim(), source: "User-entered; not independently verified" };
+    const next = [snapshot, ...snapshots].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+    setSnapshots(next);
+    try { localStorage.setItem("gem-copy-center-snapshots-v1", JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
+    setSnapshotForm({ venue: "BTCC", capturedAt: new Date().toISOString().slice(0, 16), equity: "", available: "", unrealizedPnl: "0", note: "" });
+    setSnapshotMessage("Portfolio snapshot saved in this browser. This is not live-synced exchange data.");
+  }
+
+  function exportSnapshotCsv() {
+    const headers = ["exchange", "captured_at", "equity_usdt", "available_usdt", "unrealized_pnl_usdt", "note", "source"];
+    const rows = snapshots.map((s) => [s.venue, s.capturedAt, s.equity, s.available, s.unrealizedPnl, s.note, s.source]);
+    const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\\r\\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gem-copy-center-portfolio-snapshots.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setSnapshotMessage(`Exported ${snapshots.length} portfolio snapshots to CSV.`);
   }
 
   function exportTraderCsv() {
@@ -230,6 +273,25 @@ export default function CopyTradingPage() {
         </div>
       </section>
 
+      <section className="section-block portfolio-ledger">
+        <div className="section-heading"><div><p className="eyebrow">03 / PORTFOLIO TRACKING</p><h2>Portfolio snapshot ledger</h2></div><span className="demo-label">{snapshots.length} saved snapshots</span></div>
+        <p className="muted ledger-intro">Record the balances you see after signing in to each exchange. These are timestamped manual observations, not a live account connection or tax statement.</p>
+        <form className="snapshot-form" onSubmit={addSnapshot}>
+          <label>Exchange<select value={snapshotForm.venue} onChange={(e) => setSnapshotForm({ ...snapshotForm, venue: e.target.value })}><option>BTCC</option><option>Bitget</option><option>MT5</option><option>MetaMask</option><option>Phantom</option><option>Other</option></select></label>
+          <label>Observed at<input required type="datetime-local" value={snapshotForm.capturedAt} onChange={(e) => setSnapshotForm({ ...snapshotForm, capturedAt: e.target.value })} /></label>
+          <label>Account equity (USDT equivalent)<input required type="number" min="0" step="any" value={snapshotForm.equity} onChange={(e) => setSnapshotForm({ ...snapshotForm, equity: e.target.value })} placeholder="e.g. 250" /></label>
+          <label>Available balance (USDT equivalent)<input required type="number" min="0" step="any" value={snapshotForm.available} onChange={(e) => setSnapshotForm({ ...snapshotForm, available: e.target.value })} placeholder="e.g. 180" /></label>
+          <label>Unrealized P&amp;L (USDT equivalent)<input required type="number" step="any" value={snapshotForm.unrealizedPnl} onChange={(e) => setSnapshotForm({ ...snapshotForm, unrealizedPnl: e.target.value })} /></label>
+          <label>Note (optional)<input value={snapshotForm.note} onChange={(e) => setSnapshotForm({ ...snapshotForm, note: e.target.value })} placeholder="Account type or context" /></label>
+          <button type="submit" className="primary-btn">Save snapshot</button>
+        </form>
+        {snapshotMessage && <p className="form-message" role="status">{snapshotMessage}</p>}
+        <div className="ledger-toolbar"><span className="footnote">Manual entries only · values in USDT-equivalent terms</span><button className="review-btn" onClick={exportSnapshotCsv} type="button">Export snapshot CSV</button></div>
+        <div className="table-wrap"><table><thead><tr><th>Observed at</th><th>Exchange</th><th>Equity</th><th>Available</th><th>Unrealized P&amp;L</th><th>Note / source</th></tr></thead>
+          <tbody>{snapshots.map((s) => <tr key={s.id}><td>{new Date(s.capturedAt).toLocaleString()}</td><td>{s.venue}</td><td>{s.equity.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td>{s.available.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td className={s.unrealizedPnl >= 0 ? "positive" : "negative"}>{s.unrealizedPnl.toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td><strong>{s.note || "—"}</strong><span className="cell-sub">{s.source}</span></td></tr>)}</tbody>
+        </table></div>
+      </section>
+
       <section className="section-block planner">
         <div><p className="eyebrow">03 / ALLOCATION PLANNER</p><h2>Set a planning limit</h2><p className="muted">Use this calculator to think through a cap before configuring the exchange. It does not move funds or change exchange settings.</p></div>
         <div className="planner-card">
@@ -252,7 +314,7 @@ export default function CopyTradingPage() {
         </ul>
       </section>
 
-      <footer className="footer"><span>GEM Copy Center · Working preview</span><span>Browser-local records · No live account data · No trade execution</span></footer>
+      <footer className="footer"><span>GEM Copy Center · Working preview</span><span>Browser-local records · Manual account snapshots · No trade execution</span></footer>
     </main>
   );
 }
