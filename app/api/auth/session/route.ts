@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRefreshedSession, cloudConfigured, getCloudSession, safeErrorMessage } from "@/lib/cloud-auth";
+import { applyRefreshedSession, cloudConfigured, getCloudSession, safeErrorMessage } from "../../../../lib/cloud-auth";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   if (!cloudConfigured()) return NextResponse.json({ configured: false, authenticated: false, error: "Cloud sync is not configured yet." });
