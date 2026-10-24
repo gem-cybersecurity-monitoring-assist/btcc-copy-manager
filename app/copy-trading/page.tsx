@@ -1,5 +1,7 @@
 "use client";
 
+import "./styles.css";
+
 import { useMemo, useState } from "react";
 
 type Trader = {
