@@ -1,49 +1,89 @@
+// Next.js adapter for lib/cloud-core.ts: reads cookies/headers, applies request guards,
+// and writes results (including HttpOnly session cookies) to NextResponse.
 import { NextRequest, NextResponse } from "next/server";
-export type CloudUser = { id: string; email?: string };
-export type SupabaseTokens = { access_token: string; refresh_token: string; expires_in?: number; user?: CloudUser };
-export type CloudSession = { user: CloudUser; accessToken: string; refreshed?: SupabaseTokens };
-function config() {
-  const url = process.env.SUPABASE_URL?.replace(/\/$/, "");
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Cloud sync is not configured. Set SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.");
-  return { url, key };
+import {
+  ACCESS_COOKIE,
+  CloudService,
+  REFRESH_COOKIE,
+  createRateLimiter,
+  isJsonContentType,
+  isSameOriginRequest,
+  readCloudConfig,
+  type Result,
+  type SessionCookies,
+} from "./cloud-core.ts";
+
+const NO_STORE = { "Cache-Control": "no-store" };
+
+export function cloudService(): CloudService | null {
+  const config = readCloudConfig(process.env);
+  return config ? new CloudService(config) : null;
 }
-export function cloudConfigured() { return Boolean(process.env.SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY); }
-export function setSessionCookies(response: NextResponse, tokens: SupabaseTokens) {
+
+export function notConfigured() {
+  return NextResponse.json(
+    { configured: false, authenticated: false, error: "Cloud sync is not configured yet. Set SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (see CLOUD_SETUP.md).", code: "not_configured" },
+    { status: 503, headers: NO_STORE },
+  );
+}
+
+export function sessionCookiesFrom(request: NextRequest): SessionCookies {
+  return { access: request.cookies.get(ACCESS_COOKIE)?.value, refresh: request.cookies.get(REFRESH_COOKIE)?.value };
+}
+
+export function toResponse(result: Result, extraHeaders: Record<string, string> = {}) {
+  const response = NextResponse.json(result.body, { status: result.status, headers: { ...NO_STORE, ...extraHeaders } });
   const secure = process.env.NODE_ENV === "production";
-  const maxAge = Math.max(60, Math.min(tokens.expires_in ?? 3600, 86400));
-  response.cookies.set("gem_cc_access", tokens.access_token, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge });
-  response.cookies.set("gem_cc_refresh", tokens.refresh_token, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 2592000 });
-}
-export function clearSessionCookies(response: NextResponse) {
-  for (const name of ["gem_cc_access", "gem_cc_refresh"]) response.cookies.set(name, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
-}
-export async function authRequest(path: string, init: RequestInit = {}) {
-  const { url, key } = config();
-  const response = await fetch(url + path, { ...init, cache: "no-store", headers: { apikey: key, "Content-Type": "application/json", ...(init.headers ?? {}) } });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = typeof data?.msg === "string" ? data.msg : typeof data?.message === "string" ? data.message : typeof data?.error_description === "string" ? data.error_description : typeof data?.error === "string" ? data.error : "Authentication request failed.";
-    throw Object.assign(new Error(message), { status: response.status });
+  for (const cookie of result.cookies ?? []) {
+    response.cookies.set(cookie.name, cookie.value, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: cookie.maxAge });
   }
-  return data;
+  return response;
 }
-export async function getCloudSession(request: NextRequest): Promise<CloudSession | null> {
-  const accessToken = request.cookies.get("gem_cc_access")?.value;
-  const refreshToken = request.cookies.get("gem_cc_refresh")?.value;
-  if (!accessToken && !refreshToken) return null;
-  if (accessToken) {
-    try {
-      const user = await authRequest("/auth/v1/user", { headers: { Authorization: "Bearer " + accessToken } });
-      if (user?.id) return { user: { id: user.id, email: user.email }, accessToken };
-    } catch { /* Refresh below when possible. */ }
+
+const limiters = {
+  auth: createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 }),
+  email: createRateLimiter({ limit: 3, windowMs: 15 * 60 * 1000 }),
+  workspace: createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 }),
+};
+
+function clientKey(request: NextRequest) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
+}
+
+/**
+ * Guards for state-changing requests: same-origin only, JSON body required (blocks HTML-form CSRF),
+ * and a per-client rate limit. Returns a response when the request must be rejected.
+ */
+export function guardMutation(request: NextRequest, bucket: keyof typeof limiters, options: { requireJson?: boolean } = {}) {
+  const allowedHosts = [request.nextUrl.host, request.headers.get("host"), request.headers.get("x-forwarded-host")];
+  if (!isSameOriginRequest({ origin: request.headers.get("origin"), secFetchSite: request.headers.get("sec-fetch-site") }, allowedHosts)) {
+    return toResponse({ status: 403, body: { error: "Cross-site requests are not allowed.", code: "cross_site" } });
   }
-  if (!refreshToken) return null;
+  if (options.requireJson !== false && !isJsonContentType(request.headers.get("content-type"))) {
+    return toResponse({ status: 415, body: { error: "Requests must use Content-Type: application/json.", code: "unsupported_media_type" } });
+  }
+  const limit = limiters[bucket].check(bucket + ":" + clientKey(request));
+  if (!limit.allowed) {
+    return toResponse({ status: 429, body: { error: "Too many requests. Wait a few minutes and try again.", code: "rate_limited" } }, { "Retry-After": String(limit.retryAfterSeconds) });
+  }
+  return null;
+}
+
+const MAX_AUTH_BODY = 16_384;
+
+/** Parses a small JSON body (auth routes). Oversized or malformed bodies yield null and fail validation. */
+export async function readJson(request: NextRequest): Promise<unknown> {
   try {
-    const tokens = await authRequest("/auth/v1/token?grant_type=refresh_token", { method: "POST", body: JSON.stringify({ refresh_token: refreshToken }) }) as SupabaseTokens;
-    if (!tokens.access_token || !tokens.refresh_token || !tokens.user?.id) return null;
-    return { user: tokens.user, accessToken: tokens.access_token, refreshed: tokens };
-  } catch { return null; }
+    const text = await request.text();
+    if (text.length > MAX_AUTH_BODY) return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
-export function applyRefreshedSession(response: NextResponse, session: CloudSession | null) { if (session?.refreshed) setSessionCookies(response, session.refreshed); }
-export function safeErrorMessage(error: unknown) { return error instanceof Error ? error.message : "Unexpected server error."; }
+
+/** Where Supabase confirmation links should send the user. Must be in the Supabase redirect allow-list. */
+export function confirmationRedirect(request: NextRequest) {
+  const configured = process.env.COPY_CENTER_SITE_URL?.trim().replace(/\/+$/, "");
+  return (configured || request.nextUrl.origin) + "/copy-trading";
+}

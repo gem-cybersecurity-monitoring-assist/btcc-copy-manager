@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { applyRefreshedSession, cloudConfigured, getCloudSession, safeErrorMessage } from "../../../../lib/cloud-auth";
+import { cloudService, sessionCookiesFrom, toResponse } from "../../../../lib/cloud-auth.ts";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
-  if (!cloudConfigured()) return NextResponse.json({ configured: false, authenticated: false, error: "Cloud sync is not configured yet." });
-  try {
-    const session = await getCloudSession(request);
-    const response = NextResponse.json({ configured: true, authenticated: Boolean(session), user: session?.user ?? null });
-    applyRefreshedSession(response, session);
-    return response;
-  } catch (error) { return NextResponse.json({ configured: true, authenticated: false, error: safeErrorMessage(error) }); }
+  const service = cloudService();
+  // 200 so the dashboard can render a "setup required" state instead of an error.
+  if (!service) return NextResponse.json({ configured: false, authenticated: false, user: null }, { headers: { "Cache-Control": "no-store" } });
+  return toResponse(await service.sessionStatus(sessionCookiesFrom(request)));
 }
