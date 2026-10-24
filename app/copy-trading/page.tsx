@@ -2,7 +2,7 @@
 
 import "./styles.css";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Trader = {
   name: string;
@@ -49,6 +49,8 @@ export default function CopyTradingPage() {
   const [showDemo, setShowDemo] = useState(true);
   const [form, setForm] = useState({ name: "", venue: "BTCC", period: "90 days", roi: "", drawdown: "", winRate: "", trades: "", leverage: "Unknown" });
   const [formMessage, setFormMessage] = useState("");
+  const [backupMessage, setBackupMessage] = useState("");
+  const backupInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -65,6 +67,56 @@ export default function CopyTradingPage() {
       try { localStorage.setItem("gem-copy-center-saved-v1", JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
       return next;
     });
+  }
+
+  function exportBackup() {
+    const payload = { schema: "gem-copy-center-backup-v1", exportedAt: new Date().toISOString(), traders: manualTraders, savedReviews: saved };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gem-copy-center-backup.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupMessage("Backup exported. Keep the file somewhere private; it contains your saved review notes.");
+  }
+
+  async function importBackup(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as { schema?: string; traders?: Trader[]; savedReviews?: string[] };
+      if (parsed.schema !== "gem-copy-center-backup-v1" || !Array.isArray(parsed.traders) || !Array.isArray(parsed.savedReviews)) {
+        throw new Error("This file is not a supported GEM Copy Center backup.");
+      }
+      const valid = parsed.traders.every((t) => t && typeof t.name === "string" && t.name.trim() && typeof t.venue === "string" && typeof t.period === "string" && Number.isFinite(t.roi) && Number.isFinite(t.drawdown) && t.drawdown >= 0 && t.drawdown <= 100 && Number.isFinite(t.winRate) && t.winRate >= 0 && t.winRate <= 100 && Number.isInteger(t.trades) && t.trades >= 0 && typeof t.leverage === "string" && typeof t.history === "string");
+      if (!valid || !parsed.savedReviews.every((name) => typeof name === "string")) {
+        throw new Error("Backup validation failed. Your current records were not changed.");
+      }
+      setManualTraders(parsed.traders);
+      setSaved(parsed.savedReviews);
+      localStorage.setItem("gem-copy-center-traders-v1", JSON.stringify(parsed.traders));
+      localStorage.setItem("gem-copy-center-saved-v1", JSON.stringify(parsed.savedReviews));
+      setBackupMessage(`Restored ${parsed.traders.length} trader records and ${parsed.savedReviews.length} review bookmarks in this browser.`);
+    } catch (error) {
+      setBackupMessage(error instanceof Error ? error.message : "Import failed. Your current records were not changed.");
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function exportTraderCsv() {
+    const headers = ["name", "venue", "period", "roi_percent", "max_drawdown_percent", "win_rate_percent", "trade_count", "leverage", "source"];
+    const rows = manualTraders.map((t) => [t.name, t.venue, t.period, t.roi, t.drawdown, t.winRate, t.trades, t.leverage, t.history]);
+    const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\\r\\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "gem-copy-center-traders.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupMessage(`Exported ${manualTraders.length} user-entered trader records to CSV.`);
   }
 
   function addManualTrader(event: React.FormEvent<HTMLFormElement>) {
@@ -136,6 +188,16 @@ export default function CopyTradingPage() {
         <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>
         {showDemo && <div className="demo-warning"><strong>Demo only.</strong> These trader names and statistics are examples to demonstrate the comparison UI. They are not live exchange results and must not be used to choose a real trader. <button onClick={() => setShowDemo(false)} aria-label="Dismiss demo notice">Dismiss</button></div>}
         <div className="demo-toggle-row"><button className="review-btn" onClick={() => setShowDemo((v) => !v)}>{showDemo ? "Hide demo rows" : "Show demo rows"}</button><span className="footnote">Manually entered trader stats are stored only in this browser.</span></div>
+        <div className="data-tools">
+          <div><strong>Move your records between devices</strong><span>Local browser storage only · No cloud account yet</span></div>
+          <div className="data-tool-actions">
+            <button className="review-btn" onClick={exportBackup}>Export backup</button>
+            <button className="review-btn" onClick={() => backupInput.current?.click()}>Import backup</button>
+            <button className="review-btn" onClick={exportTraderCsv}>Export CSV</button>
+            <input ref={backupInput} type="file" accept="application/json,.json" aria-label="Import GEM Copy Center backup" onChange={importBackup} hidden />
+          </div>
+          {backupMessage && <p className="form-message" role="status">{backupMessage}</p>}
+        </div>
         <div className="filters">
           <input aria-label="Search traders" placeholder="Search trader name…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <select aria-label="Filter exchange" value={venue} onChange={(e) => setVenue(e.target.value)}><option>All</option><option>BTCC</option><option>Bitget</option></select>
