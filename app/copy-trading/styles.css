@@ -239,3 +239,25 @@
 .copy-shell .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 @media(max-width:1000px) { .copy-shell .start-steps { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:600px) { .copy-shell .start-steps { grid-template-columns:1fr; } .copy-shell .start-guide-head { flex-direction:column; } }
+
+/* ---- Agent ---- */
+.copy-shell .agent-chat { background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; min-height:220px; max-height:520px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+.copy-shell .agent-empty p { margin:0 0 8px; color:var(--muted); font-size:13px; }
+.copy-shell .agent-examples { display:flex; flex-wrap:wrap; gap:8px; }
+.copy-shell .agent-examples button { border:1px solid var(--line); cursor:pointer; font-size:12px; padding:8px 12px; }
+.copy-shell .agent-msg { max-width:85%; font-size:13px; line-height:1.5; }
+.copy-shell .agent-msg p { margin:0 0 6px; white-space:pre-wrap; }
+.copy-shell .agent-msg.user { align-self:flex-end; background:var(--accent); color:#fff; border-radius:14px 14px 4px 14px; padding:9px 12px; }
+.copy-shell .agent-msg.user p { margin:0; }
+.copy-shell .agent-msg.assistant { align-self:flex-start; }
+.copy-shell .agent-text { background:var(--paper); border-radius:14px 14px 14px 4px; padding:9px 12px; }
+.copy-shell .agent-text p:last-child { margin-bottom:0; }
+.copy-shell .agent-tool { font-size:11px; color:var(--muted); margin:2px 0 !important; }
+.copy-shell .agent-approval { border:2px solid #d99b32; background:#fff8e9; border-radius:12px; padding:12px; font-size:13px; }
+.copy-shell .agent-approval ul { margin:6px 0 10px; padding-left:18px; }
+.copy-shell .agent-thinking { color:var(--muted); font-size:12px; margin:0; }
+.copy-shell .agent-input textarea { width:100%; border:1px solid #dce2eb; border-radius:10px; padding:10px 12px; font:inherit; font-size:13px; resize:vertical; }
+.copy-shell .agent-input .engine-actions { margin-top:8px; }
+.copy-shell .agent-input button { border:0; cursor:pointer; }
+.copy-shell .agent-input .secondary-btn { border:1px solid var(--line); }
+@media(max-width:600px) { .copy-shell .agent-msg { max-width:100%; } }

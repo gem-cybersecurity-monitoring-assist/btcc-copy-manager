@@ -12,9 +12,11 @@ import type { DataSource, EngineState, ProviderAccount, ProviderDefinition, Prov
 import type { Trader } from "../../../lib/workspace.ts";
 import { AllocationTab, IntelligenceTab, RiskTab } from "./AnalysisTabs.tsx";
 import { LabTab, MonitoringTab, WalletsTab } from "./OpsTabs.tsx";
+import { AgentTab } from "./AgentTab.tsx";
 import { Notice, num, pct, Pill, usd, when, type EngineChange } from "./ui.tsx";
 
 const TABS = [
+  ["agent", "★ Agent"],
   ["providers", "A · Providers"],
   ["opportunities", "B · Opportunities"],
   ["intelligence", "C · Strategy intelligence"],
@@ -67,6 +69,7 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
         {TABS.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} aria-controls={`engine-panel-${id}`} id={`engine-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => (id === "allocation" ? go("allocation") : setTab(id))}>{label}{id === "risk" && openAlerts > 0 ? <span className="tab-badge">{openAlerts}</span> : null}</button>)}
       </div>
       <div role="tabpanel" id={`engine-panel-${tab}`} aria-labelledby={`engine-tab-${tab}`} className="engine-panel">
+        {tab === "agent" && <AgentTab engine={engine} onChange={onChange} />}
         {tab === "providers" && <ProvidersTab engine={engine} onChange={onChange} now={now} evaluations={evaluations} />}
         {tab === "opportunities" && <OpportunitiesTab engine={engine} onChange={onChange} evaluations={evaluations} manualTraders={manualTraders} now={now} />}
         {tab === "intelligence" && <IntelligenceTab engine={engine} onChange={onChange} evaluations={evaluations} />}
@@ -115,7 +118,7 @@ function StartGuide({ engine, onChange, go, showSimulatedPlan }: { engine: Engin
   ];
   return (
     <div className="start-guide" aria-label="Start here guide">
-      <div className="start-guide-head"><div><p className="eyebrow">START HERE</p><h3>Four steps to use GEM Copy Center</h3><p className="muted">No account needed: everything saves in this browser. GEM never moves money; you copy traders on the exchange itself.</p></div>
+      <div className="start-guide-head"><div><p className="eyebrow">START HERE</p><h3>Four steps to use GEM Copy Center</h3><p className="muted">No account needed: everything saves in this browser. GEM never moves money; you copy traders on the exchange itself. Prefer to just ask? <button type="button" className="link-btn" onClick={() => go("agent")}>Open the ★ Agent</button> and describe what you want.</p></div>
         <button type="button" className="link-btn" onClick={() => setHiddenPersist(true)}>Hide guide</button></div>
       <ol className="start-steps">{steps.map((s, i) => <li key={s.title} className={s.done ? "done" : ""}><span className="step-num" aria-hidden="true">{s.done ? "✓" : i + 1}</span><div><strong>{s.title}</strong>{s.done && <span className="sr-only"> (done)</span>}<p>{s.text}</p><div className="engine-actions">{s.action}</div></div></li>)}</ol>
     </div>

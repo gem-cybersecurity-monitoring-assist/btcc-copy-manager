@@ -44,6 +44,7 @@ const limiters = {
   auth: createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 }),
   email: createRateLimiter({ limit: 3, windowMs: 15 * 60 * 1000 }),
   workspace: createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 }),
+  agent: createRateLimiter({ limit: 40, windowMs: 10 * 60 * 1000 }),
 };
 
 function clientKey(request: NextRequest) {

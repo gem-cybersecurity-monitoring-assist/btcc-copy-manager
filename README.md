@@ -6,6 +6,7 @@ A copy-trading **planning, intelligence, and record-keeping** dashboard. It help
 
 - Production: https://btcc-copy-manager.vercel.app/copy-trading (`/` redirects there)
 - Cloud setup, Supabase and email configuration: [CLOUD_SETUP.md](CLOUD_SETUP.md)
+- In-app agent (★ Agent tab) setup: [AGENT_SETUP.md](AGENT_SETUP.md)
 - Product scope: [docs/COPY_TRADING_CONTROL_CENTER_SCOPE.md](docs/COPY_TRADING_CONTROL_CENTER_SCOPE.md)
 
 ## Features
@@ -14,6 +15,7 @@ A copy-trading **planning, intelligence, and record-keeping** dashboard. It help
 | --- | --- |
 | Exchange access | External links to BTCC, Bitget and MT5 with instructions for each venue's native copy-trading flow. |
 | Intelligence engine | Provider registry with capability/status tracking, strategy research records and CSV history import, transparent scoring, correlation clusters, small-capital allocation planner, risk center with alerts, monitoring reviews with audit trail, walk-forward backtests and paper portfolios, optional read-only wallet connections. All provider actions remain on the provider. |
+| ★ Agent | Chat assistant (Claude) that can run the dashboard's jobs for you: review the workspace, explain risk, propose plans, run backtests, and draft changes (add a trader, change plan or risk limits, record a provider update, run a review). Every change is shown first and saved only when you click Approve; approved changes go to the audit trail. Requires `ANTHROPIC_API_KEY` and a signed-in cloud account. It cannot move money or touch exchange accounts. |
 | Trader comparison | Demo rows (clearly labelled, hideable) plus your own records. Create, edit, delete (with confirmation), search, filter by venue, and a transparent screening score. |
 | Review bookmarks | "Save review" toggle per trader. |
 | Portfolio ledger | Timestamped manual snapshots (equity, available, unrealized P&L). Validation: non-negative values, available ≤ equity, no future timestamps. Delete with confirmation. |
@@ -45,6 +47,7 @@ Configure in Vercel → Project → Settings → Environment Variables (Producti
 | --- | --- | --- |
 | `SUPABASE_URL` | for cloud | Supabase project URL (`https://<ref>.supabase.co`). |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | for cloud | Supabase anon/publishable key. Public by design; access is enforced by row-level security. Only read on the server. |
+| `ANTHROPIC_API_KEY` | for ★ Agent | Server-only key for the in-app agent (see AGENT_SETUP.md). Without it the Agent tab shows a "not switched on" notice and everything else works. |
 | `COPY_CENTER_SITE_URL` | optional | Base URL for confirmation-email links (default: the request's own origin). Set to `https://btcc-copy-manager.vercel.app` so preview deployments don't generate preview links. |
 
 **Never** set a Supabase service-role key for this app. Other variables in `.env.example` belong to the legacy code (see below) and are not used by the Copy Center.
@@ -82,6 +85,8 @@ Cloud: one row per user in `public.copy_center_workspaces` (`payload` = `{ trade
 | `POST /api/auth/logout` | Revokes the session at Supabase (best effort) and clears cookies. |
 | `GET /api/workspace` | Signed-in user's workspace (`401` if signed out). |
 | `PUT /api/workspace` | Saves the signed-in user's workspace (validated; owner id taken from the verified session). |
+| `GET /api/agent` | `{ configured, signedIn }` — whether the agent key is set and the caller is signed in. Never reveals the key. |
+| `POST /api/agent` | One agent step for a signed-in user (`401` otherwise, `503` if not configured). Body: the conversation transcript (validated: user/assistant only, no system role, ≤ 400 KB). The server adds the fixed system prompt and tool list; tools run in the browser, writes only after approval. |
 
 All state-changing routes require same-origin requests and `Content-Type: application/json`, and are rate-limited per client (best effort, in-memory per serverless instance; Supabase applies its own limits). Error responses are fixed, safe messages with a `code`; upstream error text, tokens, and passwords are never returned or logged.
 

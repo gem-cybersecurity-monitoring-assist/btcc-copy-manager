@@ -162,6 +162,33 @@ function csvFixture(days) {
   const backup = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
   check("backup includes engine state", backup.engine && backup.engine.strategies.length === 7 && backup.engine.audit.length > 5);
 
+  // ★ Agent · real endpoint without a key shows the setup notice
+  await tab("★ Agent");
+  check("agent says it is not switched on without an API key", await seen("The agent isn’t switched on yet") || await seen("The agent isn't switched on yet"));
+  check("agent input disabled until configured", await engine.locator("#agent-message").isDisabled());
+
+  // ★ Agent · mocked API: a proposed change waits for approval, then is saved and audited
+  let posts = 0;
+  await page.route("**/api/agent", async (route) => {
+    if (route.request().method() === "GET") return route.fulfill({ json: { configured: true, signedIn: true } });
+    posts++;
+    const body = JSON.parse(route.request().postData());
+    if (posts === 1) return route.fulfill({ json: { stop_reason: "tool_use", content: [{ type: "text", text: "I'll set your plan to $40." }, { type: "tool_use", id: "toolu_1", name: "update_plan_settings", input: { total_capital_usd: 40, reserve_pct: null, max_per_provider_usd: null, method: null } }] } });
+    const last = body.messages.at(-1);
+    const approved = Array.isArray(last.content) && last.content[0].type === "tool_result" && JSON.parse(last.content[0].content).approved === true;
+    return route.fulfill({ json: { stop_reason: "end_turn", content: [{ type: "text", text: approved ? "Done: your plan now uses $40." : "OK, nothing changed." }] } });
+  });
+  await page.reload();
+  await tab("★ Agent");
+  await engine.locator("#agent-message").fill("Set my plan to $40");
+  await engine.getByRole("button", { name: "Send" }).click();
+  check("agent change waits for approval", await seen("The agent wants to make this change:") && await seen(/\$40/));
+  await engine.getByRole("button", { name: "Approve" }).click();
+  check("approved change is confirmed by the agent", await seen("Done: your plan now uses $40."));
+  await tab("F · Monitoring & audit");
+  check("approved agent change is in the audit trail", await seen("agent change approved"));
+  await page.unroute("**/api/agent");
+
   // mobile
   const m = await browser.newPage({ viewport: { width: 375, height: 800 } });
   await m.goto(BASE + "/copy-trading#engine");
