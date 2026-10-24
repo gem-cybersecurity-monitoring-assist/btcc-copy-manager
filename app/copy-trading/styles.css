@@ -107,3 +107,21 @@
 .copy-shell .ledger-toolbar button { flex-shrink:0; }
 @media(max-width:760px) { .copy-shell .snapshot-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .copy-shell .snapshot-form button { grid-column:1 / -1; } .copy-shell .ledger-toolbar { align-items:flex-start; flex-direction:column; } }
 @media(max-width:440px) { .copy-shell .snapshot-form { grid-template-columns:1fr; } }
+
+.copy-shell .cloud-account { border:1px solid var(--line); background:#fff; border-radius:16px; padding:22px; margin:22px 0 8px; box-shadow:0 8px 28px #1b2a4608; }
+.copy-shell .cloud-account-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; }
+.copy-shell .cloud-account-heading h2 { font-size:24px; }
+.copy-shell .cloud-account-heading .muted { max-width:760px; font-size:12px; margin:8px 0 0; }
+.copy-shell .cloud-status { flex-shrink:0; border:1px solid #f0dfb8; border-radius:99px; padding:7px 10px; background:#fff8e9; color:#79571b; font-size:11px; font-weight:750; }
+.copy-shell .cloud-status.configured { background:#edf9f2; border-color:#cbe8d6; color:#216644; }
+.copy-shell .cloud-setup-hint { margin-top:16px; padding:13px 15px; border-radius:10px; background:#fff8e9; border:1px solid #f4e4bc; color:#70531b; font-size:12px; }
+.copy-shell .cloud-auth-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:18px; }
+.copy-shell .cloud-auth-form label { display:block; font-size:11px; font-weight:700; }
+.copy-shell .cloud-auth-form input { display:block; margin-top:6px; }
+.copy-shell .cloud-buttons { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; }
+.copy-shell .cloud-buttons button { border:0; cursor:pointer; }
+.copy-shell .cloud-buttons button:disabled { opacity:.55; cursor:wait; }
+.copy-shell .cloud-sync-controls { margin-top:12px; }
+.copy-shell .cloud-sync-controls p { font-size:12px; }
+.copy-shell .cloud-footnote { font-size:11px; color:var(--muted); margin:14px 0 0; }
+@media(max-width:600px) { .copy-shell .cloud-account { padding:16px; } .copy-shell .cloud-account-heading { flex-direction:column; } .copy-shell .cloud-auth-form { grid-template-columns:1fr; } .copy-shell .cloud-buttons { align-items:stretch; } .copy-shell .cloud-buttons button { justify-content:center; } }
