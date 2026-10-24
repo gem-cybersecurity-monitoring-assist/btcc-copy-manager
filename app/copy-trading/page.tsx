@@ -1,6 +1,7 @@
 "use client";
 
 import "./styles.css";
+import CloudAccountPanel from "./CloudAccountPanel";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -192,6 +193,8 @@ export default function CopyTradingPage() {
         <a className="brand" href="/"><span className="brand-mark">G</span><span>GEM <span className="muted">/ Copy Center</span></span></a>
         <span className="mode-pill"><i /> Planning mode · No trades executed</span>
       </header>
+
+      <CloudAccountPanel />
 
       <section className="hero">
         <div className="hero-copy">
