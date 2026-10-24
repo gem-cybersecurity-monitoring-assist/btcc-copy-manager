@@ -2,7 +2,7 @@
 
 import "./styles.css";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Trader = {
   name: string;
@@ -45,12 +45,47 @@ export default function CopyTradingPage() {
   const [capital, setCapital] = useState("100");
   const [riskCap, setRiskCap] = useState("10");
   const [saved, setSaved] = useState<string[]>([]);
+  const [manualTraders, setManualTraders] = useState<Trader[]>([]);
   const [showDemo, setShowDemo] = useState(true);
+  const [form, setForm] = useState({ name: "", venue: "BTCC", period: "90 days", roi: "", drawdown: "", winRate: "", trades: "", leverage: "Unknown" });
+  const [formMessage, setFormMessage] = useState("");
 
-  const traders = useMemo(() => demoTraders
+  useEffect(() => {
+    try {
+      const storedTraders = localStorage.getItem("gem-copy-center-traders-v1");
+      const storedSaved = localStorage.getItem("gem-copy-center-saved-v1");
+      if (storedTraders) setManualTraders(JSON.parse(storedTraders) as Trader[]);
+      if (storedSaved) setSaved(JSON.parse(storedSaved) as string[]);
+    } catch { /* Ignore invalid local browser data and keep the dashboard usable. */ }
+  }, []);
+
+  function toggleSaved(name: string) {
+    setSaved((old) => {
+      const next = old.includes(name) ? old.filter((n) => n !== name) : [...old, name];
+      try { localStorage.setItem("gem-copy-center-saved-v1", JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
+      return next;
+    });
+  }
+
+  function addManualTrader(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const roi = Number(form.roi), drawdown = Number(form.drawdown), winRate = Number(form.winRate), trades = Number(form.trades);
+    if (!form.name.trim() || ![roi, drawdown, winRate, trades].every(Number.isFinite) || drawdown < 0 || drawdown > 100 || winRate < 0 || winRate > 100 || trades < 0 || !Number.isInteger(trades)) {
+      setFormMessage("Check the trader name and numbers. Drawdown and win rate must be 0–100; trade count must be a whole number.");
+      return;
+    }
+    const trader: Trader = { name: form.name.trim(), venue: form.venue, period: form.period, roi, drawdown, winRate, trades, leverage: form.leverage, profitShare: "Check venue terms", history: "User-entered", note: "Manually entered from the exchange UI; not independently verified." };
+    const next = [...manualTraders.filter((t) => !(t.name.toLowerCase() === trader.name.toLowerCase() && t.venue === trader.venue)), trader];
+    setManualTraders(next);
+    try { localStorage.setItem("gem-copy-center-traders-v1", JSON.stringify(next)); } catch { /* Storage may be disabled. */ }
+    setForm({ name: "", venue: "BTCC", period: "90 days", roi: "", drawdown: "", winRate: "", trades: "", leverage: "Unknown" });
+    setFormMessage("Saved in this browser. Values are user-entered and have not been independently verified.");
+  }
+
+  const traders = useMemo(() => [...(showDemo ? demoTraders : []), ...manualTraders]
     .filter((t) => venue === "All" || t.venue === venue)
     .filter((t) => t.name.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => scoreTrader(b) - scoreTrader(a)), [query, venue]);
+    .sort((a, b) => scoreTrader(b) - scoreTrader(a)), [query, venue, manualTraders, showDemo]);
 
   const allocation = Math.max(0, Number(capital) || 0);
   const perTrader = Math.max(0, Number(riskCap) || 0);
@@ -98,9 +133,9 @@ export default function CopyTradingPage() {
       </section>
 
       <section id="traders" className="section-block">
-        <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">Illustrative demo data</span></div>
+        <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>
         {showDemo && <div className="demo-warning"><strong>Demo only.</strong> These trader names and statistics are examples to demonstrate the comparison UI. They are not live exchange results and must not be used to choose a real trader. <button onClick={() => setShowDemo(false)} aria-label="Dismiss demo notice">Dismiss</button></div>}
-        <div className="filters">
+        <div className="demo-toggle-row"><button className="review-btn" onClick={() => setShowDemo((v) => !v)}>{showDemo ? "Hide demo rows" : "Show demo rows"}</button><span className="footnote">Manually entered trader stats are stored only in this browser.</span></div>\n        <div className="filters">
           <input aria-label="Search traders" placeholder="Search trader name…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <select aria-label="Filter exchange" value={venue} onChange={(e) => setVenue(e.target.value)}><option>All</option><option>BTCC</option><option>Bitget</option></select>
         </div>
@@ -110,7 +145,7 @@ export default function CopyTradingPage() {
             <td><strong>{t.name}</strong><span className="cell-sub">{t.venue} · {t.history}</span></td>
             <td>{t.period}</td><td className={t.roi >= 0 ? "positive" : "negative"}>{t.roi.toFixed(1)}%</td><td>{t.drawdown.toFixed(1)}%</td><td>{t.winRate}%</td><td>{t.trades}</td>
             <td><span className="score">{scoreTrader(t)}/100</span><span className="cell-sub">{t.leverage} leverage</span></td>
-            <td><button className={saved.includes(t.name) ? "saved-btn" : "review-btn"} onClick={() => setSaved((old) => old.includes(t.name) ? old.filter((n) => n !== t.name) : [...old, t.name])}>{saved.includes(t.name) ? "Saved ✓" : "Save review"}</button></td>
+            <td><button className={saved.includes(t.name) ? "saved-btn" : "review-btn"} onClick={() => toggleSaved(t.name)}>{saved.includes(t.name) ? "Saved ✓" : "Save review"}</button></td>
           </tr>)}</tbody>
         </table></div>
         <p className="footnote">*Illustrative values only. The score is a simple screening heuristic, not a forecast. Real evaluation must include verified history, fees, funding, profit share, slippage, leverage, data freshness, and drawdown across different market conditions.</p>
@@ -138,7 +173,7 @@ export default function CopyTradingPage() {
         </ul>
       </section>
 
-      <footer className="footer"><span>GEM Copy Center · Initial UI prototype</span><span>Manual links only · No live account data · No trade execution</span></footer>
+      <footer className="footer"><span>GEM Copy Center · Working preview</span><span>Browser-local records · No live account data · No trade execution</span></footer>
     </main>
   );
 }
