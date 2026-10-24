@@ -97,3 +97,13 @@
 .copy-shell .form-message { color:#256c52; background:#eef9f3; border:1px solid #cdebdc; padding:10px 12px; border-radius:8px; font-size:12px; }
 @media(max-width:760px) { .copy-shell .manual-entry-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .copy-shell .manual-entry-form button { grid-column:1 / -1; } .copy-shell .demo-toggle-row { align-items:flex-start; flex-direction:column; } }
 @media(max-width:440px) { .copy-shell .manual-entry-form { grid-template-columns:1fr; } }
+
+.copy-shell .ledger-intro { font-size:12px; max-width:760px; margin:0 0 16px; }
+.copy-shell .snapshot-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:18px; margin:14px 0; }
+.copy-shell .snapshot-form label { font-size:11px; font-weight:700; display:block; }
+.copy-shell .snapshot-form input,.copy-shell .snapshot-form select { display:block; margin-top:6px; }
+.copy-shell .snapshot-form button { border:0; cursor:pointer; justify-content:center; align-self:end; min-height:40px; }
+.copy-shell .ledger-toolbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:12px 0; }
+.copy-shell .ledger-toolbar button { flex-shrink:0; }
+@media(max-width:760px) { .copy-shell .snapshot-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .copy-shell .snapshot-form button { grid-column:1 / -1; } .copy-shell .ledger-toolbar { align-items:flex-start; flex-direction:column; } }
+@media(max-width:440px) { .copy-shell .snapshot-form { grid-template-columns:1fr; } }
