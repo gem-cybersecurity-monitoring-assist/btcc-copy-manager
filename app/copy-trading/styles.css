@@ -70,3 +70,15 @@
 .copy-shell .checklist li p { color:#788497; font-size:11px; margin:3px 0 0; }
 .copy-shell .footer { border-top:1px solid var(--line); margin-top:25px; padding-top:20px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; color:#8b95a4; font-size:10px; }
 @media(max-width:760px) { .copy-shell { padding:0 16px 28px; } .copy-shell .topbar { height:auto; min-height:66px; flex-wrap:wrap; padding:12px 0; } .copy-shell .mode-pill { font-size:9px; } .copy-shell .hero { grid-template-columns:1fr; padding:38px 0 24px; gap:22px; } .copy-shell .hero-panel { padding:19px; } .copy-shell .section-heading { align-items:start; flex-direction:column; } .copy-shell .exchange-grid { grid-template-columns:1fr; } .copy-shell .exchange-card p { min-height:0; } .copy-shell .planner,.copy-shell .checklist { grid-template-columns:1fr; gap:18px; } .copy-shell .filters { flex-direction:column; } .copy-shell .filters input,.copy-shell .filters select { max-width:none; } .copy-shell .demo-warning { align-items:start; } .copy-shell .footer { flex-direction:column; } }
+
+.copy-shell .demo-toggle-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; }
+.copy-shell .manual-entry-card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px; margin-top:22px; }
+.copy-shell .manual-entry-card h3 { margin:0 0 8px; }
+.copy-shell .manual-entry-card>.muted { font-size:12px; max-width:760px; }
+.copy-shell .manual-entry-form { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:18px; }
+.copy-shell .manual-entry-form label { display:block; font-size:11px; font-weight:700; }
+.copy-shell .manual-entry-form input,.copy-shell .manual-entry-form select { display:block; margin-top:6px; }
+.copy-shell .manual-entry-form button { border:0; cursor:pointer; justify-content:center; align-self:end; min-height:40px; }
+.copy-shell .form-message { color:#256c52; background:#eef9f3; border:1px solid #cdebdc; padding:10px 12px; border-radius:8px; font-size:12px; }
+@media(max-width:760px) { .copy-shell .manual-entry-form { grid-template-columns:repeat(2,minmax(0,1fr)); } .copy-shell .manual-entry-form button { grid-column:1 / -1; } .copy-shell .demo-toggle-row { align-items:flex-start; flex-direction:column; } }
+@media(max-width:440px) { .copy-shell .manual-entry-form { grid-template-columns:1fr; } }
