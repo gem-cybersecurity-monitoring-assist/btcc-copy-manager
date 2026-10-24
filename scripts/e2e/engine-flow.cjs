@@ -43,6 +43,19 @@ function csvFixture(days) {
   check("engine section renders with honesty notice", await seen("What it does not do:"));
   check("built-in providers listed, untracked", await engine.getByRole("button", { name: "Track BTCC" }).isVisible() && await engine.getByRole("button", { name: "Track Bitget" }).isVisible());
 
+  // Start-here guide
+  check("start guide shown at the top of the page", await seen("Four steps to use GEM Copy Center"));
+  await engine.getByRole("button", { name: "Load practice traders" }).click();
+  check("guide step 1 loads practice traders and opens the simulated plan", await seen("This proposal uses generated data") && (await engine.getByRole("tab", { name: "D · Capital allocation" }).getAttribute("aria-selected")) === "true");
+  await engine.getByRole("button", { name: "Remove practice traders" }).click();
+  check("guide removes practice traders", await seen("Load practice traders"));
+  await engine.getByRole("button", { name: "Add a trader" }).click();
+  check("guide step 2 opens the add-trader form", await seen("Record a trader / strategy"));
+  await engine.getByRole("button", { name: "Hide guide" }).click();
+  check("guide can be hidden and brought back", await seen("Show the “Start here” guide"));
+  await page.getByRole("button", { name: "Show the “Start here” guide" }).click();
+  await tab("A · Providers");
+
   // A · provider status machine
   await engine.getByRole("button", { name: "Track BTCC" }).click();
   const btcc = engine.locator(".engine-card", { hasText: "BTCC" }).first();

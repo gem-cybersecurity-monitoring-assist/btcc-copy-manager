@@ -238,6 +238,8 @@ export default function CopyTradingPage() {
         <span className="mode-pill"><i /> Planning mode · No trades executed</span>
       </header>
 
+      {loaded && <IntelligenceEngine engine={engine} onChange={updateEngine} manualTraders={manualTraders} />}
+
       <CloudAccountPanel getLocalWorkspace={currentWorkspace} onRestore={restoreFromCloud} />
       {storageNotice && <p className="storage-notice" role="alert">{storageNotice}</p>}
 
@@ -275,8 +277,6 @@ export default function CopyTradingPage() {
         </div>
         <p className="safety-note"><strong>Security:</strong> Never enter exchange passwords, 2FA codes, API secrets, wallet seed phrases, or private keys into this dashboard. Confirm trader selection, allocation, and stop-loss settings on the exchange before starting a copy relationship.</p>
       </section>
-
-      {loaded && <IntelligenceEngine engine={engine} onChange={updateEngine} manualTraders={manualTraders} />}
 
       <section id="traders" className="section-block">
         <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>

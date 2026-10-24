@@ -222,3 +222,20 @@
 .copy-shell .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
 @media(max-width:860px) { .copy-shell .engine-form,.copy-shell .engine-form fieldset { grid-template-columns:repeat(2,minmax(0,1fr)); } .copy-shell .engine-two-col { grid-template-columns:1fr; } }
 @media(max-width:600px) { .copy-shell .engine-form,.copy-shell .engine-form fieldset { grid-template-columns:1fr; } .copy-shell .span-2 { grid-column:auto; } .copy-shell .engine-summary-grid { grid-template-columns:1fr; } .copy-shell .exposure-list li { grid-template-columns:1fr; } }
+
+/* ---- Start here guide ---- */
+.copy-shell .start-guide { background:#fff; border:2px solid var(--accent); border-radius:16px; padding:18px; margin:4px 0 18px; }
+.copy-shell .start-guide-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.copy-shell .start-guide-head h3 { font-size:20px; margin:0 0 4px; }
+.copy-shell .start-guide-head .muted { margin:0; font-size:13px; }
+.copy-shell .start-steps { list-style:none; padding:0; margin:14px 0 0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.copy-shell .start-steps li { display:flex; gap:10px; background:var(--paper); border-radius:12px; padding:12px; }
+.copy-shell .start-steps li.done { background:#edf9f2; }
+.copy-shell .start-steps p { font-size:12px; color:#4b5668; margin:4px 0 8px; }
+.copy-shell .step-num { flex-shrink:0; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; background:var(--accent); color:#fff; font-weight:800; font-size:13px; }
+.copy-shell .start-steps li.done .step-num { background:#198365; }
+.copy-shell .start-steps .primary-btn,.copy-shell .start-steps .secondary-btn { padding:9px 12px; font-size:12px; }
+.copy-shell .guide-show { display:block; margin:0 0 10px; font-size:12px; }
+.copy-shell .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+@media(max-width:1000px) { .copy-shell .start-steps { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px) { .copy-shell .start-steps { grid-template-columns:1fr; } .copy-shell .start-guide-head { flex-direction:column; } }

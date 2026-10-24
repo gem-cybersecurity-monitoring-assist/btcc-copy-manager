@@ -30,6 +30,8 @@ const STATUS_TONE: Partial<Record<ProviderStatus, "good" | "warn" | "bad">> = { 
 
 export default function IntelligenceEngine({ engine, onChange, manualTraders }: { engine: EngineState; onChange: EngineChange; manualTraders: Trader[] }) {
   const [tab, setTab] = useState<TabId>("providers");
+  // The allocation tab remounts on every visit; only the guide's practice button opens it with simulated data.
+  const [allocationView, setAllocationView] = useState({ key: 0, simulated: false });
   const [now, setNow] = useState(() => new Date());
   const ranAuto = useRef(false);
 
@@ -48,25 +50,75 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
   const evaluations = useMemo(() => rankStrategies(engine.strategies, engine.policy, now, engine.weights), [engine.strategies, engine.policy, engine.weights, now]);
   const openAlerts = engine.alerts.filter((a) => !a.resolvedAt && !a.acknowledgedAt).length;
 
+  /** Switches tab and scrolls the tab row (or a target inside the panel) into view. */
+  function go(next: TabId, targetId?: string, simulated = false) {
+    if (next === "allocation") setAllocationView((v) => ({ key: v.key + 1, simulated }));
+    setTab(next);
+    requestAnimationFrame(() => document.getElementById(targetId ?? "engine-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
   return (
     <section id="engine" className="section-block engine" aria-label="Copy trading intelligence engine">
+      <StartGuide engine={engine} onChange={onChange} go={go} showSimulatedPlan={() => go("allocation", undefined, true)} />
       <div className="section-heading"><div><p className="eyebrow">INTELLIGENCE ENGINE</p><h2>Multi-provider research, allocation &amp; risk</h2></div>
         <span className="section-note">{engine.strategies.length} strategies · {engine.providers.length} tracked providers · {openAlerts} open alert{openAlerts === 1 ? "" : "s"}</span></div>
       <Notice tone="info"><strong>What this engine does:</strong> scores the strategies you record, proposes small allocations within your limits, monitors risk across platforms, and keeps an audit trail. <strong>What it does not do:</strong> it does not move money, enroll you in copy trading, pause a trader, or read exchange accounts. Every platform action happens on the platform itself, and statuses you record are your confirmations, not GEM verifications. Scores and simulations are not predictions or guarantees.</Notice>
-      <div className="engine-tabs" role="tablist" aria-label="Engine sections">
-        {TABS.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} aria-controls={`engine-panel-${id}`} id={`engine-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}{id === "risk" && openAlerts > 0 ? <span className="tab-badge">{openAlerts}</span> : null}</button>)}
+      <div className="engine-tabs" id="engine-tabs" role="tablist" aria-label="Engine sections">
+        {TABS.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} aria-controls={`engine-panel-${id}`} id={`engine-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => (id === "allocation" ? go("allocation") : setTab(id))}>{label}{id === "risk" && openAlerts > 0 ? <span className="tab-badge">{openAlerts}</span> : null}</button>)}
       </div>
       <div role="tabpanel" id={`engine-panel-${tab}`} aria-labelledby={`engine-tab-${tab}`} className="engine-panel">
         {tab === "providers" && <ProvidersTab engine={engine} onChange={onChange} now={now} evaluations={evaluations} />}
         {tab === "opportunities" && <OpportunitiesTab engine={engine} onChange={onChange} evaluations={evaluations} manualTraders={manualTraders} now={now} />}
         {tab === "intelligence" && <IntelligenceTab engine={engine} onChange={onChange} evaluations={evaluations} />}
-        {tab === "allocation" && <AllocationTab engine={engine} onChange={onChange} evaluations={evaluations} now={now} />}
+        {tab === "allocation" && <AllocationTab key={allocationView.key} engine={engine} onChange={onChange} evaluations={evaluations} now={now} startWithSimulated={allocationView.simulated} />}
         {tab === "risk" && <RiskTab engine={engine} onChange={onChange} evaluations={evaluations} now={now} />}
         {tab === "monitoring" && <MonitoringTab engine={engine} onChange={onChange} />}
         {tab === "lab" && <LabTab engine={engine} onChange={onChange} />}
         {tab === "wallets" && <WalletsTab />}
       </div>
     </section>
+  );
+}
+
+// ---- Start here guide --------------------------------------------------------
+
+const GUIDE_KEY = "gem-copy-center-guide-hidden";
+
+function StartGuide({ engine, onChange, go, showSimulatedPlan }: { engine: EngineState; onChange: EngineChange; go: (tab: TabId, targetId?: string) => void; showSimulatedPlan: () => void }) {
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { try { setHidden(localStorage.getItem(GUIDE_KEY) === "1"); } catch { /* storage unavailable */ } }, []);
+  const setHiddenPersist = (value: boolean) => { setHidden(value); try { if (value) localStorage.setItem(GUIDE_KEY, "1"); else localStorage.removeItem(GUIDE_KEY); } catch { /* ignore */ } };
+
+  const hasSample = engine.strategies.some((s) => s.id.startsWith(SAMPLE_PREFIX));
+  const realStrategies = engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX));
+  const realWithHistory = realStrategies.filter((s) => s.series).length;
+  const tracked = engine.providers.length;
+
+  function tryPractice() {
+    if (!hasSample) {
+      const sample = simulatedStrategies(new Date());
+      onChange({ ...engine, strategies: [...engine.strategies, ...sample] }, { action: "sample_loaded", detail: `Loaded ${sample.length} SIMULATED strategies from the start guide.` });
+    }
+    showSimulatedPlan();
+  }
+  function clearPractice() {
+    onChange({ ...engine, strategies: engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX)), providers: engine.providers.map((a) => (a.selectedStrategyId?.startsWith(SAMPLE_PREFIX) ? { ...a, selectedStrategyId: null } : a)) }, { action: "sample_removed", detail: "Removed simulated strategies from the start guide." });
+  }
+
+  if (hidden) return <button type="button" className="link-btn guide-show" onClick={() => setHiddenPersist(false)}>Show the “Start here” guide</button>;
+
+  const steps = [
+    { done: hasSample, title: "See how it works with practice traders", text: "Loads 6 made-up traders (marked SIMULATED) and shows the plan the engine would make for $30. Nothing real happens.", action: <><button type="button" className="primary-btn" onClick={tryPractice}>{hasSample ? "Show the practice plan" : "Load practice traders"}</button>{hasSample && <button type="button" className="secondary-btn" onClick={clearPractice}>Remove practice traders</button>}</> },
+    { done: realWithHistory > 0, title: "Add a real trader you are considering", text: realStrategies.length && !realWithHistory ? "Add the trader's return history (CSV) so the engine can judge it." : "Copy the trader's figures from their profile on BTCC, Bitget, or MT5. Return history (CSV) is what lets the engine recommend them.", action: <button type="button" className="primary-btn" onClick={() => go("opportunities", "strategy-form")}>Add a trader</button> },
+    { done: false, title: "Get your plan", text: "Enter how much you want to use (for example $30). The engine says how much to put with each trader, and what to keep back, with reasons.", action: <button type="button" className="primary-btn" onClick={() => go("allocation")}>Open my plan</button> },
+    { done: tracked > 0, title: "Copy on the exchange, then record it here", text: "Start copying on the exchange's own website using the planned amount, then mark the steps and the amount in Providers so GEM can watch the risk.", action: <button type="button" className="primary-btn" onClick={() => go("providers")}>Record on Providers</button> },
+  ];
+  return (
+    <div className="start-guide" aria-label="Start here guide">
+      <div className="start-guide-head"><div><p className="eyebrow">START HERE</p><h3>Four steps to use GEM Copy Center</h3><p className="muted">No account needed: everything saves in this browser. GEM never moves money; you copy traders on the exchange itself.</p></div>
+        <button type="button" className="link-btn" onClick={() => setHiddenPersist(true)}>Hide guide</button></div>
+      <ol className="start-steps">{steps.map((s, i) => <li key={s.title} className={s.done ? "done" : ""}><span className="step-num" aria-hidden="true">{s.done ? "✓" : i + 1}</span><div><strong>{s.title}</strong>{s.done && <span className="sr-only"> (done)</span>}<p>{s.text}</p><div className="engine-actions">{s.action}</div></div></li>)}</ol>
+    </div>
   );
 }
 
@@ -321,7 +373,7 @@ function OpportunitiesTab({ engine, onChange, evaluations, manualTraders, now }:
           })}
         </tbody>
       </table></div>
-      <form className="engine-form" onSubmit={submit}>
+      <form className="engine-form" id="strategy-form" onSubmit={submit}>
         <h3>{editing ? "Update strategy" : "Record a trader / strategy"}</h3>
         <p className="muted">Copy the figures from the trader&apos;s official profile. History (CSV) is what makes a strategy eligible: drawdown duration, volatility, risk ratios, and correlation all need it.</p>
         <label>Provider<select value={form.providerId} onChange={(e) => setForm({ ...form, providerId: e.target.value })}>{providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>

@@ -74,8 +74,8 @@ export function IntelligenceTab({ engine, onChange, evaluations }: { engine: Eng
 
 // ---- D · Capital allocation ------------------------------------------------
 
-export function AllocationTab({ engine, onChange, evaluations, now }: { engine: EngineState; onChange: EngineChange; evaluations: StrategyEvaluation[]; now: Date }) {
-  const [includeSim, setIncludeSim] = useState(false);
+export function AllocationTab({ engine, onChange, evaluations, now, startWithSimulated = false }: { engine: EngineState; onChange: EngineChange; evaluations: StrategyEvaluation[]; now: Date; startWithSimulated?: boolean }) {
+  const [includeSim, setIncludeSim] = useState(startWithSimulated);
   const [message, setMessage] = useState("");
   const planner = engine.planner;
   const names = new Map(engine.strategies.map((s) => [s.id, s.name]));
