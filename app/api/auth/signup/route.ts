@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authRequest, safeErrorMessage, setSessionCookies, type SupabaseTokens } from "@/lib/cloud-auth";
+import { authRequest, safeErrorMessage, setSessionCookies, type SupabaseTokens } from "../../../../lib/cloud-auth";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   try {
