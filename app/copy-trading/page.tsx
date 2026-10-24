@@ -135,7 +135,8 @@ export default function CopyTradingPage() {
       <section id="traders" className="section-block">
         <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>
         {showDemo && <div className="demo-warning"><strong>Demo only.</strong> These trader names and statistics are examples to demonstrate the comparison UI. They are not live exchange results and must not be used to choose a real trader. <button onClick={() => setShowDemo(false)} aria-label="Dismiss demo notice">Dismiss</button></div>}
-        <div className="demo-toggle-row"><button className="review-btn" onClick={() => setShowDemo((v) => !v)}>{showDemo ? "Hide demo rows" : "Show demo rows"}</button><span className="footnote">Manually entered trader stats are stored only in this browser.</span></div>\n        <div className="filters">
+        <div className="demo-toggle-row"><button className="review-btn" onClick={() => setShowDemo((v) => !v)}>{showDemo ? "Hide demo rows" : "Show demo rows"}</button><span className="footnote">Manually entered trader stats are stored only in this browser.</span></div>
+        <div className="filters">
           <input aria-label="Search traders" placeholder="Search trader name…" value={query} onChange={(e) => setQuery(e.target.value)} />
           <select aria-label="Filter exchange" value={venue} onChange={(e) => setVenue(e.target.value)}><option>All</option><option>BTCC</option><option>Bitget</option></select>
         </div>
