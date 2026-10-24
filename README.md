@@ -1,6 +1,6 @@
 # GEM Copy Center
 
-A copy-trading **planning and record-keeping** dashboard. It helps you compare copy traders, keep review notes and bookmarks, record manual portfolio snapshots, back up those records, and (optionally) sync them to a private cloud workspace.
+A copy-trading **planning, intelligence, and record-keeping** dashboard. It helps you compare copy traders, keep review notes and bookmarks, record manual portfolio snapshots, back up those records, and (optionally) sync them to a private cloud workspace. Its **intelligence engine** scores strategies across providers (BTCC, Bitget, MT5, and any you add), proposes small allocations within explicit risk limits, monitors portfolio-level risk, and runs walk-forward backtests — see [docs/INTELLIGENCE_ENGINE.md](docs/INTELLIGENCE_ENGINE.md).
 
 **What it does not do:** it does not place trades, enroll you in copy trading, mirror positions, or read exchange balances. Copy-trading enrollment and every trade happen on the exchange's own website or app (for example BTCC → Copy → Futures Copy Trading). The dashboard never asks for exchange passwords, 2FA codes, API keys or secrets, seed phrases, or private keys.
 
@@ -13,6 +13,7 @@ A copy-trading **planning and record-keeping** dashboard. It helps you compare c
 | Area | Behaviour |
 | --- | --- |
 | Exchange access | External links to BTCC, Bitget and MT5 with instructions for each venue's native copy-trading flow. |
+| Intelligence engine | Provider registry with capability/status tracking, strategy research records and CSV history import, transparent scoring, correlation clusters, small-capital allocation planner, risk center with alerts, monitoring reviews with audit trail, walk-forward backtests and paper portfolios, optional read-only wallet connections. All provider actions remain on the provider. |
 | Trader comparison | Demo rows (clearly labelled, hideable) plus your own records. Create, edit, delete (with confirmation), search, filter by venue, and a transparent screening score. |
 | Review bookmarks | "Save review" toggle per trader. |
 | Portfolio ledger | Timestamped manual snapshots (equity, available, unrealized P&L). Validation: non-negative values, available ≤ equity, no future timestamps. Delete with confirmation. |
@@ -57,10 +58,11 @@ Browser-local (per browser and device; cleared if you clear site data):
 | `gem-copy-center-traders-v1` | Array of trader records |
 | `gem-copy-center-saved-v1` | Array of bookmarked trader names |
 | `gem-copy-center-snapshots-v1` | Array of portfolio snapshots |
+| `gem-copy-center-engine-v1` | Intelligence engine state (providers, strategies, policy, alerts, audit, score history, paper portfolios) |
 
 Every load is validated; unreadable records are skipped (with a notice) instead of crashing the page. Storage failures (full or disabled storage) are reported.
 
-Cloud: one row per user in `public.copy_center_workspaces` (`payload` = `{ traders, savedReviews, portfolioSnapshots }`). Validation rules and limits (750 KB, 1000 traders, 1000 bookmarks, 5000 snapshots) live in `lib/workspace.ts` and are shared by the browser and the server.
+Cloud: one row per user in `public.copy_center_workspaces` (`payload` = `{ traders, savedReviews, portfolioSnapshots, engine? }`). Validation rules and limits (750 KB, 1000 traders, 1000 bookmarks, 5000 snapshots) live in `lib/workspace.ts` and are shared by the browser and the server.
 
 ## Backup and restore
 
@@ -103,6 +105,7 @@ pnpm build
 node scripts/e2e/mock-supabase.mjs &                                                   # port 54321
 SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=anon-test-key pnpm start -p 3100 &
 node scripts/e2e/copy-center-flow.cjs                                                    # needs Playwright + Chromium installed
+node scripts/e2e/engine-flow.cjs                                                         # intelligence engine flows (no Supabase needed)
 ```
 
 It covers empty states, create/edit/delete, persistence across reload, CSV/backup export, rejected imports, import/restore confirmation, sign-up messaging, unconfirmed and wrong-password sign-in, the confirmation-link landing, session cookies, upload/restore, sign-out, API rejection after sign-out, and mobile layout. The email endpoints are limited to 3 requests per 15 minutes per client, so restart the server between repeated runs.
@@ -119,6 +122,8 @@ app/                  Deployed Next.js App Router app (GEM Copy Center)
   api/auth/*          Auth routes (thin adapters)
   api/workspace       Workspace route (thin adapter)
 lib/workspace.ts      Shared data model + validation (browser and server)
+lib/engine/           Intelligence engine: providers, quality, metrics, scoring, allocation, risk, monitoring, backtest
+app/copy-trading/engine/  Engine dashboard tabs (A–H)
 lib/cloud-core.ts     Framework-free Supabase auth/workspace logic (unit-tested)
 lib/cloud-auth.ts     Next.js adapter: cookies, origin/content-type guards, rate limits
 supabase/migrations/  SQL migrations (apply in order)
@@ -131,7 +136,9 @@ src/, sentinel/, scripts/btcc-*   Legacy code — NOT deployed (see below)
 
 ## Known limitations
 
-- Trader statistics and balances are typed in by you; they are not verified against the exchange.
+- Trader statistics and balances are typed in by you; they are not verified against the exchange. No provider has a live data integration yet, so the engine works from what you record.
+- Monitoring reviews run in the browser when the dashboard is open; no background server job is deployed.
+- Scores, proposals, backtests, and paper portfolios are analytical aids, not predictions or guaranteed returns.
 - Cloud sync is manual, whole-workspace replacement (no merge). Last upload wins.
 - Rate limiting is per serverless instance, not global.
 - Cloud users cannot delete their cloud row from the UI (no DELETE grant by design); upload an empty workspace to clear it, or delete the account in Supabase.

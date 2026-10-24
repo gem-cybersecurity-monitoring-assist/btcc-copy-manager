@@ -31,6 +31,8 @@ select grantee, privilege_type from information_schema.role_table_grants
  where table_name = 'copy_center_workspaces' and grantee in ('anon', 'authenticated');      -- authenticated: SELECT, INSERT, UPDATE only; no anon rows
 ```
 
+Intelligence-engine data is stored inside the same per-user `payload` (as `payload.engine`) and is validated by the same server route, so no additional migration is required for it.
+
 ## 3. Authentication URLs (Supabase → Authentication → URL Configuration)
 - **Site URL:** `https://btcc-copy-manager.vercel.app/copy-trading`
 - **Redirect URLs (allow-list):** add `https://btcc-copy-manager.vercel.app/copy-trading`. Optionally `http://localhost:3000/copy-trading` for local testing.

@@ -2,6 +2,9 @@
 // Used by the dashboard (local storage, backup import, cloud restore) and by the
 // /api/workspace route so the browser and the server enforce the same rules.
 
+import { parseEngineState } from "./engine/state.ts";
+import type { EngineState } from "./engine/types.ts";
+
 export type Trader = {
   name: string;
   venue: string;
@@ -27,12 +30,14 @@ export type Snapshot = {
   source: string;
 };
 
-export type Workspace = { traders: Trader[]; savedReviews: string[]; portfolioSnapshots: Snapshot[] };
+/** `engine` is optional so workspaces and backups created before the intelligence engine stay valid. */
+export type Workspace = { traders: Trader[]; savedReviews: string[]; portfolioSnapshots: Snapshot[]; engine?: EngineState };
 
 export const STORAGE_KEYS = {
   traders: "gem-copy-center-traders-v1",
   saved: "gem-copy-center-saved-v1",
   snapshots: "gem-copy-center-snapshots-v1",
+  engine: "gem-copy-center-engine-v1",
 } as const;
 
 export const BACKUP_SCHEMAS = ["gem-copy-center-backup-v1", "gem-copy-center-backup-v2"] as const;
@@ -120,7 +125,13 @@ export function parseWorkspace(input: unknown): ParseResult<Workspace> {
     if (!snapshot) return { ok: false, error: `Portfolio snapshot ${index + 1} is invalid.` };
     normalizedSnapshots.push(snapshot);
   }
-  return { ok: true, value: { traders: normalizedTraders, savedReviews: [...new Set(savedReviews as string[])], portfolioSnapshots: normalizedSnapshots } };
+  const value: Workspace = { traders: normalizedTraders, savedReviews: [...new Set(savedReviews as string[])], portfolioSnapshots: normalizedSnapshots };
+  if (input.engine !== undefined && input.engine !== null) {
+    const engine = parseEngineState(input.engine);
+    if (!engine.ok) return { ok: false, error: engine.error };
+    value.engine = engine.value;
+  }
+  return { ok: true, value };
 }
 
 /** Parses an exported backup file. Accepts v1 (no snapshots) and v2 backups. */
@@ -166,11 +177,13 @@ export function loadStoredList<T>(raw: string | null, normalize: (value: unknown
 export const normalizeBookmark = (value: unknown): string | null => (isText(value) && value.length > 0 ? value : null);
 
 export function workspaceCounts(w: Workspace) {
-  return `${w.traders.length} trader record(s), ${w.savedReviews.length} review bookmark(s), ${w.portfolioSnapshots.length} portfolio snapshot(s)`;
+  const base = `${w.traders.length} trader record(s), ${w.savedReviews.length} review bookmark(s), ${w.portfolioSnapshots.length} portfolio snapshot(s)`;
+  return w.engine ? `${base}, ${w.engine.strategies.length} engine strateg${w.engine.strategies.length === 1 ? "y" : "ies"}, ${w.engine.providers.length} tracked provider(s)` : base;
 }
 
 export function isWorkspaceEmpty(w: Workspace) {
-  return w.traders.length === 0 && w.savedReviews.length === 0 && w.portfolioSnapshots.length === 0;
+  const engineEmpty = !w.engine || (w.engine.strategies.length === 0 && w.engine.providers.length === 0 && w.engine.paperPortfolios.length === 0);
+  return w.traders.length === 0 && w.savedReviews.length === 0 && w.portfolioSnapshots.length === 0 && engineEmpty;
 }
 
 /** CSV with CRLF rows, quoted cells, and a guard against spreadsheet formula injection. */

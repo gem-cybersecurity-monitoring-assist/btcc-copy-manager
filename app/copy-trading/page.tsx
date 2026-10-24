@@ -3,7 +3,10 @@
 import "./styles.css";
 import CloudAccountPanel from "./CloudAccountPanel";
 import { downloadBackup, downloadFile, readLocalWorkspace, writeLocalWorkspace } from "./storage.ts";
-import { isWorkspaceEmpty, parseBackupText, toCsv, traderKey, workspaceCounts, type Snapshot, type Trader, type Workspace } from "../../lib/workspace.ts";
+import IntelligenceEngine from "./engine/IntelligenceEngine.tsx";
+import { appendAudit, compactToBudget, defaultEngineState } from "../../lib/engine/state.ts";
+import type { EngineState } from "../../lib/engine/types.ts";
+import { isWorkspaceEmpty, LIMITS, parseBackupText, toCsv, traderKey, workspaceCounts, type Snapshot, type Trader, type Workspace } from "../../lib/workspace.ts";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -56,6 +59,7 @@ export default function CopyTradingPage() {
   const [snapshotMessage, setSnapshotMessage] = useState("");
   const [storageNotice, setStorageNotice] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [engine, setEngine] = useState<EngineState>(defaultEngineState);
   const backupInput = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -64,18 +68,20 @@ export default function CopyTradingPage() {
     setManualTraders(workspace.traders);
     setSaved(workspace.savedReviews);
     setSnapshots(workspace.portfolioSnapshots);
+    setEngine(workspace.engine ?? defaultEngineState());
     if (error) setStorageNotice(error);
     else if (dropped > 0) setStorageNotice(`${dropped} unreadable browser record(s) were skipped. Valid records were loaded; export a backup to keep a clean copy.`);
     setLoaded(true);
   }, []);
 
-  const currentWorkspace = useCallback((): Workspace => ({ traders: manualTraders, savedReviews: saved, portfolioSnapshots: snapshots }), [manualTraders, saved, snapshots]);
+  const currentWorkspace = useCallback((): Workspace => ({ traders: manualTraders, savedReviews: saved, portfolioSnapshots: snapshots, engine }), [manualTraders, saved, snapshots, engine]);
 
   /** Single write path: update state and browser storage together, and surface storage failures. */
   const persist = useCallback((next: Workspace): string | null => {
     setManualTraders(next.traders);
     setSaved(next.savedReviews);
     setSnapshots(next.portfolioSnapshots);
+    setEngine(next.engine ?? defaultEngineState());
     const error = writeLocalWorkspace(next);
     setStorageNotice(error ?? "");
     return error;
@@ -193,6 +199,21 @@ export default function CopyTradingPage() {
     setFormMessage(error ?? `Deleted ${t.name} (${t.venue}).`);
   }
 
+  /** Engine updates: user actions are written to the engine audit trail before persisting. */
+  const updateEngine = useCallback((next: EngineState, audit?: { action: string; detail: string }) => {
+    const withAudit = audit ? appendAudit(next, { at: new Date().toISOString(), actor: "user", ...audit }) : next;
+    // Keep the whole workspace within the cloud upload limit (with headroom for the request wrapper).
+    const rest = new TextEncoder().encode(JSON.stringify({ ...currentWorkspace(), engine: null })).byteLength;
+    const budget = LIMITS.maxBytes - rest - 2_000;
+    const compacted = compactToBudget(withAudit, budget);
+    if (!compacted.ok) {
+      setStorageNotice(`That change was not saved: the workspace would exceed the ${Math.round(LIMITS.maxBytes / 1000)} KB backup/cloud limit. Remove unused strategies, return history, or portfolio snapshots first.`);
+      return;
+    }
+    const error = persist({ ...currentWorkspace(), engine: compacted.state });
+    if (!error && compacted.trimmed) setStorageNotice(`To stay within the ${Math.round(LIMITS.maxBytes / 1000)} KB workspace limit, the oldest audit events, resolved alerts, and score snapshots were trimmed.`);
+  }, [currentWorkspace, persist]);
+
   const restoreFromCloud = useCallback((workspace: Workspace) => {
     setEditingKey(null);
     setForm(emptyTraderForm);
@@ -227,7 +248,7 @@ export default function CopyTradingPage() {
           <p className="hero-text">Compare traders, plan allocations, and keep your exchange actions in your own hands. Sign-ins and copy-trade setup happen on the exchange itself.</p>
           <div className="hero-actions">
             <a className="primary-btn" href="#exchanges">Connect your workflow <span>↗</span></a>
-            <a className="secondary-btn" href="#traders">Review trader scores</a>
+            <a className="secondary-btn" href="#engine">Open intelligence engine</a>
           </div>
         </div>
         <div className="hero-panel">
@@ -235,8 +256,9 @@ export default function CopyTradingPage() {
           <div className="metric-large">Not connected <span>—</span></div>
           <p className="muted">No exchange account or live balance is connected.</p>
           <div className="panel-divider" />
-          <div className="panel-row"><span>Connected exchanges</span><strong>0</strong></div>
-          <div className="panel-row"><span>Verified live traders</span><strong>0</strong></div>
+          <div className="panel-row"><span>Exchanges connected by API</span><strong>0</strong></div>
+          <div className="panel-row"><span>Providers tracked manually</span><strong>{engine.providers.length}</strong></div>
+          <div className="panel-row"><span>Strategies under evaluation</span><strong>{engine.strategies.length}</strong></div>
           <div className="panel-row"><span>Live orders sent by this app</span><strong>0</strong></div>
         </div>
       </section>
@@ -253,6 +275,8 @@ export default function CopyTradingPage() {
         </div>
         <p className="safety-note"><strong>Security:</strong> Never enter exchange passwords, 2FA codes, API secrets, wallet seed phrases, or private keys into this dashboard. Confirm trader selection, allocation, and stop-loss settings on the exchange before starting a copy relationship.</p>
       </section>
+
+      {loaded && <IntelligenceEngine engine={engine} onChange={updateEngine} manualTraders={manualTraders} />}
 
       <section id="traders" className="section-block">
         <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>
