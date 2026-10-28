@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { CopyCenterWorkspace } from "@/components/copy-center-workspace";
 
 export default function Home() {
-  redirect("/copy-trading");
+  return <CopyCenterWorkspace />;
 }

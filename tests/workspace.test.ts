@@ -113,3 +113,31 @@ test("trader identity is venue-scoped and case-insensitive", () => {
   assert.equal(traderKey({ name: "Alpha", venue: "BTCC" }), traderKey({ name: "alpha", venue: "BTCC" }));
   assert.notEqual(traderKey({ name: "Alpha", venue: "BTCC" }), traderKey({ name: "Alpha", venue: "Bitget" }));
 });
+
+test("validates and round-trips cloud-synced Copy Center preferences", () => {
+  const copyCenter = {
+    budget: "10",
+    maxLoss: "2",
+    activity: [{ id: "evt-1", at: "2026-10-28T08:00:00.000Z", title: "Wallet connected", detail: "Public address checked; no transaction." }]
+  };
+  const parsed = parseWorkspace({ ...emptyWorkspace(), copyCenter });
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) return;
+  assert.deepEqual(parsed.value.copyCenter, copyCenter);
+  const backup = createBackup(parsed.value, new Date("2026-10-28T08:00:00Z"));
+  const roundTrip = parseBackupText(JSON.stringify(backup));
+  assert.equal(roundTrip.ok, true);
+  if (roundTrip.ok) assert.deepEqual(roundTrip.value.copyCenter, copyCenter);
+});
+
+test("rejects invalid cloud Copy Center preferences as a whole", () => {
+  const base = { ...emptyWorkspace(), copyCenter: { budget: "10", maxLoss: "2", activity: [] } };
+  const bad = [
+    { ...base, copyCenter: { ...base.copyCenter, budget: "-1" } },
+    { ...base, copyCenter: { ...base.copyCenter, budget: "100001" } },
+    { ...base, copyCenter: { ...base.copyCenter, maxLoss: "101" } },
+    { ...base, copyCenter: { ...base.copyCenter, activity: [{ id: "", at: "not-a-date", title: "bad", detail: "" }] } },
+    { ...base, copyCenter: { ...base.copyCenter, activity: Array.from({ length: 51 }, (_, i) => ({ id: String(i), at: "2026-10-28T08:00:00Z", title: "event", detail: "" })) } }
+  ];
+  for (const input of bad) assert.equal(parseWorkspace(input).ok, false);
+});

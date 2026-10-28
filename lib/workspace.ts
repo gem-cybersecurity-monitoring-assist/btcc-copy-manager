@@ -31,7 +31,9 @@ export type Snapshot = {
 };
 
 /** `engine` is optional so workspaces and backups created before the intelligence engine stay valid. */
-export type Workspace = { traders: Trader[]; savedReviews: string[]; portfolioSnapshots: Snapshot[]; engine?: EngineState };
+export type CopyCenterActivity = { id: string; at: string; title: string; detail: string };
+export type CopyCenterPreferences = { budget: string; maxLoss: string; activity: CopyCenterActivity[] };
+export type Workspace = { traders: Trader[]; savedReviews: string[]; portfolioSnapshots: Snapshot[]; engine?: EngineState; copyCenter?: CopyCenterPreferences };
 
 export const STORAGE_KEYS = {
   traders: "gem-copy-center-traders-v1",
@@ -57,6 +59,24 @@ export type ParseResult<T> = { ok: true; value: T } | { ok: false; error: string
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isText = (value: unknown, max: number = LIMITS.text): value is string => typeof value === "string" && value.length <= max;
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+function normalizeCopyCenter(input: unknown): CopyCenterPreferences | null {
+  if (!isRecord(input)) return null;
+  const budget = input.budget;
+  const maxLoss = input.maxLoss;
+  const activity = input.activity ?? [];
+  if (typeof budget !== "string" || budget.length > 32 || !Number.isFinite(Number(budget)) || Number(budget) < 0 || Number(budget) > 100_000) return null;
+  if (typeof maxLoss !== "string" || maxLoss.length > 32 || !Number.isFinite(Number(maxLoss)) || Number(maxLoss) < 0 || Number(maxLoss) > 100) return null;
+  if (!Array.isArray(activity) || activity.length > 50) return null;
+  const normalizedActivity: CopyCenterActivity[] = [];
+  for (const raw of activity) {
+    if (!isRecord(raw)) return null;
+    if (!isText(raw.id, 100) || !raw.id || !isText(raw.at, 40) || Number.isNaN(Date.parse(raw.at))) return null;
+    if (!isText(raw.title, 160) || !raw.title.trim() || !isText(raw.detail, 1000)) return null;
+    normalizedActivity.push({ id: raw.id, at: raw.at, title: raw.title.trim(), detail: raw.detail });
+  }
+  return { budget, maxLoss, activity: normalizedActivity };
+}
 
 export function emptyWorkspace(): Workspace {
   return { traders: [], savedReviews: [], portfolioSnapshots: [] };
@@ -131,6 +151,11 @@ export function parseWorkspace(input: unknown): ParseResult<Workspace> {
     if (!engine.ok) return { ok: false, error: engine.error };
     value.engine = engine.value;
   }
+  if (input.copyCenter !== undefined && input.copyCenter !== null) {
+    const copyCenter = normalizeCopyCenter(input.copyCenter);
+    if (!copyCenter) return { ok: false, error: "Copy Center preferences are invalid." };
+    value.copyCenter = copyCenter;
+  }
   return { ok: true, value };
 }
 
@@ -183,7 +208,7 @@ export function workspaceCounts(w: Workspace) {
 
 export function isWorkspaceEmpty(w: Workspace) {
   const engineEmpty = !w.engine || (w.engine.strategies.length === 0 && w.engine.providers.length === 0 && w.engine.paperPortfolios.length === 0);
-  return w.traders.length === 0 && w.savedReviews.length === 0 && w.portfolioSnapshots.length === 0 && engineEmpty;
+  return w.traders.length === 0 && w.savedReviews.length === 0 && w.portfolioSnapshots.length === 0 && engineEmpty && !w.copyCenter;
 }
 
 /** CSV with CRLF rows, quoted cells, and a guard against spreadsheet formula injection. */
