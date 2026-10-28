@@ -4,7 +4,7 @@ A copy-trading **planning, intelligence, and record-keeping** dashboard. It help
 
 **What it does not do:** it does not place trades, enroll you in copy trading, mirror positions, or read exchange balances. Copy-trading enrollment and every trade happen on the exchange's own website or app (for example BTCC → Copy → Futures Copy Trading). The dashboard never asks for exchange passwords, 2FA codes, API keys or secrets, seed phrases, or private keys.
 
-- Production: https://btcc-copy-manager.vercel.app/copy-trading (`/` redirects there)
+- Production: https://btcc-copy-manager.vercel.app (`/` is the Copy Center workspace; the full engine is at `/copy-trading`)
 - Cloud setup, Supabase and email configuration: [CLOUD_SETUP.md](CLOUD_SETUP.md)
 - In-app agent (★ Agent tab) setup: [AGENT_SETUP.md](AGENT_SETUP.md)
 - Product scope: [docs/COPY_TRADING_CONTROL_CENTER_SCOPE.md](docs/COPY_TRADING_CONTROL_CENTER_SCOPE.md)

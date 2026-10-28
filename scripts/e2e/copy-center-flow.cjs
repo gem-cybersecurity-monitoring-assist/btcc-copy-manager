@@ -19,9 +19,10 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gem-copy-center-e2e-"));
   const status = () => page.locator(".cloud-account .form-message").innerText();
   const seen = (text) => page.getByText(text).first().waitFor({ timeout: 4000 }).then(() => true, () => false);
 
-  // Empty state + root redirect
+  // Home workspace links to the engine; then the empty state on /copy-trading
   await page.goto(BASE + "/");
-  check("root redirects to /copy-trading", page.url().endsWith("/copy-trading"));
+  check("home shows the Copy Center workspace with a link to the engine", await seen("MONITORING ONLY") && await page.getByRole("link", { name: /Open copy-trading engine/ }).first().isVisible());
+  await page.goto(BASE + "/copy-trading");
   await page.getByRole("button", { name: "Hide demo rows" }).first().click();
   check("empty trader table shows guidance", await seen("No trader records yet"));
   check("empty snapshot table shows guidance", await seen("No portfolio snapshots yet"));
