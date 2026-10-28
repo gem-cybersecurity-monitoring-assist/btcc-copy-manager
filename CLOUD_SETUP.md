@@ -6,7 +6,7 @@
 - Vercel environment variables `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for Production, Preview and Development.
 - Production: `https://btcc-copy-manager.vercel.app` (Vercel project `btcc-copy-manager`).
 
-Verified on 2026-10-24: production `GET /api/auth/session` returns `{"configured":true,"authenticated":false}`, so the environment variables are present. The database schema, policies, grants, Auth settings and Auth logs could **not** be read during the audit (the available Supabase connector was denied access to this project). Run the verification queries below to confirm them.
+Verified on 2026-10-28: production Vercel environment has `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `COPY_CENTER_SITE_URL` configured for Production, Preview, and Development. The Supabase table `public.copy_center_workspaces` exists with RLS enabled, zero rows, and owner-only authenticated SELECT/INSERT/UPDATE policies; table grants show no `anon` access and no DELETE grant. The optional hardening migration `20261025_copy_center_workspace_hardening.sql` is still unapplied: live schema inspection found no payload-size constraint or server-side `updated_at` trigger. The Supabase security advisor also reports leaked-password protection disabled; enabling HaveIBeenPwned protection requires a supported project plan. The production deployment is READY and CI passed 104 tests. A real owner-account save/restore and email-delivery test has not been performed.
 
 Supabase data, Auth settings, SMTP settings and Vercel environment values live in those services, not in this repository.
 
