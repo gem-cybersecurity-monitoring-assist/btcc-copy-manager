@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { cloudService, guardMutation, sessionCookiesFrom } from "@/lib/cloud-auth-bridge.ts";
+import { isReadOnlyUtaPermissions } from "@/lib/bitget-readonly.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,10 +36,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Enter the Bitget API key, secret, and passphrase." }, { status: 400, headers: noStore });
   }
 
-  const timestamp = String(Date.now());
-  const requestPath = "/api/v3/account/assets";
-  const signature = createHmac("sha256", secret).update(timestamp + "GET" + requestPath).digest("base64");
   try {
+    const permissionPath = "/api/v3/account/info";
+    const permissionTimestamp = String(Date.now());
+    const permissionSignature = createHmac("sha256", secret).update(permissionTimestamp + "GET" + permissionPath).digest("base64");
+    const permissionResponse = await fetch("https://api.bitget.com" + permissionPath, {
+      method: "GET",
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        "ACCESS-KEY": apiKey.trim(),
+        "ACCESS-SIGN": permissionSignature,
+        "ACCESS-TIMESTAMP": permissionTimestamp,
+        "ACCESS-PASSPHRASE": passphrase,
+        "Content-Type": "application/json",
+        "locale": "en-US"
+      }
+    });
+    const permissionPayload = await permissionResponse.json().catch(() => ({})) as {
+      code?: string;
+      data?: { permissions?: unknown };
+    };
+    if (!permissionResponse.ok || permissionPayload.code !== "00000" || !isReadOnlyUtaPermissions(permissionPayload.data?.permissions)) {
+      return NextResponse.json({
+        ok: false,
+        error: "This key could not be verified as read-only. Create a Bitget API key with UTA management/read permission only; remove trading, copy-trading, withdrawal, and other permissions."
+      }, { status: 403, headers: noStore });
+    }
+
+    const timestamp = String(Date.now());
+    const requestPath = "/api/v3/account/assets";
+    const signature = createHmac("sha256", secret).update(timestamp + "GET" + requestPath).digest("base64");
     const upstream = await fetch("https://api.bitget.com" + requestPath, {
       method: "GET",
       cache: "no-store",
@@ -60,7 +88,7 @@ export async function POST(request: NextRequest) {
     if (!upstream.ok || payload.code !== "00000" || !payload.data) {
       return NextResponse.json({
         ok: false,
-        error: "Bitget did not verify these credentials. Check the key, secret, passphrase, account type, IP allow-list, and read-only UTA account-assets permission."
+        error: "Bitget did not verify these credentials. Check the key, secret, passphrase, IP allow-list, and UTA management/read permission."
       }, { status: 401, headers: noStore });
     }
     const numberOrNull = (value: unknown) => {
@@ -76,8 +104,9 @@ export async function POST(request: NextRequest) {
       accountEquityUsd: numberOrNull(payload.data.accountEquity),
       usdtEquity: numberOrNull(payload.data.usdtEquity),
       btcEquity: numberOrNull(payload.data.btcEquity),
+      permissionsVerified: "uta_mgt only",
       credentialsStored: false,
-      message: "Credentials were verified for this request only and were not stored. Re-enter them for a later verification."
+      message: "Read-only permission and account assets were verified for this request only. Credentials were not stored. Re-enter them for a later verification."
     }, { status: 200, headers: noStore });
   } catch {
     return NextResponse.json({ ok: false, error: "Bitget could not be reached safely. No credentials were stored; try again later." }, { status: 502, headers: noStore });
