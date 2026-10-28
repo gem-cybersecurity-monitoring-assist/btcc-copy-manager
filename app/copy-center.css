@@ -17,3 +17,5 @@
 
 /* Authenticated cloud sync and wallet connection controls */
 .cc-cloud-card{margin:0 0 22px}.cc-cloud-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0;max-width:720px}.cc-cloud-form .cc-field{min-width:0}.cc-cloud-form .cc-field input{width:100%;box-sizing:border-box}.cc-cloud-form .cc-modal-actions{grid-column:1/-1;flex-wrap:wrap}.cc-cloud-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 12px}.cc-cloud-card .cc-form-note{overflow-wrap:anywhere}.cc-cloud-card .cc-text-button{margin-top:8px}.cc-provider-card .cc-pill-safe{max-width:62%;overflow-wrap:anywhere}@media(max-width:640px){.cc-cloud-form{grid-template-columns:1fr}.cc-cloud-form .cc-modal-actions{grid-column:auto}.cc-cloud-actions{align-items:stretch}.cc-cloud-actions>button{flex:1 1 140px}}
+
+.cc-credential-form{display:grid;gap:12px;margin:16px 0;padding:16px;border:1px solid #dce4f0;border-radius:14px;background:#f8faff}.cc-credential-form .cc-field{min-width:0}.cc-credential-form .cc-field input{width:100%;box-sizing:border-box}.cc-credential-form .cc-button{justify-self:start}.cc-credential-form .cc-form-note{overflow-wrap:anywhere}
