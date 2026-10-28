@@ -7,6 +7,7 @@ type Provider = { id: string; name: string; kind: ProviderKind; description: str
 type Activity = { id: string; at: string; title: string; detail: string };
 type CloudSession = { configured: boolean; authenticated: boolean; user?: { id: string; email?: string } | null; error?: string };
 type WalletAddresses = { phantom?: string; metamask?: string; base?: string };
+type BitgetVerification = { verifiedAt: string; accountEquityUsd: number | null; usdtEquity: number | null; btcEquity: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
 type PhantomProvider = { connect: () => Promise<{ publicKey?: { toString: () => string } }>; publicKey?: { toString: () => string }; isConnected?: boolean };
 
@@ -55,6 +56,7 @@ export function CopyCenterWorkspace() {
   const [bgSecret, setBgSecret] = useState("");
   const [bgPhrase, setBgPhrase] = useState("");
   const [bgMessage, setBgMessage] = useState("");
+  const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
 
   useEffect(() => {
@@ -209,10 +211,20 @@ export function CopyCenterWorkspace() {
       if (!get.ok) throw new Error(typeof current.error === "string" ? current.error : "Sign in to use cloud sync.");
       if (mode === "restore") {
         if (!current.workspace?.copyCenter) throw new Error("There are no saved Copy Center preferences in the cloud account yet.");
-        const saved = current.workspace.copyCenter as { budget?: unknown; maxLoss?: unknown; activity?: unknown[] };
+        const saved = current.workspace.copyCenter as { budget?: unknown; maxLoss?: unknown; activity?: unknown[]; walletAddresses?: unknown };
         if (typeof saved.budget !== "string" || typeof saved.maxLoss !== "string" || !Array.isArray(saved.activity)) throw new Error("The saved Copy Center settings are invalid; local data was not changed.");
         setBudget(saved.budget);
         setMaxLoss(saved.maxLoss);
+        if (saved.walletAddresses && typeof saved.walletAddresses === "object" && !Array.isArray(saved.walletAddresses)) {
+          const candidate = saved.walletAddresses as Record<string, unknown>;
+          setWalletAddresses({
+            ...(typeof candidate.phantom === "string" ? { phantom: candidate.phantom } : {}),
+            ...(typeof candidate.metamask === "string" ? { metamask: candidate.metamask } : {}),
+            ...(typeof candidate.base === "string" ? { base: candidate.base } : {})
+          });
+        } else {
+          setWalletAddresses({});
+        }
         setActivity(saved.activity.filter((item): item is Activity => Boolean(item && typeof item === "object" && typeof (item as Activity).id === "string" && typeof (item as Activity).at === "string" && typeof (item as Activity).title === "string" && typeof (item as Activity).detail === "string")).slice(0, 50));
         setCloudUpdatedAt(typeof current.updatedAt === "string" ? current.updatedAt : null);
         setCloudMessage("Cloud preferences restored. Wallet sessions must be re-verified in this browser.");
@@ -223,7 +235,7 @@ export function CopyCenterWorkspace() {
         const response = await fetch("/api/workspace", {
           method: "PUT", credentials: "same-origin", cache: "no-store",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ workspace: { ...base, copyCenter: { budget, maxLoss, activity: activity.slice(0, 50) } } })
+          body: JSON.stringify({ workspace: { ...base, copyCenter: { budget, maxLoss, activity: activity.slice(0, 50), walletAddresses } } })
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.error) throw new Error(typeof result.error === "string" ? result.error : "Cloud save failed.");
@@ -238,11 +250,18 @@ export function CopyCenterWorkspace() {
   async function verifyBitget() {
     setBgBusy(true);
     setBgMessage("");
+    setBgResult(null);
     try {
       if (!cloudSession.authenticated) throw new Error("Sign in first to verify an exchange connection.");
       const response = await fetch("/api/connections/bitget/verify", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: bgKey, secret: bgSecret, passphrase: bgPhrase }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error : "Bitget verification failed.");
+      setBgResult({
+        verifiedAt: typeof data.verifiedAt === "string" ? data.verifiedAt : new Date().toISOString(),
+        accountEquityUsd: typeof data.accountEquityUsd === "number" && Number.isFinite(data.accountEquityUsd) ? data.accountEquityUsd : null,
+        usdtEquity: typeof data.usdtEquity === "number" && Number.isFinite(data.usdtEquity) ? data.usdtEquity : null,
+        btcEquity: typeof data.btcEquity === "number" && Number.isFinite(data.btcEquity) ? data.btcEquity : null
+      });
       setProviders((old) => old.map((p) => p.id === "bitget" ? { ...p, state: "verified-once", note: "Read-only API verified once at " + new Date().toLocaleString() + ". Credentials were not saved; no recurring sync is active." } : p));
       log("Bitget verified", "Read-only account-assets endpoint succeeded. No order or transfer endpoint was called.");
       setBgMessage("Read-only verification succeeded. Credentials were not saved; re-enter them for the next check.");
@@ -334,7 +353,7 @@ export function CopyCenterWorkspace() {
         <section className="cc-notice"><span className="cc-notice-icon">i</span><div><strong>Honest connection status</strong><p>Planning settings save in this browser by default. Phantom, MetaMask, and Base support public-address checks; Bitget supports a one-time read-only account-assets check after sign-in. BTCC setup stays in BTCC, while Farcaster and MetaTrader 5 remain guide-only. Sign in and choose Save to cloud or Restore cloud data to sync planning preferences. This workspace does not submit trades, transfers, or withdrawals.</p></div></section>
       </div>}
 
-      {view === "providers" && <div className="cc-page"><section className="cc-section-head"><div><p className="cc-eyebrow">CONNECTORS</p><h2>Your accounts and services</h2><p className="cc-lead">Each service has a separate status. A setup guide is not the same as a live connection.</p></div><span className="cc-pill cc-pill-muted">{connectedCount} verified</span></section><div className="cc-provider-grid">{providers.map((provider) => <article className="cc-provider-card" key={provider.id}><div className="cc-provider-top"><span className={"cc-provider-icon cc-icon-" + provider.kind}>{provider.name.slice(0, 1)}</span><span className={"cc-pill " + (provider.state !== "not-connected" ? "cc-pill-safe" : "cc-pill-off")}>{provider.state === "connected" ? "Verified session" : provider.state === "verified-once" ? "Verified once" : "Not connected"}</span></div><p className="cc-provider-kind">{provider.kind}</p><h3>{provider.name}</h3><p className="cc-provider-description">{provider.description}</p><button className="cc-card-button" onClick={() => requestConnection(provider)}>View setup <span>→</span></button></article>)}</div><p className="cc-footnote">Wallets are marked connected only after a live public-address check. Bitget is verified once per read-only account-assets check. BTCC remains guide-only while its futures API status is unresolved; Farcaster and MetaTrader 5 remain guide-only.</p></div>}
+      {view === "providers" && <div className="cc-page"><section className="cc-section-head"><div><p className="cc-eyebrow">CONNECTORS</p><h2>Your accounts and services</h2><p className="cc-lead">Each service has a separate status. A setup guide is not the same as a live connection.</p></div><span className="cc-pill cc-pill-muted">{connectedCount} verified</span></section><div className="cc-provider-grid">{providers.map((provider) => <article className="cc-provider-card" key={provider.id}><div className="cc-provider-top"><span className={"cc-provider-icon cc-icon-" + provider.kind}>{provider.name.slice(0, 1)}</span><span className={"cc-pill " + (provider.state !== "not-connected" ? "cc-pill-safe" : "cc-pill-off")}>{provider.state === "connected" ? "Verified session" : provider.state === "verified-once" ? "Verified once" : "Not connected"}</span></div><p className="cc-provider-kind">{provider.kind}</p><h3>{provider.name}</h3><p className="cc-provider-description">{provider.description}</p><button className="cc-card-button" onClick={() => requestConnection(provider)}>View setup <span>→</span></button></article>)}</div><p className="cc-footnote">Wallet sessions are verified by the wallet extension; Bitget can be checked once with read-only credentials. Public wallet addresses can be saved with your explicit cloud-save action, but a restored address is not treated as connected until the active wallet session verifies it again. BTCC, Farcaster, and MetaTrader 5 remain guide-only until their adapters are verified.</p></div>}
 
       {view === "portfolio" && <div className="cc-page"><section className="cc-section-head"><div><p className="cc-eyebrow">PORTFOLIO OVERVIEW</p><h2>One view, separate allocations</h2><p className="cc-lead">A monitoring layout for future verified balances and positions.</p></div><span className="cc-pill cc-pill-muted">No exchange data loaded</span></section><div className="cc-portfolio-empty"><div className="cc-empty-icon">▤</div><h3>Your portfolio will appear here</h3><p>No live account balances or positions have been imported. Connect a supported provider after its integration passes validation.</p><button className="cc-button" onClick={() => setView("providers")}>Review connections →</button></div><section className="cc-table-card"><div className="cc-table-title"><h3>Provider coverage</h3><span>Setup inventory</span></div><div className="cc-table-wrap"><table><thead><tr><th>Provider</th><th>Type</th><th>Connection</th><th>Next step</th></tr></thead><tbody>{providers.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.kind}</td><td><span className="cc-table-status">{p.state === "connected" ? "Verified session" : p.state === "verified-once" ? "Verified once" : "Not connected"}</span></td><td><button className="cc-text-button" onClick={() => requestConnection(p)}>Review</button></td></tr>)}</tbody></table></div></section></div>}
 
@@ -370,6 +389,7 @@ export function CopyCenterWorkspace() {
         <label className="cc-field">API passphrase<input type="password" autoComplete="off" value={bgPhrase} onChange={(e) => setBgPhrase(e.target.value)} maxLength={256} required /></label>
         <button className="cc-button" disabled={bgBusy || !cloudSession.authenticated}>{bgBusy ? "Verifying…" : "Verify read-only access"}</button>
         {bgMessage && <p className="cc-form-note" role="status">{bgMessage}</p>}
+        {bgResult && <div className="cc-notice" role="status"><span className="cc-notice-icon">✓</span><div><strong>Read-only verification passed</strong><p>Verified {new Date(bgResult.verifiedAt).toLocaleString()}. {bgResult.accountEquityUsd !== null ? "Account equity: " + money(bgResult.accountEquityUsd) + ". " : ""}{bgResult.usdtEquity !== null ? "USDT equity: " + bgResult.usdtEquity + ". " : ""}{bgResult.btcEquity !== null ? "BTC equity: " + bgResult.btcEquity + ". " : ""}This is a one-time response, not live streaming or a stored balance.</p></div></div>}
       </form>}
       {selected.id === "btcc" && <div className="cc-notice"><span className="cc-notice-icon">i</span><div><strong>BTCC native connection</strong><p>BTCC announced on February 13, 2026 that futures API trading functions would be suspended and the API application portal closed pending a restoration notice. GEM has not verified that the futures API has been restored. Do not enter BTCC API credentials here; manage copy activation directly in BTCC's official Copy Trading screen.</p><a href="https://www.btcc.com/en-US/copy-trading" target="_blank" rel="noreferrer">Open official BTCC Copy Trading ↗</a><br /><a href="https://www.btcc.com/en-US/detail/176811" target="_blank" rel="noreferrer">Read BTCC’s official API notice ↗</a><br /><a href="https://www.btcc.com/en-US/user-center/setting/api" target="_blank" rel="noreferrer">Open official BTCC API settings ↗</a></div></div>}
       {(selected.id === "phantom" || selected.id === "metamask" || selected.id === "base") && <div className="cc-form-note"><p>This connection reads the public wallet address only. GEM does not request a message signature, token approval, transaction, or withdrawal.</p><p><strong>iPhone tip:</strong> Open this site inside the wallet app’s built-in browser, then return here and tap Connect wallet. iOS Safari and the ChatGPT in-app browser may not expose the wallet provider.</p><p><a href="https://help.phantom.com/articles/how-to-connect-phantom-to-a-dapp-29995498642195" target="_blank" rel="noreferrer">Phantom’s iPhone connection guide ↗</a> · <a href="https://docs.metamask.io/metamask-connect/" target="_blank" rel="noreferrer">MetaMask mobile connection docs ↗</a></p></div>}<ol><li>Open the official service and confirm you can sign in.</li><li>Start with read-only permissions wherever supported.</li><li>Never share passwords, seed phrases, private keys, or API secrets in chat.</li><li>Verify the integration and its status before relying on displayed balances.</li></ol><div className="cc-modal-actions"><button className="cc-button cc-button-secondary" onClick={() => setSelected(null)}>Close</button>{(selected.id === "phantom" || selected.id === "metamask" || selected.id === "base") ? <button className="cc-button" onClick={() => void connectWallet(selected)}>Connect wallet</button> : <button className="cc-button" onClick={() => confirmNotConnected(selected)}>Record review</button>}</div></section></div>}

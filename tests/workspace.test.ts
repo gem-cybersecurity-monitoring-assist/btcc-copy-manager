@@ -141,3 +141,44 @@ test("rejects invalid cloud Copy Center preferences as a whole", () => {
   ];
   for (const input of bad) assert.equal(parseWorkspace(input).ok, false);
 });
+
+
+test("cloud Copy Center preferences validate and round-trip public wallet addresses only", () => {
+  const workspace = {
+    traders: [],
+    savedReviews: [],
+    portfolioSnapshots: [],
+    copyCenter: {
+      budget: "10",
+      maxLoss: "2",
+      activity: [],
+      walletAddresses: {
+        phantom: "So11111111111111111111111111111111111111112",
+        metamask: "0x0000000000000000000000000000000000000001",
+        base: "0x0000000000000000000000000000000000000002",
+      },
+    },
+  };
+  const result = parseWorkspace(workspace);
+  assert.equal(result.ok, true);
+  if (result.ok) assert.deepEqual(result.value.copyCenter?.walletAddresses, workspace.copyCenter.walletAddresses);
+
+  const invalidEvm = structuredClone(workspace);
+  invalidEvm.copyCenter.walletAddresses.metamask = "0xnot-an-address";
+  assert.equal(parseWorkspace(invalidEvm).ok, false);
+
+  const invalidSolana = structuredClone(workspace);
+  invalidSolana.copyCenter.walletAddresses.phantom = "not-a-wallet";
+  assert.equal(parseWorkspace(invalidSolana).ok, false);
+});
+
+test("older cloud Copy Center preferences remain valid without wallet addresses", () => {
+  const result = parseWorkspace({
+    traders: [],
+    savedReviews: [],
+    portfolioSnapshots: [],
+    copyCenter: { budget: "10", maxLoss: "2", activity: [] },
+  });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.value.copyCenter?.walletAddresses, undefined);
+});
