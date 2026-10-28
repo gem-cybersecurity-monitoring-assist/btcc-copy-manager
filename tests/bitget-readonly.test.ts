@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isReadOnlyUtaPermissions } from "../lib/bitget-readonly.ts";
+import { isReadOnlyUtaPermissions } from "../src/lib/bitget-readonly.ts";
 
 test("accepts the minimum UTA management/read permission", () => {
   assert.equal(isReadOnlyUtaPermissions(["uta_mgt"]), true);
