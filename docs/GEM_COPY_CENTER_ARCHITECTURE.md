@@ -2,7 +2,7 @@
 
 ## Product direction
 
-The active Next.js routing directory is the repository-root `app/` folder; the existing `src/app/` folder is not used for routing because the root `app/` directory takes precedence. The default page is the multi-provider workspace. It is designed for phone-first use and separates account visibility, provider setup, allocation planning, and execution tools. The existing BTCC live-order control room remains available at `/advanced-btcc` while the copy-center integration layer is validated.
+The active Next.js routing directory is the repository-root `app/` folder; the existing `src/app/` folder is not used for routing because the root `app/` directory takes precedence. The default page is the multi-provider workspace. It is designed for phone-first use and separates account visibility, provider setup, allocation planning, and execution tools. The existing provider engine remains available at `/copy-trading`, and the BTCC live-order control room remains separately available at `/advanced-btcc` while the friendly workspace and connector layer are validated.
 
 ## Current UI capabilities
 
