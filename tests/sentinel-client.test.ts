@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { containsForbiddenCredentialKeys } from "../src/lib/sentinel-client";
+import { containsForbiddenCredentialKeys } from "../src/lib/sentinel-client.ts";
 
 test("allows normalized read-only Sentinel payloads", () => {
   assert.equal(

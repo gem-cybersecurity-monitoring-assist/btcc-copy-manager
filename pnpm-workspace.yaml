@@ -1,2 +1,5 @@
 allowBuilds:
   sharp: set this to true or false
+overrides:
+  # GHSA: source-map-js <1.2.2 event-loop DoS (transitive via next > postcss, build-time only).
+  source-map-js: ">=1.2.2"

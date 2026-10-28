@@ -7,7 +7,8 @@ import {
   verifyAuthCookie,
   verifyControlSecret,
   expectedAuthCookie,
-} from "../src/lib/steel-browser";
+  STEEL_SESSION_TIMEOUT_MS,
+} from "../src/lib/steel-browser.ts";
 
 function withSteelEnv(run: () => void) {
   const previous = {
@@ -33,8 +34,8 @@ test("Steel configuration requires server secrets and reports safe policy metada
     const status = steelConfigStatus();
     assert.equal(status.ready, true);
     assert.deepEqual(status.missing, []);
-    assert.equal(status.timeoutMs, 30 * 60 * 1000);
-    assert.equal(status.captchaSolving, true);
+    assert.equal(status.timeoutMs, STEEL_SESSION_TIMEOUT_MS);
+    assert.equal(status.captchaSolving, false); // disabled in 8515ae6 for Steel Launch-plan compatibility
     assert.equal(status.inactivityTimeoutDisabled, true);
     assert.equal(status.persistentProfiles, true);
   });
@@ -63,7 +64,11 @@ test("Steel browser state round-trips through authenticated encryption", () => {
     assert.notEqual(sealed.includes("session-test"), true);
     assert.deepEqual(unsealSteelState(sealed), state);
 
-    const tampered = `${sealed.slice(0, -1)}${sealed.endsWith("A") ? "B" : "A"}`;
+    // Flip a character inside the ciphertext segment. (Changing the final base64url character of the
+    // tag can alter only ignored padding bits, which would leave the token byte-for-byte identical.)
+    const [version, iv, data, tag] = sealed.split(".");
+    const tamperedData = `${data[0] === "A" ? "B" : "A"}${data.slice(1)}`;
+    const tampered = [version, iv, tamperedData, tag].join(".");
     assert.deepEqual(unsealSteelState(tampered), {});
   });
 });
