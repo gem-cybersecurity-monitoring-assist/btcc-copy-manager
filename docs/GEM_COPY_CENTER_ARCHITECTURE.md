@@ -7,7 +7,7 @@ The active Next.js routing directory is the repository-root `app/` folder; the l
 ## Current UI capabilities
 
 - Provider inventory: BTCC and Bitget exchanges; Phantom and MetaMask wallets; Base network; Farcaster identity; MetaTrader 5 terminal.
-- Phantom and MetaMask wallet account access, plus Base mainnet selection and account verification. Only public addresses are read. No signature, token approval, transaction, or withdrawal is requested.
+- Phantom and MetaMask wallet account access, plus Base mainnet selection and account verification. Only public addresses are read. No signature, token approval, transaction, or withdrawal is requested. On iPhone, users should open the site inside the wallet app's in-app browser because Safari/other mobile browsers may not expose injected wallet providers; the UI links to official wallet guidance.
 - Bitget one-time read-only account-assets verification through `POST /api/connections/bitget/verify`. The user must be signed in. API key, secret, and passphrase are held in request memory only, are not logged or persisted, and are cleared from the UI after the request. This does not provide recurring account sync.
 - BTCC remains a guided native workflow. BTCC's official February 13, 2026 notice says futures API trading functions would be suspended and the API application portal closed pending a restoration notice; GEM has not verified restoration. Copy activation stays in BTCC's own interface. Source: https://www.btcc.com/en-US/detail/176811
 - Local allocation and loss planning, browser activity history, provider status labels, responsive navigation, and an explicit reset confirmation.
