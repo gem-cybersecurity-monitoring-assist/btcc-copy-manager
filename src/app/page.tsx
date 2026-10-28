@@ -1,5 +1,5 @@
-import { ManagerShell } from "@/components/manager-shell";
+import { CopyCenterWorkspace } from "@/components/copy-center-workspace";
 
 export default function HomePage() {
-  return <ManagerShell />;
+  return <CopyCenterWorkspace />;
 }
