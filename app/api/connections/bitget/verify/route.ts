@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { cloudService, guardMutation, sessionCookiesFrom } from "../../../../lib/cloud-auth.ts";
+import { cloudService, guardMutation, sessionCookiesFrom } from "@/lib/cloud-auth-bridge.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
