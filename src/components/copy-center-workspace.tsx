@@ -51,6 +51,11 @@ export function CopyCenterWorkspace() {
   const [cloudPassword, setCloudPassword] = useState("");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState<string | null>(null);
+  const [bgKey, setBgKey] = useState("");
+  const [bgSecret, setBgSecret] = useState("");
+  const [bgPhrase, setBgPhrase] = useState("");
+  const [bgMessage, setBgMessage] = useState("");
+  const [bgBusy, setBgBusy] = useState(false);
 
   useEffect(() => {
     try {
@@ -228,6 +233,27 @@ export function CopyCenterWorkspace() {
     } catch (error) {
       setCloudMessage(error instanceof Error ? error.message : "Cloud sync failed.");
     } finally { setCloudBusy(false); }
+  }
+
+  async function verifyBitget() {
+    setBgBusy(true);
+    setBgMessage("");
+    try {
+      if (!cloudSession.authenticated) throw new Error("Sign in first to verify an exchange connection.");
+      const response = await fetch("/api/connections/bitget/verify", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: bgKey, secret: bgSecret, passphrase: bgPhrase }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error : "Bitget verification failed.");
+      setProviders((old) => old.map((p) => p.id === "bitget" ? { ...p, state: "connected", note: "Read-only API verified for this session. Credentials were not saved." } : p));
+      log("Bitget verified", "Read-only account-assets endpoint succeeded. No order or transfer endpoint was called.");
+      setBgMessage("Read-only verification succeeded. Credentials were not saved; re-enter them for the next check.");
+    } catch (error) {
+      setBgMessage(error instanceof Error ? error.message : "Verification failed.");
+    } finally {
+      setBgKey("");
+      setBgSecret("");
+      setBgPhrase("");
+      setBgBusy(false);
+    }
   }
 
   async function connectWallet(provider: Provider) {
