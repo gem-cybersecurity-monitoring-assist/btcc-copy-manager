@@ -9,7 +9,7 @@ import { Notice, type EngineChange } from "./ui.tsx";
 type Block = { type: string; [key: string]: unknown };
 type Turn = { role: "user" | "assistant"; content: string | Block[] };
 type Pending = { summary: string[]; resolve: (approved: boolean) => void };
-type Status = { configured?: boolean; signedIn?: boolean; checked: boolean };
+type Status = { configured?: boolean; signedIn?: boolean; provider?: string; checked: boolean };
 
 const MAX_ROUNDS = 10;
 const TOOL_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/agent", { cache: "no-store" }).then((r) => r.json()).then((d) => setStatus({ configured: Boolean(d.configured), signedIn: Boolean(d.signedIn), checked: true })).catch(() => setStatus({ checked: true }));
+    fetch("/api/agent", { cache: "no-store" }).then((r) => r.json()).then((d) => setStatus({ configured: Boolean(d.configured), signedIn: Boolean(d.signedIn), provider: d.provider === "deepseek" ? "deepseek" : "anthropic", checked: true })).catch(() => setStatus({ checked: true }));
   }, []);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [turns, pending, busy]);
 
@@ -114,7 +114,7 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
   return (
     <div className="engine-stack agent">
       <Notice tone="info"><strong>Your GEM agent</strong> can review your workspace, add traders you tell it about, build your plan, check risk, and run reviews. Every change it wants to make is shown to you first and saved only when you click <strong>Approve</strong>. It cannot move money, trade, or touch your exchange accounts.</Notice>
-      {status.checked && status.configured === false && <Notice tone="warn"><strong>The agent isn&apos;t switched on yet.</strong> The site owner needs to add an <code>ANTHROPIC_API_KEY</code> in Vercel → Settings → Environment Variables and redeploy (see AGENT_SETUP.md).</Notice>}
+      {status.checked && status.configured === false && <Notice tone="warn"><strong>The agent isn&apos;t switched on yet.</strong> The site owner needs to add a <code>{status.provider === "deepseek" ? "DEEPSEEK_API_KEY" : "ANTHROPIC_API_KEY"}</code> in Vercel → Settings → Environment Variables and redeploy (see AGENT_SETUP.md).</Notice>}
       {status.checked && status.configured && !status.signedIn && <Notice tone="warn"><strong>Sign in to use the agent.</strong> Use the Cloud account box on this page. Signing in keeps the agent private to you.</Notice>}
 
       <div className="agent-chat" aria-live="polite">
@@ -136,7 +136,7 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
         <textarea id="agent-message" rows={2} maxLength={4000} value={input} disabled={!ready || busy} placeholder={ready ? "Type a message…" : "The agent is unavailable until it is switched on and you are signed in."} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} />
         <div className="engine-actions"><button type="submit" className="primary-btn" disabled={!ready || busy || !input.trim()}>Send</button>{turns.length > 0 && <button type="button" className="secondary-btn" disabled={busy} onClick={() => { setTurns([]); setError(""); }}>New conversation</button>}</div>
       </form>
-      <p className="footnote">Messages, and the workspace details the agent looks up, are sent to Anthropic&apos;s API to produce replies. Don&apos;t share exchange passwords, API keys, or recovery phrases.</p>
+      <p className="footnote">Messages, and the workspace details the agent looks up, are sent to {status.provider === "deepseek" ? "DeepSeek" : "Anthropic"}&apos;s API to produce replies. Don&apos;t share exchange passwords, API keys, or recovery phrases.</p>
     </div>
   );
 }

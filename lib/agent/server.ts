@@ -1,4 +1,4 @@
-// Server-side relay between the dashboard and Claude. The browser owns the conversation and runs the
+// Server-side relay between the dashboard and the agent's model (Claude here; DeepSeek in deepseek.ts). The browser owns the conversation and runs the
 // tools against the user's workspace; this module validates the transcript, adds the fixed system prompt
 // and tool definitions, and calls the Messages API with the server-held API key.
 
@@ -35,14 +35,31 @@ export function validateTranscript(raw: unknown): { ok: true; messages: Anthropi
   return { ok: true, messages: messages as Anthropic.Beta.BetaMessageParam[] };
 }
 
-export async function runAgentTurn(rawBody: string, client: MessagesClient): Promise<AgentResult> {
+export type AgentProvider = "anthropic" | "deepseek";
+
+/** AGENT_PROVIDER picks the backend; otherwise DeepSeek is used when only its key is set, else Claude. */
+export function agentProvider(env: Record<string, string | undefined>): { provider: AgentProvider; configured: boolean } {
+  const has = (k: string) => Boolean(env[k]?.trim());
+  const wanted = env.AGENT_PROVIDER?.trim().toLowerCase();
+  const provider: AgentProvider = wanted === "deepseek" || wanted === "anthropic" ? wanted : has("DEEPSEEK_API_KEY") && !has("ANTHROPIC_API_KEY") ? "deepseek" : "anthropic";
+  return { provider, configured: has(provider === "deepseek" ? "DEEPSEEK_API_KEY" : "ANTHROPIC_API_KEY") };
+}
+
+/** Size, JSON and transcript checks shared by every backend. */
+export function parseAgentRequest(rawBody: string): { ok: true; messages: Anthropic.Beta.BetaMessageParam[] } | { ok: false; result: AgentResult } {
   if (new TextEncoder().encode(rawBody).byteLength > AGENT_LIMITS.maxBytes) {
-    return { status: 413, body: { error: "This conversation is too long. Start a new conversation.", code: "conversation_too_long" } };
+    return { ok: false, result: { status: 413, body: { error: "This conversation is too long. Start a new conversation.", code: "conversation_too_long" } } };
   }
   let parsed: unknown;
-  try { parsed = JSON.parse(rawBody); } catch { return { status: 400, body: { error: "Request body must be valid JSON.", code: "invalid_json" } }; }
+  try { parsed = JSON.parse(rawBody); } catch { return { ok: false, result: { status: 400, body: { error: "Request body must be valid JSON.", code: "invalid_json" } } }; }
   const transcript = validateTranscript(parsed);
-  if (!transcript.ok) return { status: 400, body: { error: transcript.error, code: "invalid_transcript" } };
+  if (!transcript.ok) return { ok: false, result: { status: 400, body: { error: transcript.error, code: "invalid_transcript" } } };
+  return transcript;
+}
+
+export async function runAgentTurn(rawBody: string, client: MessagesClient): Promise<AgentResult> {
+  const transcript = parseAgentRequest(rawBody);
+  if (!transcript.ok) return transcript.result;
   try {
     const response = await client.beta.messages.create({
       model: AGENT_MODEL,
