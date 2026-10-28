@@ -32,7 +32,8 @@ export type Snapshot = {
 
 /** `engine` is optional so workspaces and backups created before the intelligence engine stay valid. */
 export type CopyCenterActivity = { id: string; at: string; title: string; detail: string };
-export type CopyCenterPreferences = { budget: string; maxLoss: string; activity: CopyCenterActivity[] };
+export type CopyCenterWalletAddresses = { phantom?: string; metamask?: string; base?: string };
+export type CopyCenterPreferences = { budget: string; maxLoss: string; activity: CopyCenterActivity[]; walletAddresses?: CopyCenterWalletAddresses };
 export type Workspace = { traders: Trader[]; savedReviews: string[]; portfolioSnapshots: Snapshot[]; engine?: EngineState; copyCenter?: CopyCenterPreferences };
 
 export const STORAGE_KEYS = {
@@ -75,7 +76,25 @@ function normalizeCopyCenter(input: unknown): CopyCenterPreferences | null {
     if (!isText(raw.title, 160) || !raw.title.trim() || !isText(raw.detail, 1000)) return null;
     normalizedActivity.push({ id: raw.id, at: raw.at, title: raw.title.trim(), detail: raw.detail });
   }
-  return { budget, maxLoss, activity: normalizedActivity };
+  let walletAddresses: CopyCenterWalletAddresses | undefined;
+  if (input.walletAddresses !== undefined && input.walletAddresses !== null) {
+    if (!isRecord(input.walletAddresses)) return null;
+    const rawWallets = input.walletAddresses;
+    const candidate: CopyCenterWalletAddresses = {};
+    if (rawWallets.phantom !== undefined) {
+      if (typeof rawWallets.phantom !== "string" || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(rawWallets.phantom)) return null;
+      candidate.phantom = rawWallets.phantom;
+    }
+    for (const key of ["metamask", "base"] as const) {
+      const address = rawWallets[key];
+      if (address !== undefined) {
+        if (typeof address !== "string" || !/^0x[a-fA-F0-9]{40}$/.test(address)) return null;
+        candidate[key] = address;
+      }
+    }
+    walletAddresses = candidate;
+  }
+  return { budget, maxLoss, activity: normalizedActivity, ...(walletAddresses ? { walletAddresses } : {}) };
 }
 
 export function emptyWorkspace(): Workspace {
