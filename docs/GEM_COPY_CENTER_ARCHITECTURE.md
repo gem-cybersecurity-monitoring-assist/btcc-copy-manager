@@ -9,7 +9,7 @@ The active Next.js routing directory is the repository-root `app/` folder; the l
 - Provider inventory: BTCC and Bitget exchanges; Phantom and MetaMask wallets; Base network; Farcaster identity; MetaTrader 5 terminal.
 - Phantom and MetaMask wallet account access, plus Base mainnet selection and account verification. Only public addresses are read. No signature, token approval, transaction, or withdrawal is requested.
 - Bitget one-time read-only account-assets verification through `POST /api/connections/bitget/verify`. The user must be signed in. API key, secret, and passphrase are held in request memory only, are not logged or persisted, and are cleared from the UI after the request. This does not provide recurring account sync.
-- BTCC remains a guided native workflow. This repository does not claim a verified read-only BTCC API adapter; copy activation stays in BTCC's own interface.
+- BTCC remains a guided native workflow. BTCC's official February 13, 2026 notice says futures API trading functions would be suspended and the API application portal closed pending a restoration notice; GEM has not verified restoration. Copy activation stays in BTCC's own interface. Source: https://www.btcc.com/en-US/detail/176811
 - Local allocation and loss planning, browser activity history, provider status labels, responsive navigation, and an explicit reset confirmation.
 - Authenticated Supabase sign-up, sign-in, resend-confirmation, session refresh, and logout through server routes. The browser receives HttpOnly session cookies rather than access/refresh tokens in JSON.
 - Explicit Save to cloud and Restore cloud data actions. Only the validated `copyCenter` planning preferences and activity list are synced by this UI; wallet session addresses and exchange credentials are not uploaded.
@@ -38,7 +38,7 @@ A live authenticated save/restore test still requires the owner to sign into the
 - Manual Vercel preview build completed successfully and emitted the home, copy-trading, advanced BTCC, workspace, auth, agent, and Bitget verification routes.
 - Preview HTTP checks returned 200 for `/`, `/copy-trading`, and `/advanced-btcc`; an unknown route returned 404. `/api/auth/session` reported `configured: true` and `authenticated: false` for the unsigned test request. GET requests to POST-only auth/verification endpoints returned 405.
 - Production deployment for the same commit reached READY and Vercel assigned `btcc-copy-manager.vercel.app` as an alias.
-- The automatic Vercel Git checks remain blocked by the `github-private-org-to-hobby` integration restriction; the manual deployment completed.
+- The automatic Vercel Git checks remain blocked by the `github-private-org-to-hobby` integration restriction; the manual production deployment completed successfully and the `btcc-copy-manager.vercel.app` alias points to the merged release.
 - Supabase's security advisor reports that platform-level leaked-password protection is disabled. The app enforces a 12-character minimum, but enabling HaveIBeenPwned protection is a project-plan/configuration decision and was not changed here.
 
 ## Remaining owner-side checks
