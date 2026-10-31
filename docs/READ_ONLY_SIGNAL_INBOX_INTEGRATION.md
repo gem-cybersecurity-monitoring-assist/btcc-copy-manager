@@ -26,6 +26,20 @@ There is no dedicated signed outbound webhook or push-event route in the verifie
 
 The production Copy Center is a planning, intelligence, and record-keeping workspace. Its current contract explicitly excludes exchange trading, copy enrollment, and automatic mirroring. Provider statistics are manually entered/imported or simulated; the existing provider registry does not yet have a verified live signal feed.
 
+
+## Exact production endpoint behaviour verified in source
+
+The read-only routes are currently protected by the Worker's global per-IP D1 rate limiter, but they do not call `requireApiKey`. That API-key check is applied to selected mutation/order routes. The read-only signal endpoints therefore must be treated as publicly reachable data endpoints, not as authenticated account data. Copy Center must not send a backend API key, exchange credential, or user token to them. The global rate limiter defaults to 120 requests per minute per IP (configurable by `RATE_LIMIT_RPM`). CORS defaults to wildcard when `CORS_ALLOWED_ORIGINS` is not configured.
+
+Additional source details:
+
+- `GET /market/prices?symbols=BTC,ETH` returns each resolved price with `source`, `stale`, and a response-time `ts`. This is the strongest current endpoint for identifying a cache/static fallback, but its `ts` is not the original market tick timestamp.
+- `GET /market/snapshots?symbol=BTC&limit=50` returns stored snapshot rows, including `created_at`, `source`, and `stale`. It can help establish the age of the latest cached market observation.
+- `GET /signal/latest` returns a persisted row directly when present; that response adds runtime safety flags and response-time `ts`, but does not add `price_source` or a linked market-snapshot ID. Otherwise it derives an EMA-style result from up to 20 stored prices and returns `price_source`; the implementation does not expose the selected snapshot IDs/timestamps or `px.stale` in that derived response.
+- The current symbol normalizer removes USD/USDT suffixes but is not itself a strict symbol allowlist. Copy Center must apply its own allowlist before requesting upstream data.
+
+Consequently, do not infer signal freshness from the response `ts`, and do not infer that a persisted signal's entry price matches the latest market price. A Copy Center preview can display source metadata as an informational observation, but must keep any signal without a trustworthy signal timestamp and linked market-data timestamp in a non-actionable `REVIEW_REQUIRED` state.
+
 ## Integration boundary
 
 Implement this in stages, keeping the two applications separate:
