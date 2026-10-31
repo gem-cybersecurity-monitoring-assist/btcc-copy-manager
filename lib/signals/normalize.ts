@@ -9,7 +9,7 @@ export type SignalInboxItem = {
   id: string; eventId: string; symbol: SignalSymbol; side: SignalSide; confidence: number; strategy: string;
   entryPrice: number; stopLoss: number | null; takeProfit: number | null;
   source: SignalSource; sourceKind: SignalSourceKind | null; provenanceStatus: string | null;
-  priceSource: string | null; signalCreatedAt: string | null; marketDataAsOf: string | null;
+  priceSource: string | null; marketSnapshotPrice: number | null; signalCreatedAt: string | null; marketDataAsOf: string | null;
   expiresAt: string | null; fetchedAt: string | null; freshness: SignalFreshness;
   decisionGrade: boolean; reviewRequired: true; readOnly: true;
 };
@@ -68,9 +68,11 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
     if (parsedSignalAt === undefined || parsedMarketAt === undefined || parsedExpiry === undefined) return { ok: false, error: "The signal provenance timestamps are invalid." };
     if (parsedSignalAt && Date.parse(parsedSignalAt) > nowMs + 5 * 60_000) return { ok: false, error: "The signal creation timestamp is in the future." };
     if (parsedMarketAt && Date.parse(parsedMarketAt) > nowMs + 5 * 60_000) return { ok: false, error: "The market-data timestamp is in the future." };
-    if (payload.source_kind === "persisted" && (payload.stale !== true || payload.decision_grade !== false || payload.market_data_as_of !== null || payload.price_source !== null)) return { ok: false, error: "Persisted signals without a linked market snapshot must remain stale and non-decision-grade." };
+    if (payload.source_kind === "persisted" && (payload.stale !== true || payload.decision_grade !== false || payload.market_data_as_of !== null || payload.market_snapshot_price !== null || payload.price_source !== null)) return { ok: false, error: "Persisted signals without a linked market snapshot must remain stale and non-decision-grade." };
     if (payload.source_kind === "derived") {
-      if (parsedMarketAt === null || parsedExpiry === null || (priceSource !== "coinbase" && priceSource !== "binance")) return { ok: false, error: "Derived signals require a verified live market snapshot." };
+      if (parsedMarketAt === null || parsedExpiry === null || !finite(payload.market_snapshot_price) || payload.market_snapshot_price <= 0 || (priceSource !== "coinbase" && priceSource !== "binance")) return { ok: false, error: "Derived signals require a verified live market snapshot." };
+      const priceTolerance = Math.max(1e-8, payload.entry_price * 1e-10);
+      if (Math.abs(payload.market_snapshot_price - payload.entry_price) > priceTolerance) return { ok: false, error: "The signal entry price does not match its market snapshot." };
       const marketMs = Date.parse(parsedMarketAt);
       const expiryMs = Date.parse(parsedExpiry);
       const marketExpired = nowMs - marketMs < 0 || nowMs - marketMs > 15 * 60_000 || expiryMs <= nowMs || expiryMs > marketMs + 15 * 60_000;
@@ -131,7 +133,7 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
   return { ok: true, value: {
     id, eventId, symbol, side: rawSide, confidence: payload.confidence, strategy: payload.strategy.trim(),
     entryPrice: payload.entry_price, stopLoss, takeProfit, source, sourceKind, provenanceStatus,
-    priceSource, signalCreatedAt, marketDataAsOf, expiresAt, fetchedAt, freshness,
+    priceSource, marketSnapshotPrice: finite(payload.market_snapshot_price) ? payload.market_snapshot_price : null, signalCreatedAt, marketDataAsOf, expiresAt, fetchedAt, freshness,
     decisionGrade, reviewRequired: true, readOnly: true,
   } };
 }
