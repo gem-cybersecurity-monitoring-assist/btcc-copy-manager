@@ -45,7 +45,7 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
   if (stopLoss === undefined || takeProfit === undefined) return { ok: false, error: "The signal risk levels are invalid." };
   const fetchedAt = finite(payload.ts) && payload.ts > 0 && payload.ts <= 8.64e15 && Number.isFinite(new Date(payload.ts).getTime()) ? new Date(payload.ts).toISOString() : null;
   const priceSource = typeof payload.price_source === "string" ? payload.price_source : null;
-  const hasVersionedContract = payload.schema_version !== undefined || payload.source_kind !== undefined || payload.event_id !== undefined;
+  const hasVersionedContract = payload.schema_version !== undefined || payload.source_kind !== undefined;
 
   let source: SignalSource;
   let sourceKind: SignalSourceKind | null = null;
