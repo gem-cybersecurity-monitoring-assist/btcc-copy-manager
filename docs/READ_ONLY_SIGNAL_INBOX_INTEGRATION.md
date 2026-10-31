@@ -42,6 +42,18 @@ Additional source details:
 
 Consequently, do not infer signal freshness from the response `ts`, and do not infer that a persisted signal's entry price matches the latest market price. A Copy Center preview can display source metadata as an informational observation, but must keep any signal without a trustworthy signal timestamp and linked market-data timestamp in a non-actionable `REVIEW_REQUIRED` state.
 
+## Live read-only production smoke check (2026-10-31)
+
+The canonical Worker origin was fetched successfully through its public GET endpoints. The observed results are a point-in-time diagnostic, not a trading recommendation:
+
+- `GET /signal/latest?symbol=BTC` returned `HOLD`, confidence `0.5`, strategy `worker_ema_crossover`, `price_source=coinbase`, and the full paper/testnet safety flags (`allow_mainnet=false`, `live_trading_enabled=false`, `withdrawals_enabled=false`). No stop-loss or take-profit was supplied for this HOLD result.
+- `GET /market/prices?symbols=BTC,ETH` returned both assets with `source=coinbase` and `stale=false` at the time of the check.
+- `GET /market/snapshots?symbol=BTC&limit=3` returned stored Coinbase observations with database `created_at` timestamps.
+- `GET /exchange/status` returned `status=paper_only` and `live_execution=false`.
+- An unsupported symbol probe, `GET /signal/latest?symbol=UNLISTED`, still returned `available=true` with `price_source=fallback` and a synthetic price of `1`. This confirms that Copy Center must reject unknown symbols itself and must reject every `price_source=fallback` result; the Worker response's `available` field is not a validity check.
+
+All probes were GET-only. No credentials were sent, and no order, paper trade, configuration change, database write initiated by the integration, or deployment was performed. The endpoint was reachable and the returned runtime flags remained paper/testnet-only during this check.
+
 ## Integration boundary
 
 Implement this in stages, keeping the two applications separate:
