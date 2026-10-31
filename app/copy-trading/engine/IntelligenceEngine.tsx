@@ -13,10 +13,12 @@ import type { Trader } from "../../../lib/workspace.ts";
 import { AllocationTab, IntelligenceTab, RiskTab } from "./AnalysisTabs.tsx";
 import { LabTab, MonitoringTab, WalletsTab } from "./OpsTabs.tsx";
 import { AgentTab } from "./AgentTab.tsx";
+import { SignalInboxTab } from "./SignalInboxTab.tsx";
 import { Notice, num, pct, Pill, usd, when, type EngineChange } from "./ui.tsx";
 
 const TABS = [
   ["agent", "★ Agent"],
+  ["signals", "I · Signal Inbox"],
   ["providers", "A · Providers"],
   ["opportunities", "B · Opportunities"],
   ["intelligence", "C · Strategy intelligence"],
@@ -70,6 +72,7 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
       </div>
       <div role="tabpanel" id={`engine-panel-${tab}`} aria-labelledby={`engine-tab-${tab}`} className="engine-panel">
         {tab === "agent" && <AgentTab engine={engine} onChange={onChange} />}
+        {tab === "signals" && <SignalInboxTab />}
         {tab === "providers" && <ProvidersTab engine={engine} onChange={onChange} now={now} evaluations={evaluations} />}
         {tab === "opportunities" && <OpportunitiesTab engine={engine} onChange={onChange} evaluations={evaluations} manualTraders={manualTraders} now={now} />}
         {tab === "intelligence" && <IntelligenceTab engine={engine} onChange={onChange} evaluations={evaluations} />}
