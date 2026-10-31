@@ -47,7 +47,7 @@ test("accepts fresh derived signals only when Worker supplies a fresh matching m
   if (result.ok) { assert.equal(result.value.freshness, "FRESH_MARKET_DATA"); assert.equal(result.value.marketDataAsOf, "2026-10-31T11:59:00.000Z"); assert.equal(result.value.id, "ema:BTC:88:BUY"); }
 });
 test("marks Worker-reported stale derived market data stale", () => {
-  const { created_at, id, ...derived } = { ...base, strategy: "worker_ema_crossover", price_source: "coinbase", market_data_as_of: "2026-10-31T11:59:00.000Z", market_data_stale: true, stale: true };
+  const { created_at, id, ...derived } = { ...base, strategy: "worker_ema_crossover", price_source: "coinbase", event_id: "ema:BTC:88:BUY", market_data_as_of: "2026-10-31T11:59:00.000Z", market_data_stale: true, stale: true };
   void created_at; void id;
   const result = normalizeWorkerSignal(derived, now);
   assert.equal(result.ok, true); if (result.ok) assert.equal(result.value.freshness, "STALE");
