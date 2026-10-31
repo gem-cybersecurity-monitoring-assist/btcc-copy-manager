@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeWorkerSignal, SIGNAL_SYMBOLS } from "../../../../lib/signals/normalize.ts";
+import { normalizeWorkerSignal, SIGNAL_SYMBOLS } from "../../../lib/signals/normalize.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
