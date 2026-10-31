@@ -13,6 +13,8 @@ The production Worker is Cloudflare Workers + D1, with the entry point configure
 - `/intent/live`, `/live/order`, and `/withdraw` remain disabled
 - authenticated paper actions are separately protected by the Worker's identity and GLOBAL TRADER authorization checks
 
+The canonical Worker origin recorded by the Crypto Signal Bot production runbook and deployment status is `https://crypto-signal-bot-api.analyzer-d94.workers.dev`. Do not substitute older `workers.dev` hostnames or infer a hostname from the Worker name alone.
+
 The current Worker exposes read-only signal routes:
 
 - `GET /signal/latest?symbol=BTCUSDT`
