@@ -27,9 +27,10 @@ export function SignalInboxTab() {
     : signal?.freshness === "SOURCE_TIME_UNVERIFIED" ? "Source time unverified"
     : signal?.freshness === "FRESH_BY_MARKET_TIME" ? "Market data timestamp verified"
     : signal?.freshness === "FRESH_BY_SIGNAL_AND_MARKET_TIME" ? "Signal + market timestamps verified"
+    : signal?.freshness === "FRESH_MARKET_DATA" ? "Market timestamp available · review only"
     : "Recent signal timestamp only";
   const freshnessTone = signal?.freshness === "STALE" ? "bad"
-    : signal?.freshness === "SOURCE_TIME_UNVERIFIED" || signal?.freshness === "FRESH_BY_SIGNAL_TIME" ? "warn"
+    : signal?.freshness === "SOURCE_TIME_UNVERIFIED" || signal?.freshness === "FRESH_BY_SIGNAL_TIME" || signal?.freshness === "FRESH_MARKET_DATA" ? "warn"
     : "good";
   return (
     <div className="engine-stack signal-inbox">
@@ -60,6 +61,7 @@ export function SignalInboxTab() {
           <p><strong>Fetched:</strong> {signal.fetchedAt ? new Date(signal.fetchedAt).toLocaleString() : "Not supplied"}</p>
           {signal.freshness === "SOURCE_TIME_UNVERIFIED" && <Notice tone="warn">The current Worker response does not include the source market-snapshot timestamp. Its response time is not proof of market freshness. Treat this as research context only.</Notice>}
           {signal.freshness === "FRESH_BY_SIGNAL_TIME" && <Notice tone="warn">The signal creation time is recent, but the underlying market-snapshot time is not supplied. This is not a verified current market view.</Notice>}
+          {signal.freshness === "FRESH_MARKET_DATA" && <Notice tone="warn">A recent market timestamp is supplied, but this response lacks the complete versioned provenance envelope. Keep it in manual review; it is not decision-grade.</Notice>}
           {signal.freshness === "STALE" && <Notice tone="warn">The Worker marked this signal stale or incomplete. It is shown for context only and is not decision-grade.</Notice>}
           {signal.provenanceStatus === "UNTRUSTED_PRICE_FALLBACK" && <Notice tone="warn">The Worker could not verify the price source. Do not use this entry reference.</Notice>}
           <div className="signal-readonly"><Pill tone="neutral">Read only</Pill><Pill tone="warn">Human review required</Pill><Pill tone="neutral">No automatic execution</Pill><Pill tone={signal.decisionGrade ? "good" : "warn"}>{signal.decisionGrade ? "Source timestamps passed" : "Not decision-grade"}</Pill></div>
