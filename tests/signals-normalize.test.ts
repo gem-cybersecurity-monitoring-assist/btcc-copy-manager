@@ -63,6 +63,7 @@ test("keeps persisted signals without linked market data stale and non-decision-
     provenance_status: "PERSISTED_SIGNAL",
     signal_created_at: "2026-10-31T11:55:00.000Z",
     market_data_as_of: null,
+    market_snapshot_price: null,
     expires_at: "2026-10-31T12:10:00.000Z",
     stale: true,
     decision_grade: false,
@@ -106,6 +107,7 @@ test("normalizes a fresh versioned derived signal by market snapshot time", () =
     provenance_status: "DERIVED_WORKER_SIGNAL",
     signal_created_at: "2026-10-31T12:00:00.000Z",
     market_data_as_of: "2026-10-31T11:59:45.000Z",
+    market_snapshot_price: 68000,
     expires_at: "2026-10-31T12:14:45.000Z",
     price_source: "coinbase",
     stale: false,
@@ -118,6 +120,27 @@ test("normalizes a fresh versioned derived signal by market snapshot time", () =
   }
 });
 
+test("rejects a derived signal whose entry price differs from the reported market snapshot", () => {
+  const result = normalizeWorkerSignal({
+    ...base,
+    created_at: undefined,
+    id: undefined,
+    strategy: "worker_ema_crossover",
+    schema_version: 1,
+    event_id: "derived:BTC:77:BUY",
+    source_kind: "derived",
+    provenance_status: "DERIVED_WORKER_SIGNAL",
+    signal_created_at: "2026-10-31T12:00:00.000Z",
+    market_data_as_of: "2026-10-31T11:59:45.000Z",
+    market_snapshot_price: 67999,
+    expires_at: "2026-10-31T12:14:45.000Z",
+    price_source: "coinbase",
+    stale: false,
+    decision_grade: true,
+  }, now);
+  assert.equal(result.ok, false);
+});
+
 test("keeps stale versioned signals visible but never decision-grade", () => {
   const result = normalizeWorkerSignal({
     ...base,
@@ -127,6 +150,7 @@ test("keeps stale versioned signals visible but never decision-grade", () => {
     provenance_status: "PERSISTED_SIGNAL",
     signal_created_at: "2026-10-31T11:00:00.000Z",
     market_data_as_of: null,
+    market_snapshot_price: null,
     expires_at: "2026-10-31T11:15:00.000Z",
     stale: true,
     decision_grade: false,
@@ -146,6 +170,7 @@ test("rejects inconsistent or incomplete versioned provenance", () => {
     provenance_status: "DERIVED_WORKER_SIGNAL",
     signal_created_at: "2026-10-31T12:00:00.000Z",
     market_data_as_of: "2026-10-31T11:59:45.000Z",
+    market_snapshot_price: 68000,
     expires_at: "2026-10-31T12:14:45.000Z",
     price_source: "coinbase",
     stale: false,
