@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isSignalInboxSymbol, normalizeWorkerSignal } from "../../../../lib/signal-inbox.ts";
+import { isSignalInboxSymbol, normalizeWorkerSignal } from "../../../lib/signal-inbox.ts";
 
 export const runtime = "nodejs";
 
