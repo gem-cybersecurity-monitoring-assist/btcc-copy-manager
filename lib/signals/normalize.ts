@@ -2,20 +2,32 @@ export const SIGNAL_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "ADA", "XRP", "DOT", 
 export type SignalSymbol = (typeof SIGNAL_SYMBOLS)[number];
 export type SignalSide = "BUY" | "SELL" | "HOLD";
 export type SignalSource = "PERSISTED_SIGNAL" | "DERIVED_WORKER_SIGNAL";
-export type SignalFreshness = "FRESH_BY_SIGNAL_TIME" | "FRESH_MARKET_DATA" | "STALE" | "SOURCE_TIME_UNVERIFIED";
+export type SignalSourceKind = "persisted" | "derived";
+export type SignalFreshness = "FRESH_BY_SIGNAL_AND_MARKET_TIME" | "FRESH_BY_MARKET_TIME" | "FRESH_BY_SIGNAL_TIME" | "STALE" | "SOURCE_TIME_UNVERIFIED";
 
 export type SignalInboxItem = {
-  id: string; symbol: SignalSymbol; side: SignalSide; confidence: number; strategy: string;
+  id: string; eventId: string; symbol: SignalSymbol; side: SignalSide; confidence: number; strategy: string;
   entryPrice: number; stopLoss: number | null; takeProfit: number | null;
-  source: SignalSource; priceSource: string | null; signalCreatedAt: string | null;
-  marketDataAsOf: string | null; fetchedAt: string | null; freshness: SignalFreshness;
-  reviewRequired: true; readOnly: true;
+  source: SignalSource; sourceKind: SignalSourceKind | null; provenanceStatus: string | null;
+  priceSource: string | null; signalCreatedAt: string | null; marketDataAsOf: string | null;
+  expiresAt: string | null; fetchedAt: string | null; freshness: SignalFreshness;
+  decisionGrade: boolean; reviewRequired: true; readOnly: true;
 };
 
 type UnknownRecord = Record<string, unknown>;
 const record = (value: unknown): value is UnknownRecord => typeof value === "object" && value !== null && !Array.isArray(value);
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const positiveOrNull = (value: unknown): number | null | undefined => value === null || value === undefined ? null : finite(value) && value > 0 ? value : undefined;
+
+function parsedTimestamp(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)
+    ? `${value.replace(" ", "T")}Z`
+    : value;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined;
+}
 
 export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { ok: true; value: SignalInboxItem } | { ok: false; error: string } {
   if (!record(payload)) return { ok: false, error: "The signal response is not an object." };
@@ -32,26 +44,65 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
   const stopLoss = positiveOrNull(payload.stop_loss); const takeProfit = positiveOrNull(payload.take_profit);
   if (stopLoss === undefined || takeProfit === undefined) return { ok: false, error: "The signal risk levels are invalid." };
   const fetchedAt = finite(payload.ts) && payload.ts > 0 && payload.ts <= 8.64e15 && Number.isFinite(new Date(payload.ts).getTime()) ? new Date(payload.ts).toISOString() : null;
-  const createdAtRaw = payload.created_at; let signalCreatedAt: string | null = null;
-  const marketRaw = payload.market_data_as_of;
-  const marketMs = typeof marketRaw === "string" ? Date.parse(marketRaw) : NaN;
-  const marketDataAsOf = Number.isFinite(marketMs) && Math.abs(marketMs) <= 8.64e15 ? new Date(marketMs).toISOString() : null;
-  let source: SignalSource; let freshness: SignalFreshness; let id: string;
-  if (typeof createdAtRaw === "string" && createdAtRaw.trim()) {
-    const parsed = Date.parse(createdAtRaw);
-    if (!Number.isFinite(parsed) || Math.abs(parsed) > 8.64e15) return { ok: false, error: "The persisted signal timestamp is invalid." };
-    if (parsed > nowMs + 5 * 60_000) return { ok: false, error: "The persisted signal timestamp is in the future." };
-    signalCreatedAt = new Date(parsed).toISOString(); source = "PERSISTED_SIGNAL";
-    freshness = payload.stale === true || nowMs - parsed > 15 * 60_000 ? "STALE" : "FRESH_BY_SIGNAL_TIME";
-    id = typeof payload.event_id === "string" && payload.event_id.length <= 180 ? payload.event_id : "persisted:" + symbol + ":" + String(payload.id ?? signalCreatedAt);
-  } else if (payload.strategy === "worker_ema_crossover") {
-    if (payload.price_source !== "coinbase" && payload.price_source !== "binance") return { ok: false, error: "The derived signal uses cached or fallback pricing and is excluded from the inbox." };
-    source = "DERIVED_WORKER_SIGNAL";
-    const marketTimeValid = Number.isFinite(marketMs) && marketMs <= nowMs + 5 * 60_000 && nowMs - marketMs <= 15 * 60_000;
-    if (payload.stale === true || payload.market_data_stale === true || (Number.isFinite(marketMs) && !marketTimeValid)) freshness = "STALE";
-    else if (payload.market_data_stale === false && marketTimeValid) freshness = "FRESH_MARKET_DATA";
-    else freshness = "SOURCE_TIME_UNVERIFIED";
-    id = typeof payload.event_id === "string" && payload.event_id.length <= 180 ? payload.event_id : "derived-review:" + symbol + ":" + String(rawSide) + ":" + String(payload.strategy);
-  } else return { ok: false, error: "The signal has no verifiable creation time or recognized derived-signal source." };
-  return { ok: true, value: { id, symbol, side: rawSide, confidence: payload.confidence, strategy: payload.strategy.trim(), entryPrice: payload.entry_price, stopLoss, takeProfit, source, priceSource: typeof payload.price_source === "string" ? payload.price_source : null, signalCreatedAt, marketDataAsOf, fetchedAt, freshness, reviewRequired: true, readOnly: true } };
+  const priceSource = typeof payload.price_source === "string" ? payload.price_source : null;
+  const hasVersionedContract = payload.schema_version !== undefined || payload.source_kind !== undefined || payload.event_id !== undefined;
+
+  let source: SignalSource;
+  let sourceKind: SignalSourceKind | null = null;
+  let provenanceStatus: string | null = null;
+  let signalCreatedAt: string | null = null;
+  let marketDataAsOf: string | null = null;
+  let expiresAt: string | null = null;
+  let freshness: SignalFreshness;
+  let id: string;
+  let eventId: string;
+  let decisionGrade = false;
+
+  if (hasVersionedContract) {
+    if (payload.schema_version !== 1 || typeof payload.event_id !== "string" || !payload.event_id.trim() || payload.event_id.length > 180) return { ok: false, error: "The versioned signal identity is missing or invalid." };
+    if (payload.source_kind !== "persisted" && payload.source_kind !== "derived") return { ok: false, error: "The signal source kind is invalid." };
+    if (typeof payload.stale !== "boolean" || typeof payload.decision_grade !== "boolean") return { ok: false, error: "The signal freshness contract is incomplete." };
+    const parsedSignalAt = parsedTimestamp(payload.signal_created_at);
+    const parsedMarketAt = parsedTimestamp(payload.market_data_as_of);
+    const parsedExpiry = parsedTimestamp(payload.expires_at);
+    if (parsedSignalAt === undefined || parsedMarketAt === undefined || parsedExpiry === undefined) return { ok: false, error: "The signal provenance timestamps are invalid." };
+    if (parsedSignalAt && Date.parse(parsedSignalAt) > nowMs + 5 * 60_000) return { ok: false, error: "The signal creation timestamp is in the future." };
+    if (parsedMarketAt && Date.parse(parsedMarketAt) > nowMs + 5 * 60_000) return { ok: false, error: "The market-data timestamp is in the future." };
+    if (payload.decision_grade !== !payload.stale) return { ok: false, error: "The signal freshness flags are inconsistent." };
+    sourceKind = payload.source_kind;
+    source = sourceKind === "persisted" ? "PERSISTED_SIGNAL" : "DERIVED_WORKER_SIGNAL";
+    provenanceStatus = typeof payload.provenance_status === "string" ? payload.provenance_status : null;
+    const expectedStatus = sourceKind === "persisted" ? "PERSISTED_SIGNAL" : "DERIVED_WORKER_SIGNAL";
+    if (provenanceStatus !== expectedStatus && provenanceStatus !== "UNTRUSTED_PRICE_FALLBACK") return { ok: false, error: "The signal provenance label is invalid." };
+    if (sourceKind === "derived" && (provenanceStatus === "UNTRUSTED_PRICE_FALLBACK" || priceSource === null || priceSource === "fallback" || priceSource.startsWith("cache:"))) return { ok: false, error: "The derived signal uses cached or fallback pricing and is excluded from the inbox." };
+    signalCreatedAt = parsedSignalAt;
+    marketDataAsOf = parsedMarketAt;
+    expiresAt = parsedExpiry;
+    freshness = payload.stale ? "STALE" : sourceKind === "persisted" ? "FRESH_BY_SIGNAL_AND_MARKET_TIME" : "FRESH_BY_MARKET_TIME";
+    decisionGrade = payload.decision_grade;
+    eventId = payload.event_id;
+    id = eventId;
+  } else {
+    const createdAtRaw = payload.created_at;
+    const parsedCreatedAt = parsedTimestamp(createdAtRaw);
+    if (parsedCreatedAt === undefined) return { ok: false, error: "The persisted signal timestamp is invalid." };
+    if (parsedCreatedAt) {
+      if (Date.parse(parsedCreatedAt) > nowMs + 5 * 60_000) return { ok: false, error: "The persisted signal timestamp is in the future." };
+      signalCreatedAt = parsedCreatedAt; source = "PERSISTED_SIGNAL"; sourceKind = "persisted";
+      freshness = nowMs - Date.parse(parsedCreatedAt) > 15 * 60_000 ? "STALE" : "FRESH_BY_SIGNAL_TIME";
+      id = "persisted:" + symbol + ":" + String(payload.id ?? signalCreatedAt);
+    } else if (payload.strategy === "worker_ema_crossover") {
+      if (priceSource !== "coinbase" && priceSource !== "binance") return { ok: false, error: "The derived signal uses cached or fallback pricing and is excluded from the inbox." };
+      source = "DERIVED_WORKER_SIGNAL"; sourceKind = "derived"; freshness = "SOURCE_TIME_UNVERIFIED";
+      id = "derived-review:" + symbol + ":" + String(rawSide) + ":" + String(payload.strategy);
+    } else return { ok: false, error: "The signal has no verifiable creation time or recognized derived-signal source." };
+    eventId = id;
+  }
+
+  return { ok: true, value: {
+    id, eventId, symbol, side: rawSide, confidence: payload.confidence, strategy: payload.strategy.trim(),
+    entryPrice: payload.entry_price, stopLoss, takeProfit, source, sourceKind, provenanceStatus,
+    priceSource, signalCreatedAt, marketDataAsOf, expiresAt, fetchedAt, freshness,
+    decisionGrade, reviewRequired: true, readOnly: true,
+  } };
 }
