@@ -68,6 +68,8 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
     if (parsedSignalAt === undefined || parsedMarketAt === undefined || parsedExpiry === undefined) return { ok: false, error: "The signal provenance timestamps are invalid." };
     if (parsedSignalAt && Date.parse(parsedSignalAt) > nowMs + 5 * 60_000) return { ok: false, error: "The signal creation timestamp is in the future." };
     if (parsedMarketAt && Date.parse(parsedMarketAt) > nowMs + 5 * 60_000) return { ok: false, error: "The market-data timestamp is in the future." };
+    if (payload.source_kind === "persisted" && (payload.stale !== true || payload.decision_grade !== false || payload.market_data_as_of !== null || payload.price_source !== null)) return { ok: false, error: "Persisted signals without a linked market snapshot must remain stale and non-decision-grade." };
+    if (payload.source_kind === "derived" && (payload.market_data_as_of === null || payload.expires_at === null || (payload.price_source !== "coinbase" && payload.price_source !== "binance"))) return { ok: false, error: "Derived signals require a verified live market snapshot." };
     if (payload.decision_grade !== !payload.stale) return { ok: false, error: "The signal freshness flags are inconsistent." };
     sourceKind = payload.source_kind;
     source = sourceKind === "persisted" ? "PERSISTED_SIGNAL" : "DERIVED_WORKER_SIGNAL";
