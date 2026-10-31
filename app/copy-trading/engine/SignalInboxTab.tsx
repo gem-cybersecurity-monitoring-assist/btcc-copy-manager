@@ -23,7 +23,14 @@ export function SignalInboxTab() {
     finally { setBusy(false); }
   }, [symbol]);
   useEffect(() => { void refresh(); }, [refresh]);
-  const freshnessLabel = signal?.freshness === "STALE" ? "Stale signal" : signal?.freshness === "SOURCE_TIME_UNVERIFIED" ? "Source time unverified" : signal?.freshness === "FRESH_MARKET_DATA" ? "Fresh market snapshot" : "Recent signal timestamp";
+  const freshnessLabel = signal?.freshness === "STALE" ? "Stale / review only"
+    : signal?.freshness === "SOURCE_TIME_UNVERIFIED" ? "Source time unverified"
+    : signal?.freshness === "FRESH_BY_MARKET_TIME" ? "Market data timestamp verified"
+    : signal?.freshness === "FRESH_BY_SIGNAL_AND_MARKET_TIME" ? "Signal + market timestamps verified"
+    : "Recent signal timestamp only";
+  const freshnessTone = signal?.freshness === "STALE" ? "bad"
+    : signal?.freshness === "SOURCE_TIME_UNVERIFIED" || signal?.freshness === "FRESH_BY_SIGNAL_TIME" ? "warn"
+    : "good";
   return (
     <div className="engine-stack signal-inbox">
       <Notice tone="info"><strong>Read-only connection.</strong> Signals are fetched from the Crypto Signal Bot for review only. They are not copy-trading instructions, are not added to your strategy history, and cannot place orders or change allocations.</Notice>
@@ -37,7 +44,7 @@ export function SignalInboxTab() {
       {message && <Notice tone={message.includes("unavailable") || message.includes("timed out") ? "warn" : "info"}>{message}</Notice>}
       {signal && (
         <article className="signal-card">
-          <div className="signal-card-top"><div><p className="eyebrow">LATEST WORKER SIGNAL</p><h3>{signal.symbol}/USDT · {signal.side}</h3></div><Pill tone={signal.freshness === "STALE" ? "bad" : signal.freshness === "SOURCE_TIME_UNVERIFIED" ? "warn" : "neutral"}>{freshnessLabel}</Pill></div>
+          <div className="signal-card-top"><div><p className="eyebrow">LATEST WORKER SIGNAL</p><h3>{signal.symbol}/USDT · {signal.side}</h3></div><Pill tone={freshnessTone}>{freshnessLabel}</Pill></div>
           <div className="signal-metrics">
             <div><span>Confidence</span><strong>{(signal.confidence * 100).toFixed(0)}%</strong></div>
             <div><span>Entry reference</span><strong>{signal.entryPrice.toLocaleString(undefined, { maximumFractionDigits: 8 })}</strong></div>
@@ -45,15 +52,17 @@ export function SignalInboxTab() {
             <div><span>Take profit</span><strong>{signal.takeProfit === null ? "Not supplied" : signal.takeProfit.toLocaleString(undefined, { maximumFractionDigits: 8 })}</strong></div>
           </div>
           <p><strong>Strategy:</strong> {signal.strategy}</p>
-          <p><strong>Source:</strong> {signal.source === "PERSISTED_SIGNAL" ? "Saved Worker signal" : "Worker-derived EMA signal"}{signal.priceSource ? " · " + signal.priceSource : ""}</p>
+          <p><strong>Source:</strong> {signal.source === "PERSISTED_SIGNAL" ? "Saved Worker signal" : "Worker-derived EMA signal"}{signal.priceSource ? " · " + signal.priceSource : " · price source not supplied"}</p>
           <p><strong>Signal time:</strong> {signal.signalCreatedAt ? new Date(signal.signalCreatedAt).toLocaleString() : "Not supplied by Worker"}</p>
           <p><strong>Market data as of:</strong> {signal.marketDataAsOf ? new Date(signal.marketDataAsOf).toLocaleString() : "Not supplied by Worker"}</p>
+          <p><strong>Expires:</strong> {signal.expiresAt ? new Date(signal.expiresAt).toLocaleString() : "No trustworthy expiry supplied"}</p>
+          <p><strong>Event reference:</strong> <code>{signal.eventId}</code></p>
           <p><strong>Fetched:</strong> {signal.fetchedAt ? new Date(signal.fetchedAt).toLocaleString() : "Not supplied"}</p>
-          {signal.freshness === "SOURCE_TIME_UNVERIFIED" && <Notice tone="warn">The Worker does not provide the source market-snapshot timestamp for this derived signal. Its response time is not proof of market freshness. Treat this as research context only.</Notice>}
-          {signal.freshness === "STALE" && <Notice tone="warn">This saved signal is older than 15 minutes. Do not rely on it as a current market view.</Notice>}
-          {signal.source === "PERSISTED_SIGNAL" && <p className="field-hint">The Worker supplied a signal creation time, but not the underlying market-snapshot time. This timestamp alone does not prove the quoted price is current.</p>}
-          {signal.freshness === "FRESH_MARKET_DATA" && <Notice tone="info">The Worker reports a recent matching live market snapshot. This remains research context and still requires your review.</Notice>}
-          <div className="signal-readonly"><Pill tone="neutral">Read only</Pill><Pill tone="warn">Review required</Pill><Pill tone="neutral">No automatic execution</Pill></div>
+          {signal.freshness === "SOURCE_TIME_UNVERIFIED" && <Notice tone="warn">The current Worker response does not include the source market-snapshot timestamp. Its response time is not proof of market freshness. Treat this as research context only.</Notice>}
+          {signal.freshness === "FRESH_BY_SIGNAL_TIME" && <Notice tone="warn">The signal creation time is recent, but the underlying market-snapshot time is not supplied. This is not a verified current market view.</Notice>}
+          {signal.freshness === "STALE" && <Notice tone="warn">The Worker marked this signal stale or incomplete. It is shown for context only and is not decision-grade.</Notice>}
+          {signal.provenanceStatus === "UNTRUSTED_PRICE_FALLBACK" && <Notice tone="warn">The Worker could not verify the price source. Do not use this entry reference.</Notice>}
+          <div className="signal-readonly"><Pill tone="neutral">Read only</Pill><Pill tone="warn">Human review required</Pill><Pill tone="neutral">No automatic execution</Pill><Pill tone={signal.decisionGrade ? "good" : "warn"}>{signal.decisionGrade ? "Source timestamps passed" : "Not decision-grade"}</Pill></div>
         </article>
       )}
       <p className="field-hint">Last checked: {checkedAt ? new Date(checkedAt).toLocaleString() : "Not checked yet"}. This inbox does not save signals to your workspace.</p>
