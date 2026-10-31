@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
       {
         method: "GET",
         headers: { Accept: "application/json" },
-        cache: "no-store",
+        // Cache each allowlisted symbol briefly at the server to protect the Worker's per-IP limit.
+        next: { revalidate: 15 },
         signal: AbortSignal.timeout(8_000),
       },
     );
