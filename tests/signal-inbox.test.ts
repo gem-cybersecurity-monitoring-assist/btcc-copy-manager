@@ -24,6 +24,8 @@ test("normalizes a fresh-source signal but always requires human review", () => 
   assert.equal(result.value.side, "HOLD");
   assert.equal(result.value.confidence, 0.5);
   assert.equal(result.value.reviewState, "REVIEW_REQUIRED");
+  assert.equal(result.value.stopLoss, null);
+  assert.equal(result.value.takeProfit, null);
   assert.equal(result.value.sourceKind, "DERIVED_WORKER_SIGNAL");
   assert.equal(result.value.createdAt, null);
   assert.ok(result.value.responseAt);
