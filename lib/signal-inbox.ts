@@ -33,8 +33,10 @@ function finite(value: unknown): number | null {
 
 function isoDate(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
-  const sqliteUtc = value.match(/^(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}:\\d{2})$/);
-  const date = new Date(sqliteUtc ? `${sqliteUtc[1]}T${sqliteUtc[2]}Z` : value);
+  const sqliteUtc = value.length === 19 && value[10] === " "
+    ? `${value.slice(0, 10)}T${value.slice(11)}Z`
+    : value;
+  const date = new Date(sqliteUtc);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
