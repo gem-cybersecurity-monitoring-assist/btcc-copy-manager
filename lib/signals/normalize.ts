@@ -3,7 +3,7 @@ export type SignalSymbol = (typeof SIGNAL_SYMBOLS)[number];
 export type SignalSide = "BUY" | "SELL" | "HOLD";
 export type SignalSource = "PERSISTED_SIGNAL" | "DERIVED_WORKER_SIGNAL";
 export type SignalSourceKind = "persisted" | "derived";
-export type SignalFreshness = "FRESH_BY_SIGNAL_AND_MARKET_TIME" | "FRESH_BY_MARKET_TIME" | "FRESH_BY_SIGNAL_TIME" | "STALE" | "SOURCE_TIME_UNVERIFIED";
+export type SignalFreshness = "FRESH_BY_SIGNAL_AND_MARKET_TIME" | "FRESH_BY_MARKET_TIME" | "FRESH_BY_SIGNAL_TIME" | "FRESH_MARKET_DATA" | "STALE" | "SOURCE_TIME_UNVERIFIED";
 
 export type SignalInboxItem = {
   id: string; eventId: string; symbol: SignalSymbol; side: SignalSide; confidence: number; strategy: string;
