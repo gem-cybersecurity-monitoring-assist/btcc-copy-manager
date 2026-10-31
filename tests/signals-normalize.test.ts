@@ -126,11 +126,11 @@ test("keeps stale versioned signals visible but never decision-grade", () => {
     source_kind: "persisted",
     provenance_status: "PERSISTED_SIGNAL",
     signal_created_at: "2026-10-31T11:00:00.000Z",
-    market_data_as_of: "2026-10-31T11:00:00.000Z",
+    market_data_as_of: null,
     expires_at: "2026-10-31T11:15:00.000Z",
     stale: true,
     decision_grade: false,
-    price_source: "coinbase",
+    price_source: null,
   }, now);
   assert.equal(result.ok, true);
   if (result.ok) { assert.equal(result.value.freshness, "STALE"); assert.equal(result.value.decisionGrade, false); }
