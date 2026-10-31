@@ -23,7 +23,7 @@ export function SignalInboxTab() {
     finally { setBusy(false); }
   }, [symbol]);
   useEffect(() => { void refresh(); }, [refresh]);
-  const freshnessLabel = signal?.freshness === "STALE" ? "Stale signal" : signal?.freshness === "SOURCE_TIME_UNVERIFIED" ? "Source time unverified" : "Recent signal timestamp";
+  const freshnessLabel = signal?.freshness === "STALE" ? "Stale signal" : signal?.freshness === "SOURCE_TIME_UNVERIFIED" ? "Source time unverified" : signal?.freshness === "FRESH_MARKET_DATA" ? "Fresh market snapshot" : "Recent signal timestamp";
   return (
     <div className="engine-stack signal-inbox">
       <Notice tone="info"><strong>Read-only connection.</strong> Signals are fetched from the Crypto Signal Bot for review only. They are not copy-trading instructions, are not added to your strategy history, and cannot place orders or change allocations.</Notice>
@@ -47,10 +47,12 @@ export function SignalInboxTab() {
           <p><strong>Strategy:</strong> {signal.strategy}</p>
           <p><strong>Source:</strong> {signal.source === "PERSISTED_SIGNAL" ? "Saved Worker signal" : "Worker-derived EMA signal"}{signal.priceSource ? " · " + signal.priceSource : ""}</p>
           <p><strong>Signal time:</strong> {signal.signalCreatedAt ? new Date(signal.signalCreatedAt).toLocaleString() : "Not supplied by Worker"}</p>
+          <p><strong>Market data as of:</strong> {signal.marketDataAsOf ? new Date(signal.marketDataAsOf).toLocaleString() : "Not supplied by Worker"}</p>
           <p><strong>Fetched:</strong> {signal.fetchedAt ? new Date(signal.fetchedAt).toLocaleString() : "Not supplied"}</p>
           {signal.freshness === "SOURCE_TIME_UNVERIFIED" && <Notice tone="warn">The Worker does not provide the source market-snapshot timestamp for this derived signal. Its response time is not proof of market freshness. Treat this as research context only.</Notice>}
           {signal.freshness === "STALE" && <Notice tone="warn">This saved signal is older than 15 minutes. Do not rely on it as a current market view.</Notice>}
           {signal.source === "PERSISTED_SIGNAL" && <p className="field-hint">The Worker supplied a signal creation time, but not the underlying market-snapshot time. This timestamp alone does not prove the quoted price is current.</p>}
+          {signal.freshness === "FRESH_MARKET_DATA" && <Notice tone="info">The Worker reports a recent matching live market snapshot. This remains research context and still requires your review.</Notice>}
           <div className="signal-readonly"><Pill tone="neutral">Read only</Pill><Pill tone="warn">Review required</Pill><Pill tone="neutral">No automatic execution</Pill></div>
         </article>
       )}
