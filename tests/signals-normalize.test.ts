@@ -53,12 +53,35 @@ test("marks Worker-reported stale derived market data stale", () => {
   assert.equal(result.ok, true); if (result.ok) assert.equal(result.value.freshness, "STALE");
 });
 
-test("normalizes the versioned persisted signal contract with both timestamps", () => {
+test("keeps persisted signals without linked market data stale and non-decision-grade", () => {
   const result = normalizeWorkerSignal({
     ...base,
     created_at: undefined,
     schema_version: 1,
-    event_id: "persisted:42",
+    event_id: "signal:BTC:42",
+    source_kind: "persisted",
+    provenance_status: "PERSISTED_SIGNAL",
+    signal_created_at: "2026-10-31T11:55:00.000Z",
+    market_data_as_of: null,
+    expires_at: "2026-10-31T12:10:00.000Z",
+    stale: true,
+    decision_grade: false,
+    price_source: null,
+  }, now);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.freshness, "STALE");
+    assert.equal(result.value.decisionGrade, false);
+    assert.equal(result.value.marketDataAsOf, null);
+  }
+});
+
+test("rejects persisted signals falsely claiming fresh market data", () => {
+  const result = normalizeWorkerSignal({
+    ...base,
+    created_at: undefined,
+    schema_version: 1,
+    event_id: "signal:BTC:42",
     source_kind: "persisted",
     provenance_status: "PERSISTED_SIGNAL",
     signal_created_at: "2026-10-31T11:55:00.000Z",
@@ -68,13 +91,7 @@ test("normalizes the versioned persisted signal contract with both timestamps", 
     decision_grade: true,
     price_source: "coinbase",
   }, now);
-  assert.equal(result.ok, true);
-  if (result.ok) {
-    assert.equal(result.value.eventId, "persisted:42");
-    assert.equal(result.value.freshness, "FRESH_BY_SIGNAL_AND_MARKET_TIME");
-    assert.equal(result.value.decisionGrade, true);
-    assert.equal(result.value.marketDataAsOf, "2026-10-31T11:59:00.000Z");
-  }
+  assert.equal(result.ok, false);
 });
 
 test("normalizes a fresh versioned derived signal by market snapshot time", () => {
