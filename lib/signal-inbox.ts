@@ -33,7 +33,8 @@ function finite(value: unknown): number | null {
 
 function isoDate(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
-  const date = new Date(value);
+  const sqliteUtc = value.match(/^(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}:\\d{2})$/);
+  const date = new Date(sqliteUtc ? `${sqliteUtc[1]}T${sqliteUtc[2]}Z` : value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
@@ -72,14 +73,13 @@ export function normalizeWorkerSignal(input: unknown, requestedSymbol: SignalInb
     : null;
   const reviewState: SignalReviewState = priceSource === "fallback"
     ? "BLOCKED_FALLBACK"
-    : !priceSource || priceSource.startsWith("cache:")
+    : !priceSource || priceSource.startsWith("cache")
       ? "STALE_REVIEW"
       : "REVIEW_REQUIRED";
   const persisted = (finite(row.id) ?? 0) > 0 || typeof row.created_at === "string";
   const responseTimestamp = finite(row.ts);
-  const responseAt = responseTimestamp !== null && responseTimestamp > 0
-    ? new Date(responseTimestamp).toISOString()
-    : null;
+  const responseDate = responseTimestamp !== null && responseTimestamp > 0 ? new Date(responseTimestamp) : null;
+  const responseAt = responseDate && Number.isFinite(responseDate.getTime()) ? responseDate.toISOString() : null;
 
   return {
     ok: true,
