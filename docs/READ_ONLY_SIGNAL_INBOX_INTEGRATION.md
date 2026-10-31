@@ -69,6 +69,21 @@ Implement this in stages, keeping the two applications separate:
 6. **Audit and deduplicate.** Use a stable event identity (to be added by the Worker) and record when the user accepts, dismisses, or annotates an item. Repeated polling must not create duplicate audit events.
 7. **Future event push.** Only after the read-only preview is validated, add a versioned Worker event contract with authenticated/signature-verified delivery, bounded expiry, replay protection, and explicit source timestamps. Keep it separate from paper-order and management endpoints.
 
+## Implemented in the Copy Center integration branch
+
+The first read-only vertical slice is now present on `integration/read-only-signal-inbox-contract`:
+
+- `GET /api/signals?symbol=BTC` calls one fixed production Worker origin and one allowlisted read-only endpoint. The caller cannot supply an upstream URL, host, path, or credential.
+- The route normalizes the response and returns `Cache-Control: no-store`; it does not persist the payload.
+- Symbols are allowlisted to BTC, ETH, SOL, BNB, ADA, XRP, DOT, AVAX, DOGE, and LINK.
+- The normalizer validates paper/testnet safety flags, side, confidence, positive entry price, risk levels, and timestamps.
+- Static and cached price fallbacks are rejected for derived EMA signals.
+- Persisted signals older than 15 minutes are marked stale. Derived EMA signals are marked source-time-unverified because the current Worker omits the market-snapshot timestamp.
+- The new Signal Inbox tab lets the user select a symbol and refresh manually. It shows provenance, confidence, risk levels, freshness limitations, and explicit read-only/review-required labels.
+- Signals are not added to the workspace, strategy records, audit history, or allocation planner. No action or order endpoint is called.
+
+Automated tests were added for valid persisted signals, stale signals, derived-signal timestamp limitations, fallback-price rejection, paper-only flags, malformed fields, and invalid/future timestamps. The GitHub Actions CI run for the latest branch commit must pass before this slice is considered validated. Vercel deployment checks remain separately blocked by the connected account's private-organisation/Hobby-plan restriction; no production deployment has been made.
+
 ## Required Worker contract improvements before decision-grade ingestion
 
 The Worker should return a versioned response with:
