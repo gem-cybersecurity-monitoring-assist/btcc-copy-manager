@@ -30,7 +30,7 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
   if (typeof payload.strategy !== "string" || !payload.strategy.trim() || payload.strategy.length > 100) return { ok: false, error: "The signal strategy is missing or invalid." };
   const stopLoss = positiveOrNull(payload.stop_loss); const takeProfit = positiveOrNull(payload.take_profit);
   if (stopLoss === undefined || takeProfit === undefined) return { ok: false, error: "The signal risk levels are invalid." };
-  const fetchedAt = finite(payload.ts) && payload.ts > 0 ? new Date(payload.ts).toISOString() : null;
+  const fetchedAt = finite(payload.ts) && payload.ts > 0 && payload.ts <= 8.64e15 && Number.isFinite(new Date(payload.ts).getTime()) ? new Date(payload.ts).toISOString() : null;
   const createdAtRaw = payload.created_at; let signalCreatedAt: string | null = null;
   let source: SignalSource; let freshness: SignalFreshness; let id: string;
   if (typeof createdAtRaw === "string" && createdAtRaw.trim()) {
