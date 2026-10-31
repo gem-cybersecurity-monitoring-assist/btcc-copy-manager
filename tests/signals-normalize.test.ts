@@ -52,3 +52,90 @@ test("marks Worker-reported stale derived market data stale", () => {
   const result = normalizeWorkerSignal(derived, now);
   assert.equal(result.ok, true); if (result.ok) assert.equal(result.value.freshness, "STALE");
 });
+
+test("normalizes the versioned persisted signal contract with both timestamps", () => {
+  const result = normalizeWorkerSignal({
+    ...base,
+    created_at: undefined,
+    schema_version: 1,
+    event_id: "persisted:42",
+    source_kind: "persisted",
+    provenance_status: "PERSISTED_SIGNAL",
+    signal_created_at: "2026-10-31T11:55:00.000Z",
+    market_data_as_of: "2026-10-31T11:59:00.000Z",
+    expires_at: "2026-10-31T12:10:00.000Z",
+    stale: false,
+    decision_grade: true,
+    price_source: "coinbase",
+  }, now);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.eventId, "persisted:42");
+    assert.equal(result.value.freshness, "FRESH_BY_SIGNAL_AND_MARKET_TIME");
+    assert.equal(result.value.decisionGrade, true);
+    assert.equal(result.value.marketDataAsOf, "2026-10-31T11:59:00.000Z");
+  }
+});
+
+test("normalizes a fresh versioned derived signal by market snapshot time", () => {
+  const result = normalizeWorkerSignal({
+    ...base,
+    created_at: undefined,
+    id: undefined,
+    strategy: "worker_ema_crossover",
+    schema_version: 1,
+    event_id: "derived:BTC:77:BUY",
+    source_kind: "derived",
+    provenance_status: "DERIVED_WORKER_SIGNAL",
+    signal_created_at: "2026-10-31T12:00:00.000Z",
+    market_data_as_of: "2026-10-31T11:59:45.000Z",
+    expires_at: "2026-10-31T12:14:45.000Z",
+    price_source: "coinbase",
+    stale: false,
+    decision_grade: true,
+  }, now);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.freshness, "FRESH_BY_MARKET_TIME");
+    assert.equal(result.value.eventId, "derived:BTC:77:BUY");
+  }
+});
+
+test("keeps stale versioned signals visible but never decision-grade", () => {
+  const result = normalizeWorkerSignal({
+    ...base,
+    schema_version: 1,
+    event_id: "persisted:43",
+    source_kind: "persisted",
+    provenance_status: "PERSISTED_SIGNAL",
+    signal_created_at: "2026-10-31T11:00:00.000Z",
+    market_data_as_of: "2026-10-31T11:00:00.000Z",
+    expires_at: "2026-10-31T11:15:00.000Z",
+    stale: true,
+    decision_grade: false,
+    price_source: "coinbase",
+  }, now);
+  assert.equal(result.ok, true);
+  if (result.ok) { assert.equal(result.value.freshness, "STALE"); assert.equal(result.value.decisionGrade, false); }
+});
+
+test("rejects inconsistent or incomplete versioned provenance", () => {
+  const valid = {
+    ...base,
+    created_at: undefined,
+    schema_version: 1,
+    event_id: "derived:BTC:77:BUY",
+    source_kind: "derived",
+    provenance_status: "DERIVED_WORKER_SIGNAL",
+    signal_created_at: "2026-10-31T12:00:00.000Z",
+    market_data_as_of: "2026-10-31T11:59:45.000Z",
+    expires_at: "2026-10-31T12:14:45.000Z",
+    price_source: "coinbase",
+    stale: false,
+    decision_grade: true,
+    strategy: "worker_ema_crossover",
+  };
+  assert.equal(normalizeWorkerSignal({ ...valid, decision_grade: false }, now).ok, false);
+  assert.equal(normalizeWorkerSignal({ ...valid, market_data_as_of: "not-a-date" }, now).ok, false);
+  assert.equal(normalizeWorkerSignal({ ...valid, provenance_status: "UNTRUSTED_PRICE_FALLBACK", price_source: "fallback", stale: true, decision_grade: false }, now).ok, false);
+});
