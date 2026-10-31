@@ -50,6 +50,7 @@ export function SignalInboxTab() {
           <p><strong>Fetched:</strong> {signal.fetchedAt ? new Date(signal.fetchedAt).toLocaleString() : "Not supplied"}</p>
           {signal.freshness === "SOURCE_TIME_UNVERIFIED" && <Notice tone="warn">The Worker does not provide the source market-snapshot timestamp for this derived signal. Its response time is not proof of market freshness. Treat this as research context only.</Notice>}
           {signal.freshness === "STALE" && <Notice tone="warn">This saved signal is older than 15 minutes. Do not rely on it as a current market view.</Notice>}
+          {signal.source === "PERSISTED_SIGNAL" && <p className="field-hint">The Worker supplied a signal creation time, but not the underlying market-snapshot time. This timestamp alone does not prove the quoted price is current.</p>}
           <div className="signal-readonly"><Pill tone="neutral">Read only</Pill><Pill tone="warn">Review required</Pill><Pill tone="neutral">No automatic execution</Pill></div>
         </article>
       )}
