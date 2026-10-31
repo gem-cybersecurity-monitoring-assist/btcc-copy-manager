@@ -82,6 +82,27 @@ export function normalizeWorkerSignal(payload: unknown, nowMs = Date.now()): { o
     decisionGrade = payload.decision_grade;
     eventId = payload.event_id;
     id = eventId;
+  } else if (typeof payload.event_id === "string" && payload.event_id.trim() && payload.market_data_as_of !== undefined) {
+    // Compatibility with the earlier read-only Worker preview contract. This
+    // exposes a market timestamp but lacks the complete versioned provenance envelope.
+    const parsedMarketAt = parsedTimestamp(payload.market_data_as_of);
+    const parsedSignalAt = parsedTimestamp(payload.created_at ?? payload.signal_created_at);
+    if (parsedMarketAt === undefined || parsedSignalAt === undefined) return { ok: false, error: "The signal market-data timestamp is invalid." };
+    if (parsedMarketAt && Date.parse(parsedMarketAt) > nowMs + 5 * 60_000) return { ok: false, error: "The market-data timestamp is in the future." };
+    if (parsedSignalAt && Date.parse(parsedSignalAt) > nowMs + 5 * 60_000) return { ok: false, error: "The signal timestamp is in the future." };
+    if (typeof payload.stale !== "boolean" || typeof payload.market_data_stale !== "boolean") return { ok: false, error: "The signal freshness flags are incomplete." };
+    sourceKind = parsedSignalAt ? "persisted" : "derived";
+    source = sourceKind === "persisted" ? "PERSISTED_SIGNAL" : "DERIVED_WORKER_SIGNAL";
+    signalCreatedAt = parsedSignalAt;
+    marketDataAsOf = parsedMarketAt;
+    provenanceStatus = source;
+    const marketAge = parsedMarketAt ? nowMs - Date.parse(parsedMarketAt) : Number.POSITIVE_INFINITY;
+    const isStale = payload.stale || payload.market_data_stale || marketAge < 0 || marketAge > 15 * 60_000;
+    freshness = isStale ? "STALE" : "FRESH_MARKET_DATA";
+    decisionGrade = false;
+    eventId = payload.event_id;
+    id = eventId;
+    if (sourceKind === "derived" && (priceSource === null || priceSource === "fallback" || priceSource.startsWith("cache:"))) return { ok: false, error: "The derived signal uses cached or fallback pricing and is excluded from the inbox." };
   } else {
     const createdAtRaw = payload.created_at;
     const parsedCreatedAt = parsedTimestamp(createdAtRaw);
