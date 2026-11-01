@@ -17,6 +17,7 @@ import { SignalInboxTab } from "./SignalInboxTab.tsx";
 import { Notice, num, pct, Pill, usd, when, type EngineChange } from "./ui.tsx";
 
 const TABS = [
+  ["accounts", "Connect accounts"],
   ["agent", "★ Agent"],
   ["signals", "Signal Inbox"],
   ["providers", "A · Providers"],
@@ -33,7 +34,7 @@ type TabId = (typeof TABS)[number][0];
 const STATUS_TONE: Partial<Record<ProviderStatus, "good" | "warn" | "bad">> = { COPY_ACTIVE: "good", ACCOUNT_VERIFIED: "good", PAUSED: "warn", COPY_ACTIVATION_PENDING: "warn", DATA_STALE: "bad", ERROR: "bad", DISCONNECTED: "bad", NOT_SUPPORTED: "bad" };
 
 export default function IntelligenceEngine({ engine, onChange, manualTraders }: { engine: EngineState; onChange: EngineChange; manualTraders: Trader[] }) {
-  const [tab, setTab] = useState<TabId>("providers");
+  const [tab, setTab] = useState<TabId>("accounts");
   // The allocation tab remounts on every visit; only the guide's practice button opens it with simulated data.
   const [allocationView, setAllocationView] = useState({ key: 0, simulated: false });
   const [now, setNow] = useState(() => new Date());
@@ -71,6 +72,7 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
         {TABS.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} aria-controls={`engine-panel-${id}`} id={`engine-tab-${id}`} className={tab === id ? "active" : ""} onClick={() => (id === "allocation" ? go("allocation") : setTab(id))}>{label}{id === "risk" && openAlerts > 0 ? <span className="tab-badge">{openAlerts}</span> : null}</button>)}
       </div>
       <div role="tabpanel" id={`engine-panel-${tab}`} aria-labelledby={`engine-tab-${tab}`} className="engine-panel">
+        {tab === "accounts" && <AccountConnectionsTab engine={engine} onChange={onChange} />}
         {tab === "agent" && <AgentTab engine={engine} onChange={onChange} />}
         {tab === "signals" && <SignalInboxTab />}
         {tab === "providers" && <ProvidersTab engine={engine} onChange={onChange} now={now} evaluations={evaluations} />}
@@ -124,6 +126,37 @@ function StartGuide({ engine, onChange, go, showSimulatedPlan }: { engine: Engin
       <div className="start-guide-head"><div><p className="eyebrow">START HERE</p><h3>Four steps to use GEM Copy Center</h3><p className="muted">No account needed: everything saves in this browser. GEM never moves money; you copy traders on the exchange itself. Prefer to just ask? <button type="button" className="link-btn" onClick={() => go("agent")}>Open the ★ Agent</button> and describe what you want.</p></div>
         <button type="button" className="link-btn" onClick={() => setHiddenPersist(true)}>Hide guide</button></div>
       <ol className="start-steps">{steps.map((s, i) => <li key={s.title} className={s.done ? "done" : ""}><span className="step-num" aria-hidden="true">{s.done ? "✓" : i + 1}</span><div><strong>{s.title}</strong>{s.done && <span className="sr-only"> (done)</span>}<p>{s.text}</p><div className="engine-actions">{s.action}</div></div></li>)}</ol>
+    </div>
+  );
+}
+
+// ---- One-stop account connections ------------------------------------------
+
+function AccountConnectionsTab({ engine, onChange }: { engine: EngineState; onChange: EngineChange }) {
+  const providers = allProviders(engine.customProviders);
+  return (
+    <div className="engine-stack">
+      <Notice tone="info"><strong>One place to connect.</strong> Choose an exchange to open its official sign-in, then return here to track it. GEM does not receive your exchange password or 2FA code. Exchange API connections are not yet enabled, so a sign-in is never falsely labelled as an API connection.</Notice>
+      <div className="engine-summary-grid">
+        {providers.map((provider) => {
+          const account = engine.providers.find((item) => item.providerId === provider.id);
+          return <article className="engine-card" key={provider.id}>
+            <div className="engine-card-head"><h3>{provider.name}</h3><Pill tone={account ? "good" : "neutral"}>{account ? "Tracked in GEM" : "Not connected"}</Pill></div>
+            <p className="cell-sub">{provider.markets.join(" · ") || "Markets not specified"}</p>
+            <p>{account ? "This provider is in your GEM workspace. Complete sign-in and any copy setup on the provider's own site." : "Start with the provider's official website. Your credentials stay there."}</p>
+            <div className="engine-actions">
+              <a className="primary-btn" href={provider.url} target="_blank" rel="noreferrer">Open official sign-in ↗</a>
+              {provider.copyUrl !== provider.url && <a className="secondary-btn" href={provider.copyUrl} target="_blank" rel="noreferrer">Open copy trading ↗</a>}
+              {!account && <button type="button" className="secondary-btn" onClick={() => onChange({ ...engine, providers: [...engine.providers, newProviderAccount(provider, new Date().toISOString())] }, { action: "provider_tracked", detail: `Added ${provider.name} to the account connection centre.` })}>Add to my GEM list</button>}
+            </div>
+            {account && <p className="cell-sub">GEM status: {STATUS_LABELS[account.status]}. {statusProvenance(account)}</p>}
+          </article>;
+        })}
+      </div>
+      <h3>Wallet connections</h3>
+      <p className="cell-sub">Connect a wallet directly through its own approval window. Only public wallet information is requested; no signing or transfers.</p>
+      <WalletsTab />
+      <p className="footnote">Exchange connections are currently guided sign-ins and user-confirmed tracking, not verified live account links. Read-only API access requires a supported provider adapter and secure credential storage. Trading and withdrawals remain outside GEM.</p>
     </div>
   );
 }
