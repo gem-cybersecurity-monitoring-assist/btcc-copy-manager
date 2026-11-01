@@ -181,3 +181,40 @@ test("rejects inconsistent or incomplete versioned provenance", () => {
   assert.equal(normalizeWorkerSignal({ ...valid, market_data_as_of: "not-a-date" }, now).ok, false);
   assert.equal(normalizeWorkerSignal({ ...valid, provenance_status: "UNTRUSTED_PRICE_FALLBACK", price_source: "fallback", stale: true, decision_grade: false }, now).ok, false);
 });
+
+
+test("accepts the currently deployed paper Worker response as review-only context", () => {
+  const workerResponse = {
+    symbol: "BTC",
+    timeframe: "5m",
+    side: "HOLD",
+    action: "HOLD",
+    signal: "HOLD",
+    confidence: 0.5,
+    entry_price: 77397.485,
+    stop_loss: null,
+    take_profit: null,
+    strategy: "worker_ema_crossover",
+    available: true,
+    price_source: "coinbase",
+    mode: "paper",
+    trading_mode: "paper",
+    exchange_mode: "paper",
+    network: "testnet",
+    allow_mainnet: false,
+    live_trading_enabled: false,
+    withdrawals_enabled: false,
+    ts: Date.parse("2026-11-01T00:18:43.430Z"),
+  };
+  const result = normalizeWorkerSignal(workerResponse, Date.parse("2026-11-01T00:20:00.000Z"));
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.symbol, "BTC");
+    assert.equal(result.value.side, "HOLD");
+    assert.equal(result.value.freshness, "SOURCE_TIME_UNVERIFIED");
+    assert.equal(result.value.marketDataAsOf, null);
+    assert.equal(result.value.decisionGrade, false);
+    assert.equal(result.value.readOnly, true);
+    assert.equal(result.value.reviewRequired, true);
+  }
+});
