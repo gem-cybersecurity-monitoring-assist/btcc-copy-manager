@@ -6,6 +6,7 @@ from typing import Any
 
 from models import AccountState, TraderSnapshot
 from monitor import TraderMonitor
+from risk import RiskPolicy
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,12 @@ def build_copy_plan(
     exposure_cap = min(equity * policy.max_total_copy_ratio, max(0.0, equity - reserve))
     daily_loss_limit = equity * policy.max_daily_loss_ratio
     daily_loss = max(0.0, -account.realized_pnl_today_usdt)
-    ranked = TraderMonitor().rank(traders, account)
+    rank_policy = RiskPolicy(
+        max_margin_per_trade_usdt=policy.min_allocation_usdt,
+        max_total_open_margin_usdt=exposure_cap,
+        max_daily_loss_usdt=daily_loss_limit,
+    )
+    ranked = TraderMonitor(rank_policy).rank(traders, account)
     by_key = {(t.trader_id or t.name): t for t in traders}
     eligible: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
