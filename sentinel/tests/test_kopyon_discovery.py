@@ -16,6 +16,7 @@ def test_kopyon_trader_id_is_not_assumed_to_be_native_project_id():
     assert row.exchange_project_id is None
     assert len(row.recent_trades) == 1
     assert row.recent_trades[0].pnl_usdt == 2
+    assert row.max_drawdown_pct == 0.0
 
 
 def test_explicit_mapping_is_the_only_way_to_set_native_project_id():
