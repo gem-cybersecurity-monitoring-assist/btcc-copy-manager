@@ -33,8 +33,8 @@ test("Steel configuration requires server secrets and reports safe policy metada
     const status = steelConfigStatus();
     assert.equal(status.ready, true);
     assert.deepEqual(status.missing, []);
-    assert.equal(status.timeoutMs, 30 * 60 * 1000);
-    assert.equal(status.captchaSolving, true);
+    assert.equal(status.timeoutMs, 15 * 60 * 1000);
+    assert.equal(status.captchaSolving, false);
     assert.equal(status.inactivityTimeoutDisabled, true);
     assert.equal(status.persistentProfiles, true);
   });
