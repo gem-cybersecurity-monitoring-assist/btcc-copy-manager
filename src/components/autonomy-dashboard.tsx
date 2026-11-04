@@ -110,7 +110,16 @@ export function AutonomyDashboard() {
 
   const plan = scan?.autonomy_plan;
   const maintenance = scan?.maintenance_plan;
-  const account = {
+  const account: {
+    equity_usdt?: number;
+    reserve_usdt?: number;
+    copy_exposure_cap_usdt?: number;
+    futures_free_usdt?: number;
+    wallet_usdt?: number;
+    open_margin_usdt?: number;
+    realized_pnl_today_usdt?: number;
+    daily_loss_limit_usdt?: number;
+  } = {
     ...(plan?.account || {}),
     equity_usdt: bitgetAccount?.total_usdt ?? plan?.account?.equity_usdt,
     futures_free_usdt: bitgetAccount?.futures_free_usdt ?? plan?.account?.futures_free_usdt,
