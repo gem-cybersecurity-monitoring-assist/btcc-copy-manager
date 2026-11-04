@@ -46,7 +46,7 @@ class SentinelService:
             if self.executor.adapter.config.configured:
                 try:
                     batch.account = self.executor.adapter.account_snapshot()
-                except BitgetError:
+                except Exception:
                     batch.account.provenance = Provenance(source="unknown", confidence=0.0)
             else:
                 batch.account.provenance = Provenance(source="unknown", confidence=0.0)
