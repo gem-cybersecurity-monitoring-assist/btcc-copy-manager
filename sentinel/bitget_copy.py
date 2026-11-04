@@ -81,6 +81,7 @@ class BitgetCopyAdapter:
             "live_enabled": self.config.live_enabled,
             "allowlisted_project_count": len(self.config.allowed_project_ids),
             "minimum_subscription_usdt": self.MIN_SUBSCRIPTION_USDT,
+            "required_account_mode": "Unified Account",
             "supported": ["current_copy", "copy_settings", "current_positions", "profit_details", "follow", "modify", "unfollow", "close_all"],
             "unsupported_by_design": ["withdraw", "address_management", "fund_transfer"],
         }
