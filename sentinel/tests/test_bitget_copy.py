@@ -163,3 +163,13 @@ def test_account_snapshot_uses_uta_assets_and_nets_today_futures_fees():
     assert snapshot.realized_pnl_today_usdt == 7.5
     assert snapshot.provenance.confidence == 0.99
     assert len(calls) == 2
+
+
+def test_account_snapshot_rejects_invalid_timezone(monkeypatch):
+    adapter = BitgetCopyAdapter(config(), fake_transport([]))
+    try:
+        adapter.account_snapshot("Not/A_Timezone")
+    except BitgetError as exc:
+        assert "valid IANA timezone" in str(exc)
+    else:
+        raise AssertionError("Expected invalid timezone rejection")
