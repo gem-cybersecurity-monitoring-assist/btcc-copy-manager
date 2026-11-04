@@ -79,6 +79,7 @@ class SentinelService:
             "captured_at": batch.captured_at.isoformat(),
             "ranked": ranked,
             "autonomy_plan": plan,
+            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
             "prepared_action_ids": action_ids,
         }
 
