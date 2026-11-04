@@ -33,6 +33,14 @@ type Scan = {
   };
   error?: string;
 };
+type BitgetAccount = {
+  total_usdt?: number;
+  futures_free_usdt?: number;
+  wallet_usdt?: number;
+  open_margin_usdt?: number;
+  realized_pnl_today_usdt?: number;
+  source_timestamp?: string;
+};
 type BitgetStatus = {
   configured?: boolean;
   live_enabled?: boolean;
@@ -68,6 +76,7 @@ function Rows({ rows, empty }: { rows: Row[]; empty: string }) {
 export function AutonomyDashboard() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [bitget, setBitget] = useState<BitgetStatus | null>(null);
+  const [bitgetAccount, setBitgetAccount] = useState<BitgetAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -75,18 +84,23 @@ export function AutonomyDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [scanResponse, bitgetResponse] = await Promise.all([
+      const [scanResponse, bitgetResponse, accountResponse] = await Promise.all([
         fetch("/api/v1/sentinel/autonomy", { cache: "no-store" }),
         fetch("/api/v1/sentinel/bitget-status", { cache: "no-store" }),
+        fetch("/api/v1/sentinel/bitget-account", { cache: "no-store" }),
       ]);
-      const [scanBody, bitgetBody] = await Promise.all([scanResponse.json(), bitgetResponse.json()]);
+      const [scanBody, bitgetBody, accountBody] = await Promise.all([
+        scanResponse.json(), bitgetResponse.json(), accountResponse.json(),
+      ]);
       if (!scanResponse.ok) throw new Error(scanBody.error || "Sentinel is not connected.");
       setScan(scanBody as Scan);
       setBitget(bitgetBody as BitgetStatus);
+      setBitgetAccount(accountResponse.ok ? accountBody as BitgetAccount : null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not load the autonomous copy manager.");
       setScan(null);
       setBitget(null);
+      setBitgetAccount(null);
     } finally {
       setLoading(false);
     }
@@ -96,7 +110,7 @@ export function AutonomyDashboard() {
 
   const plan = scan?.autonomy_plan;
   const maintenance = scan?.maintenance_plan;
-  const account = plan?.account || {};
+  const account = bitgetAccount || plan?.account || {};
 
   return <div className="page-grid">
     <section className="hero-card span-2">
@@ -114,7 +128,7 @@ export function AutonomyDashboard() {
       <div className="metric"><span>Account equity</span><strong>{amount(account.equity_usdt)}</strong></div>
       <div className="metric"><span>Protected reserve</span><strong>{amount(account.reserve_usdt)}</strong></div>
       <div className="metric"><span>Copy exposure cap</span><strong>{amount(account.copy_exposure_cap_usdt)}</strong></div>
-      <div className="metric"><span>Daily loss guard</span><strong>{amount(account.daily_loss_limit_usdt)}</strong></div>
+      <div className="metric"><span>Today's realized PnL</span><strong>{amount(account.realized_pnl_today_usdt)}</strong></div>
     </section>
 
     <section className="panel">
@@ -124,6 +138,7 @@ export function AutonomyDashboard() {
       <p className="subtle">Internal copy-account funding transfer: {bitget?.internal_transfer_enabled ? `Enabled from ${text(bitget?.copy_fund_source)}` : "Disabled"}.</p>
       <p className="subtle">Allowed projects: {text(bitget?.allowlisted_project_count)} · Minimum copy amount: {amount(bitget?.minimum_subscription_usdt)}</p>
       <p className="subtle">Account mode: {text(bitget?.required_account_mode)}.</p>
+      <p className="subtle">Account snapshot: {text(bitgetAccount?.source_timestamp)}.</p>
       <p className="subtle">No withdrawals or address changes are available to the agent.</p>
     </section>
 
