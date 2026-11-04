@@ -63,7 +63,9 @@ test("Steel browser state round-trips through authenticated encryption", () => {
     assert.notEqual(sealed.includes("session-test"), true);
     assert.deepEqual(unsealSteelState(sealed), state);
 
-    const tampered = `${sealed.slice(0, -1)}${sealed.endsWith("A") ? "B" : "A"}`;
+    const parts = sealed.split(".");
+    parts[2] = `${parts[2].startsWith("A") ? "B" : "A"}${parts[2].slice(1)}`;
+    const tampered = parts.join(".");
     assert.deepEqual(unsealSteelState(tampered), {});
   });
 });
