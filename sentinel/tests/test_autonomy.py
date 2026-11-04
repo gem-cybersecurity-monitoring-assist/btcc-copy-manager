@@ -79,3 +79,28 @@ def test_bitget_candidate_requires_native_project_mapping():
     plan = build_copy_plan([trader], account, now=now)
     assert plan["selected"][0]["exchange"] == "bitget"
     assert plan["selected"][0]["exchange_project_id"] == "bg-project-123"
+
+
+def test_maintenance_flags_deteriorating_follow_and_does_not_execute():
+    from maintenance import build_maintenance_plan
+
+    now = datetime.now(timezone.utc)
+    trader, account = sample(now)
+    trader.currently_following = True
+    trader.recent_trades[0].leverage = 25
+    plan = build_maintenance_plan([trader], account, now=now)
+    assert plan["status"] == "REVIEW_ONLY"
+    assert plan["stop_review"][0]["decision"] == "STOP_AND_REPLACE_REVIEW"
+    assert plan["execution"].startswith("No unfollow")
+
+
+def test_maintenance_pauses_new_allocations_when_followed_trader_data_is_stale():
+    from maintenance import build_maintenance_plan
+
+    now = datetime.now(timezone.utc)
+    trader, account = sample(now)
+    trader.currently_following = True
+    trader.source_timestamp = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    plan = build_maintenance_plan([trader], account, now=now)
+    assert plan["retain"][0]["decision"] == "PAUSE_NEW_ALLOCATIONS"
+    assert plan["stop_review"] == []
