@@ -129,3 +129,37 @@ def test_follow_rejects_implicit_internal_fund_transfer():
     else:
         raise AssertionError("Expected internal transfer permission rejection")
     assert calls == []
+
+
+def test_account_snapshot_uses_uta_assets_and_nets_today_futures_fees():
+    calls = []
+    def transport(method, path, headers, body):
+        calls.append((method, path))
+        if path == "/api/v3/account/assets":
+            return {
+                "usdtEquity": "1000",
+                "effEquity": "650",
+                "imr": "350",
+                "positionValue": "1200",
+                "assets": [{"coin": "USDT", "available": "500"}],
+            }
+        if path.startswith("/api/v3/trade/fills?"):
+            return {
+                "list": [
+                    {"execPnl": "12", "feeDetail": [{"feeCoin": "USDT", "fee": "1"}]},
+                    {"execPnl": "-3", "feeDetail": [{"feeCoin": "USDT", "fee": "0.5"}]},
+                ],
+                "cursor": None,
+            }
+        raise AssertionError(f"Unexpected endpoint: {path}")
+
+    adapter = BitgetCopyAdapter(config(), transport)
+    snapshot = adapter.account_snapshot("Africa/Lagos")
+    assert snapshot.exchange == "bitget"
+    assert snapshot.total_usdt == 1000
+    assert snapshot.futures_free_usdt == 650
+    assert snapshot.wallet_usdt == 500
+    assert snapshot.open_margin_usdt == 350
+    assert snapshot.realized_pnl_today_usdt == 7.5
+    assert snapshot.provenance.confidence == 0.99
+    assert len(calls) == 2
