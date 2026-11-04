@@ -140,6 +140,8 @@ class KopyonBitgetDiscovery:
                 pnl_30d_pct=float(roi_value) * 100.0 if roi_value is not None else None,
                 aum_usdt=float(leader["aum"]) if leader.get("aum") is not None else None,
                 win_rate_pct=float(win_rate) * 100.0 if win_rate is not None else None,
+                max_drawdown_pct=(float(performance.get("maxDrawdown", leader.get("maxDrawdown"))) * 100.0
+                                  if performance.get("maxDrawdown", leader.get("maxDrawdown")) is not None else None),
                 copiers=int(leader["copiers"]) if leader.get("copiers") is not None else None,
                 recent_trades=trades,
                 executable_min_margin_usdt=50.0,
