@@ -13,6 +13,12 @@ type Scan = {
     excluded?: Row[];
     execution_blockers?: string[];
   };
+  ai_review?: {
+    status?: string;
+    enabled?: boolean;
+    summary?: string;
+    reviews?: Row[];
+  };
   maintenance_plan?: {
     status?: string;
     stop_review?: Row[];
@@ -43,8 +49,8 @@ function Rows({ rows, empty }: { rows: Row[]; empty: string }) {
   if (!rows.length) return <p className="subtle">{empty}</p>;
   return <div className="flag-list">{rows.map((row, index) => (
     <div className="autonomy-row" key={String(row.trader_id || row.project_id || row.trader || index)}>
-      <strong>{text(row.trader || row.name)}</strong>
-      <span>{text(row.exchange)} {row.score !== undefined ? `· Score ${text(row.score)}` : ""}</span>
+      <strong>{text(row.trader || row.name || row.trader_id)}</strong>
+      <span>{text(row.exchange || row.action)} {row.score !== undefined ? `· Score ${text(row.score)}` : ""}</span>
       <span>{row.allocation_usdt !== undefined ? amount(row.allocation_usdt) : text(row.decision)}</span>
       {Array.isArray(row.reasons) && <small>{text(row.reasons)}</small>}
     </div>
@@ -116,6 +122,13 @@ export function AutonomyDashboard() {
       <h2>{text(plan?.status || "Waiting for Sentinel")}</h2>
       <p className="subtle">Latest observation: {text(scan?.captured_at)}</p>
       <p className="subtle">Re-evaluation target: every 60 seconds while Sentinel is running.</p>
+    </section>
+
+    <section className="panel span-2">
+      <p className="eyebrow">AI independent risk panel</p>
+      <h2>{scan?.ai_review?.enabled ? "LLM review enabled" : "Deterministic-only review"}</h2>
+      <p className="subtle">{text(scan?.ai_review?.summary || "The LLM reviewer is disabled. Hard deterministic limits remain active.")}</p>
+      <Rows rows={scan?.ai_review?.reviews || []} empty="No separate AI review was run."/>
     </section>
 
     <section className="panel span-2">
