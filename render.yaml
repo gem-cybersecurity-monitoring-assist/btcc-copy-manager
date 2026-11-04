@@ -34,6 +34,10 @@ services:
         value: "false"
       - key: BITGET_COPY_LIVE_ENABLED
         value: "false"
+      - key: GEM_AUTO_COPY_EXECUTION_ENABLED
+        value: "false"
+      - key: GEM_AUTO_STOP_REPLACE_ENABLED
+        value: "false"
       - key: GEM_AI_REVIEW_ENABLED
         value: "false"
       - key: OPENAI_API_KEY
