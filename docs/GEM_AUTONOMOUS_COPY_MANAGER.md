@@ -89,3 +89,8 @@ The planner now binds each trader to an explicit venue and requires the account 
 ## Bitget account-state collection
 
 The adapter now reads UTA account assets from /api/v3/account/assets and today's USDT-futures fills from /api/v3/trade/fills. It builds a Bitget-tagged AccountState with total USDT equity, USDT available balance, initial margin and net realized PnL after USDT fees. The spendable balance is conservatively capped at the lower of available UTA USDT and effective margin equity. The daily window is based on SENTINEL_TIMEZONE (default Africa/Lagos). If fill pagination is incomplete, provenance confidence is lowered; if credentials or required read permissions are unavailable, the planner fails closed. When a Bitget batch is scanned, Sentinel refreshes this account snapshot before allocation and maintenance evaluation.
+
+
+### Bitget API key permissions
+
+Use a dedicated key with the minimum read/write scopes required by the enabled functions: UTA management read for account assets, UTA trade read for fills and realized PnL, and the copy-trading read/write scope for follower settings and follow/unfollow. Do not enable withdrawal permission. If the key is IP-restricted, the hosting service's outbound IP must be compatible with the Bitget whitelist.
