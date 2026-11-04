@@ -8,9 +8,13 @@ import os
 import time
 from dataclasses import dataclass
 from typing import Any, Callable
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+from models import AccountState, Provenance
 
 
 class BitgetError(RuntimeError):
@@ -140,6 +144,63 @@ class BitgetCopyAdapter:
     def _require_live(self):
         if not self.config.live_enabled:
             raise BitgetError("Live copy actions are disabled. Set BITGET_COPY_LIVE_ENABLED=true only after validation.")
+
+
+    def account_snapshot(self, timezone_name: str | None = None) -> AccountState:
+        """Read UTA equity and today's realized futures PnL for a venue-tagged snapshot."""
+        assets = self._request("GET", "/api/v3/account/assets")
+        if not isinstance(assets, dict) or not assets.get("usdtEquity"):
+            raise BitgetError("Bitget account-assets response did not include USDT equity.")
+        now = datetime.now(timezone.utc)
+        tz = ZoneInfo(timezone_name or os.getenv("SENTINEL_TIMEZONE", "Africa/Lagos"))
+        local_midnight = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_ms = int(local_midnight.astimezone(timezone.utc).timestamp() * 1000)
+        end_ms = int(now.timestamp() * 1000)
+        cursor = None
+        realized = 0.0
+        complete = True
+        for page in range(10):
+            params: dict[str, Any] = {
+                "category": "USDT-FUTURES",
+                "startTime": start_ms,
+                "endTime": end_ms,
+                "limit": 100,
+            }
+            if cursor:
+                params["cursor"] = cursor
+            fills = self._request("GET", "/api/v3/trade/fills", params)
+            rows = fills.get("list", []) if isinstance(fills, dict) else []
+            for fill in rows:
+                pnl = float(fill.get("execPnl") or 0)
+                fees = sum(
+                    float(fee.get("fee") or 0)
+                    for fee in fill.get("feeDetail", [])
+                    if fee.get("feeCoin") == "USDT"
+                )
+                realized += pnl - fees
+            cursor = fills.get("cursor") if isinstance(fills, dict) else None
+            if not cursor:
+                break
+        else:
+            complete = False
+
+        usdt_asset = next((row for row in assets.get("assets", []) if row.get("coin") == "USDT"), {})
+        confidence = 0.99 if complete else 0.80
+        return AccountState(
+            exchange="bitget",
+            total_usdt=max(0.0, float(assets.get("usdtEquity") or 0)),
+            futures_free_usdt=max(0.0, float(assets.get("effEquity") or 0)),
+            wallet_usdt=max(0.0, float(usdt_asset.get("available") or 0)),
+            open_margin_usdt=max(0.0, float(assets.get("imr") or 0)),
+            realized_pnl_today_usdt=realized,
+            active_positions=1 if float(assets.get("positionValue") or 0) > 0 else 0,
+            source_timestamp=now,
+            provenance=Provenance(
+                source="xhr",
+                confidence=confidence,
+                captured_at=now,
+            ),
+        )
 
     def current_copy(self, project_id: str):
         return self._request("GET", "/api/v3/copy/futures/current-copy", {"projectId": self._project(project_id)})
