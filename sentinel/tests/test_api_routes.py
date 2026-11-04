@@ -3,6 +3,7 @@ def test_sentinel_api_registers_authenticated_bitget_and_scan_routes():
 
     paths = {route.path for route in main.app.routes}
     assert "/health" in paths
+    assert "/collector/bitget-batch" in paths
     assert "/scan" in paths
     assert "/bitget/status" in paths
     assert "/bitget/account-snapshot" in paths
