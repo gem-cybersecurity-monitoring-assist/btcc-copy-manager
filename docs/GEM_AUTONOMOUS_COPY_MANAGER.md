@@ -55,3 +55,12 @@ The Sentinel API now supports bearer-token authentication for every endpoint exc
 A Render Blueprint is included at the repository root. It provisions a persistent Python web service with a mounted SQLite data disk and the 60-second monitor loop. It uses a paid always-on compute plan because an always-sleeping/free instance is not suitable for continuous monitoring or a persistent disk. Creating that service may incur charges; the blueprint is provided but is not deployed from this workflow.
 
 After the Render service is created, set the same SENTINEL_CONTROL_TOKEN in Render and the Vercel project, and set SENTINEL_URL in Vercel to the Render service URL. Add Bitget API credentials and the verified project ID list in Render's secret environment settings. Keep BITGET_COPY_LIVE_ENABLED=false until a read-only connection and end-to-end reconciliation test have passed.
+
+
+## LLM risk panel
+
+An optional structured-output reviewer is included in sentinel/agent_review.py. It asks a performance scout, a leverage/drawdown auditor and a portfolio skeptic to review public trader evidence. It sends only trader names, exchange labels and public performance/trade metrics; it does not send the connected account balance, API keys or exchange credentials.
+
+The model can only veto a deterministic candidate (KEEP / REVIEW / REJECT). It cannot promote a candidate, choose allocations, set leverage or execute exchange actions. If AI review is explicitly enabled but the API is unavailable, new allocations fail closed. Reviews are cached per collector snapshot so a 60-second scan does not repeatedly bill for identical evidence.
+
+To enable later, set OPENAI_API_KEY, OPENAI_MODEL and GEM_AI_REVIEW_ENABLED=true in the Sentinel host's secret environment. The default remains false. Model calls use the OpenAI Responses API with strict JSON Schema structured output; no model name or paid API key is assumed by the code.
