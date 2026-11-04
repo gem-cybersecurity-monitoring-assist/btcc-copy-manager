@@ -57,6 +57,18 @@ class EventStore:
                   payload_json TEXT NOT NULL,
                   UNIQUE(action_key, action_type, status, payload_json)
                 );
+                CREATE TABLE IF NOT EXISTS exchange_action_ledger (
+                  idempotency_key TEXT PRIMARY KEY,
+                  venue TEXT NOT NULL,
+                  action_type TEXT NOT NULL,
+                  project_id TEXT NOT NULL,
+                  request_hash TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  response_json TEXT,
+                  error_text TEXT
+                );
                 """
             )
 
@@ -152,3 +164,51 @@ class EventStore:
             "rationale": r["rationale"], "requires_approval": bool(r["requires_approval"]), "status": r["status"],
             "created_at": r["created_at"], "expires_at": r["expires_at"], "payload": json.loads(r["payload_json"])
         }
+
+    def begin_exchange_action(self, idempotency_key: str, venue: str, action_type: str, project_id: str, payload: dict) -> tuple[bool, dict]:
+        from datetime import datetime, timezone
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        digest = hashlib.sha256(raw.encode()).hexdigest()
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connect() as c:
+            cur = c.execute(
+                """INSERT OR IGNORE INTO exchange_action_ledger
+                (idempotency_key, venue, action_type, project_id, request_hash, status, created_at, updated_at)
+                VALUES(?,?,?,?,?,'PENDING',?,?)""",
+                (idempotency_key, venue, action_type, project_id, digest, now, now),
+            )
+            row = c.execute(
+                "SELECT * FROM exchange_action_ledger WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+        result = dict(row)
+        if result["request_hash"] != digest:
+            raise ValueError("Idempotency key was already used for a different request payload.")
+        return cur.rowcount == 1, result
+
+    def finish_exchange_action(self, idempotency_key: str, status: str, response: dict | None = None, error: str | None = None) -> bool:
+        from datetime import datetime, timezone
+        if status not in {"EXECUTED", "UNKNOWN"}:
+            raise ValueError("Exchange ledger status must be EXECUTED or UNKNOWN.")
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connect() as c:
+            cur = c.execute(
+                """UPDATE exchange_action_ledger SET status=?, updated_at=?, response_json=?, error_text=?
+                WHERE idempotency_key=? AND status='PENDING'""",
+                (status, now, json.dumps(response, sort_keys=True, default=str) if response is not None else None,
+                 error, idempotency_key),
+            )
+            return cur.rowcount == 1
+
+    def get_exchange_action(self, idempotency_key: str) -> dict | None:
+        with self._connect() as c:
+            row = c.execute(
+                "SELECT * FROM exchange_action_ledger WHERE idempotency_key=?",
+                (idempotency_key,),
+            ).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        if result.get("response_json"):
+            result["response"] = json.loads(result["response_json"])
+        return result

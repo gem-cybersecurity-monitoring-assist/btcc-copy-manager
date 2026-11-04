@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 
+from autonomy import build_copy_plan
 from models import Alert, CollectorBatch
 from monitor import TraderMonitor
+from maintenance import build_maintenance_plan
 from storage import EventStore
 from workflow import propose_copy_configuration
 
@@ -18,11 +20,18 @@ class SentinelService:
     def ingest(self, batch: CollectorBatch) -> dict:
         inserted = self.store.save_batch(batch)
         ranked = self.monitor.rank(batch.traders, batch.account)
+        plan = build_copy_plan(batch.traders, batch.account)
         action_ids: list[int] = []
         if inserted:
             self._emit_material_alerts(ranked)
             action_ids = self._prepare_workflows(batch, ranked)
-        return {"stored": inserted, "ranked": ranked, "prepared_action_ids": action_ids}
+        return {
+            "stored": inserted,
+            "ranked": ranked,
+            "autonomy_plan": plan,
+            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
+            "prepared_action_ids": action_ids,
+        }
 
     def _emit_material_alerts(self, ranked: list[dict]) -> None:
         for row in ranked:
@@ -60,14 +69,17 @@ class SentinelService:
     def scan_latest(self) -> dict:
         batch = self.store.latest_batch()
         if not batch:
-            return {"status": "no_data", "ranked": []}
+            return {"status": "no_data", "ranked": [], "autonomy_plan": None, "maintenance_plan": None}
         ranked = self.monitor.rank(batch.traders, batch.account)
+        plan = build_copy_plan(batch.traders, batch.account)
         self._emit_material_alerts(ranked)
         action_ids = self._prepare_workflows(batch, ranked)
         return {
             "status": "ok",
             "captured_at": batch.captured_at.isoformat(),
             "ranked": ranked,
+            "autonomy_plan": plan,
+            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
             "prepared_action_ids": action_ids,
         }
 

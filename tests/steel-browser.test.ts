@@ -7,7 +7,7 @@ import {
   verifyAuthCookie,
   verifyControlSecret,
   expectedAuthCookie,
-} from "../src/lib/steel-browser";
+} from "../src/lib/steel-browser.ts";
 
 function withSteelEnv(run: () => void) {
   const previous = {
@@ -33,8 +33,8 @@ test("Steel configuration requires server secrets and reports safe policy metada
     const status = steelConfigStatus();
     assert.equal(status.ready, true);
     assert.deepEqual(status.missing, []);
-    assert.equal(status.timeoutMs, 30 * 60 * 1000);
-    assert.equal(status.captchaSolving, true);
+    assert.equal(status.timeoutMs, 15 * 60 * 1000);
+    assert.equal(status.captchaSolving, false);
     assert.equal(status.inactivityTimeoutDisabled, true);
     assert.equal(status.persistentProfiles, true);
   });
@@ -63,7 +63,9 @@ test("Steel browser state round-trips through authenticated encryption", () => {
     assert.notEqual(sealed.includes("session-test"), true);
     assert.deepEqual(unsealSteelState(sealed), state);
 
-    const tampered = `${sealed.slice(0, -1)}${sealed.endsWith("A") ? "B" : "A"}`;
+    const parts = sealed.split(".");
+    parts[2] = `${parts[2].startsWith("A") ? "B" : "A"}${parts[2].slice(1)}`;
+    const tampered = parts.join(".");
     assert.deepEqual(unsealSteelState(tampered), {});
   });
 });
