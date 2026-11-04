@@ -13,6 +13,11 @@ type Scan = {
     excluded?: Row[];
     execution_blockers?: string[];
   };
+  execution?: {
+    status?: string;
+    reason?: string;
+    actions?: Row[];
+  };
   ai_review?: {
     status?: string;
     enabled?: boolean;
@@ -127,6 +132,13 @@ export function AutonomyDashboard() {
       <h2>{text(plan?.status || "Waiting for Sentinel")}</h2>
       <p className="subtle">Latest observation: {text(scan?.captured_at)}</p>
       <p className="subtle">Re-evaluation target: every 60 seconds while Sentinel is running.</p>
+    </section>
+
+    <section className="panel span-2">
+      <p className="eyebrow">Exchange execution</p>
+      <h2>{text(scan?.execution?.status || "Not connected")}</h2>
+      <p className="subtle">{text(scan?.execution?.reason || "Live follow and stop-replacement switches default to off.")}</p>
+      <Rows rows={scan?.execution?.actions || []} empty="No exchange actions were submitted."/>
     </section>
 
     <section className="panel span-2">
