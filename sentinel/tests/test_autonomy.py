@@ -33,6 +33,7 @@ def test_plan_is_bounded_and_never_executes():
     assert plan["account"]["copy_exposure_cap_usdt"] == 200
     assert plan["selected"][0]["allocation_usdt"] == 50
     assert plan["selected"][0]["status"] == "PLAN_ONLY"
+    assert plan["selected"][0]["margin_per_order_usdt"] == 5
     assert plan["maintenance_policy"]["withdrawals_enabled"] is False
 
 
