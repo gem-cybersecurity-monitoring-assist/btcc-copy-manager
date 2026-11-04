@@ -117,3 +117,15 @@ def test_copy_settings_uses_follower_settings_read_endpoint():
     adapter.copy_settings("project-1")
     assert calls[0][0] == "GET"
     assert calls[0][1] == "/api/v3/copy/futures/copy-settings?projectId=project-1"
+
+
+def test_follow_rejects_implicit_internal_fund_transfer():
+    calls = []
+    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    try:
+        adapter.follow("project-1", 50, max_position_value=150)
+    except BitgetError as exc:
+        assert "internal-transfer permission is disabled" in str(exc)
+    else:
+        raise AssertionError("Expected internal transfer permission rejection")
+    assert calls == []
