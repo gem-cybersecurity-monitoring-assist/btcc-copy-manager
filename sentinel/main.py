@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import hmac
 from contextlib import asynccontextmanager
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from bitget_copy import BitgetCopyAdapter, BitgetError
@@ -48,6 +50,22 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BTCC Sentinel", version="0.3.1", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_sentinel_auth(request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    expected = os.getenv("SENTINEL_CONTROL_TOKEN", "").strip()
+    required = os.getenv("SENTINEL_REQUIRE_AUTH", "false").lower() == "true"
+    if not expected:
+        if required:
+            return JSONResponse({"detail": "Sentinel control authentication is not configured."}, status_code=503)
+        return await call_next(request)
+    supplied = request.headers.get("authorization", "")
+    if not hmac.compare_digest(supplied, f"Bearer {expected}"):
+        return JSONResponse({"detail": "Sentinel authentication required."}, status_code=401)
+    return await call_next(request)
 
 
 class RankRequest(BaseModel):
