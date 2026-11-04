@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from threading import Lock
 
 from autonomy import build_copy_plan
 from agent_review import apply_ai_veto, run_ai_review
@@ -22,15 +23,17 @@ class SentinelService:
         self.executor = BitgetAutoExecutor(store)
         self._last_ai_review_key: str | None = None
         self._last_ai_review: dict | None = None
+        self._ai_review_lock = Lock()
 
     def _ai_review_for(self, batch: CollectorBatch) -> dict:
         key = batch.captured_at.isoformat()
-        if key == self._last_ai_review_key and self._last_ai_review is not None:
-            return self._last_ai_review
-        review = run_ai_review(batch.traders)
-        self._last_ai_review_key = key
-        self._last_ai_review = review
-        return review
+        with self._ai_review_lock:
+            if key == self._last_ai_review_key and self._last_ai_review is not None:
+                return self._last_ai_review
+            review = run_ai_review(batch.traders)
+            self._last_ai_review_key = key
+            self._last_ai_review = review
+            return review
 
     def _build_plans(self, batch: CollectorBatch) -> tuple[dict, dict, dict]:
         if batch.account.exchange == "bitget":
