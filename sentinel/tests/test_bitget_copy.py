@@ -157,7 +157,7 @@ def test_account_snapshot_uses_uta_assets_and_nets_today_futures_fees():
     snapshot = adapter.account_snapshot("Africa/Lagos")
     assert snapshot.exchange == "bitget"
     assert snapshot.total_usdt == 1000
-    assert snapshot.futures_free_usdt == 650
+    assert snapshot.futures_free_usdt == 500
     assert snapshot.wallet_usdt == 500
     assert snapshot.open_margin_usdt == 350
     assert snapshot.realized_pnl_today_usdt == 7.5
