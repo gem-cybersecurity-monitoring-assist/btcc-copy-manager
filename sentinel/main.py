@@ -273,12 +273,6 @@ def browser_gate(req: BrowserGateRequest):
     return {"allowed": allowed, "reason": reason}
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("PORT", "8421"))
-    uvicorn.run(app, host="127.0.0.1", port=port)
-
 @app.get("/bitget/status")
 def bitget_status():
     return BitgetCopyAdapter().status()
@@ -351,3 +345,10 @@ def bitget_close_all(req: BitgetCloseRequest, x_sentinel_control: str = Header(d
         )
     except BitgetError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8421"))
+    uvicorn.run(app, host="127.0.0.1", port=port)
+
