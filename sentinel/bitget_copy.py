@@ -24,6 +24,8 @@ class BitgetConfig:
     passphrase: str
     base_url: str = "https://api.bitget.com"
     live_enabled: bool = False
+    internal_transfer_enabled: bool = False
+    copy_fund_source: str = ""
     allowed_project_ids: frozenset[str] = frozenset()
 
     @classmethod
@@ -34,6 +36,8 @@ class BitgetConfig:
             passphrase=os.getenv("BITGET_API_PASSPHRASE", "").strip(),
             base_url=os.getenv("BITGET_API_BASE_URL", "https://api.bitget.com").rstrip("/"),
             live_enabled=os.getenv("BITGET_COPY_LIVE_ENABLED", "false").lower() == "true",
+            internal_transfer_enabled=os.getenv("BITGET_COPY_INTERNAL_TRANSFER_ENABLED", "false").lower() == "true",
+            copy_fund_source=os.getenv("BITGET_COPY_FUND_SOURCE", "").strip().lower(),
             allowed_project_ids=frozenset(
                 x.strip() for x in os.getenv("BITGET_COPY_ALLOWED_PROJECT_IDS", "").split(",") if x.strip()
             ),
@@ -79,6 +83,8 @@ class BitgetCopyAdapter:
             "exchange": "bitget",
             "configured": self.config.configured,
             "live_enabled": self.config.live_enabled,
+            "internal_transfer_enabled": self.config.internal_transfer_enabled,
+            "copy_fund_source": self.config.copy_fund_source or None,
             "allowlisted_project_count": len(self.config.allowed_project_ids),
             "minimum_subscription_usdt": self.MIN_SUBSCRIPTION_USDT,
             "required_account_mode": "Unified Account",
@@ -166,6 +172,10 @@ class BitgetCopyAdapter:
         project_id = self._project(project_id)
         if amount_usdt < self.MIN_SUBSCRIPTION_USDT:
             raise BitgetError("Bitget futures copy subscription minimum is 50 USDT.")
+        if not self.config.internal_transfer_enabled:
+            raise BitgetError("Bitget copy subscription may auto-transfer funds; explicit internal-transfer permission is disabled.")
+        if self.config.copy_fund_source not in {"funding", "uta", "otc"}:
+            raise BitgetError("Set BITGET_COPY_FUND_SOURCE to an explicitly authorized source: funding, uta or otc.")
         if copy_type not in {"fixed_ratio", "fixed_margin"}:
             raise BitgetError("Unsupported Bitget copy type.")
         if not 1 <= leverage <= self.MAX_LEVERAGE:
@@ -182,6 +192,7 @@ class BitgetCopyAdapter:
             "projectId": project_id,
             "type": copy_type,
             "amount": f"{amount_usdt:.2f}",
+            "accountType": self.config.copy_fund_source,
             "autoCopy": "off",
             "leverage": str(leverage),
             "maxEntrySlippage": str(max_entry_slippage),
