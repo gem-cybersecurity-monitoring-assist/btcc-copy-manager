@@ -152,7 +152,10 @@ class BitgetCopyAdapter:
         if not isinstance(assets, dict) or not assets.get("usdtEquity"):
             raise BitgetError("Bitget account-assets response did not include USDT equity.")
         now = datetime.now(timezone.utc)
-        tz = ZoneInfo(timezone_name or os.getenv("SENTINEL_TIMEZONE", "Africa/Lagos"))
+        try:
+            tz = ZoneInfo(timezone_name or os.getenv("SENTINEL_TIMEZONE", "Africa/Lagos"))
+        except Exception:
+            raise BitgetError("SENTINEL_TIMEZONE is not a valid IANA timezone.") from None
         local_midnight = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
         start_ms = int(local_midnight.astimezone(timezone.utc).timestamp() * 1000)
         end_ms = int(now.timestamp() * 1000)
