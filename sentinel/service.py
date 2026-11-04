@@ -135,6 +135,7 @@ class SentinelService:
             "autonomy_plan": plan,
             "maintenance_plan": maintenance,
             "ai_review": ai_review,
+            "execution": execution,
             "prepared_action_ids": action_ids,
         }
 
