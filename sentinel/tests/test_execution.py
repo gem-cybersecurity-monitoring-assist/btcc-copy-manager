@@ -146,3 +146,15 @@ def test_autonomous_stop_closes_positions_before_marking_inactive(monkeypatch):
     assert result["actions"][0]["status"] == "executed"
     assert adapter.unfollow_calls == [("project-1", "instant_close")]
     assert "project-1" not in store.active
+
+
+def test_live_execution_blocks_before_action_when_credentials_missing(monkeypatch):
+    monkeypatch.setenv("GEM_AUTO_COPY_EXECUTION_ENABLED", "true")
+    monkeypatch.setenv("GEM_AUTO_STOP_REPLACE_ENABLED", "false")
+    adapter = BitgetCopyAdapter(BitgetConfig(
+        "", "", "", live_enabled=True,
+        internal_transfer_enabled=True, copy_fund_source="uta",
+    ))
+    result = BitgetAutoExecutor(store=None, adapter=adapter).execute(batch(), {}, {})
+    assert result["status"] == "blocked"
+    assert "credentials are not configured" in result["reason"]
