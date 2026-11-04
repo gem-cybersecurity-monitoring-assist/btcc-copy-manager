@@ -66,6 +66,8 @@ def build_copy_plan(
         key = row["trader_id"] or row["trader"]
         trader = by_key[key]
         reasons: list[str] = []
+        if trader.exchange != account.exchange:
+            reasons.append(f"Trader venue {trader.exchange} does not match account snapshot venue {account.exchange}.")
         if row["verdict"] != "COPY" or row["score"] < policy.min_score:
             reasons.append("Deterministic trader rating is below the autonomous-copy threshold.")
         if len(trader.recent_trades) < policy.min_trades:
