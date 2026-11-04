@@ -35,9 +35,11 @@ REVIEW_SCHEMA = {
 
 
 def _public_evidence(traders: list[TraderSnapshot]) -> list[dict[str, Any]]:
-    """Only send public trader metrics; never send account balances or API credentials."""
+    """Only send bounded public trader metrics; never send account balances or credentials."""
+    max_traders = max(1, min(int(os.getenv("GEM_AI_REVIEW_MAX_TRADERS", "20")), 50))
+    max_trades = max(1, min(int(os.getenv("GEM_AI_REVIEW_MAX_TRADES", "15")), 30))
     evidence = []
-    for trader in traders:
+    for trader in traders[:max_traders]:
         evidence.append({
             "trader_id": trader.trader_id or trader.exchange_project_id or trader.name,
             "exchange": trader.exchange,
@@ -54,7 +56,7 @@ def _public_evidence(traders: list[TraderSnapshot]) -> list[dict[str, Any]]:
                     "pnl_usdt": trade.pnl_usdt,
                     "closed_at": trade.closed_at.isoformat() if trade.closed_at else None,
                 }
-                for trade in trader.recent_trades[-30:]
+                for trade in trader.recent_trades[-max_trades:]
             ],
         })
     return evidence
