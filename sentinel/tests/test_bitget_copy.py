@@ -94,3 +94,15 @@ def test_unfollow_requires_live_and_allowlist():
     adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
     adapter.unfollow("project-1", close_type="follow_close")
     assert calls[0][1].startswith("/api/v3/copy/futures/unfollow?")
+
+
+def test_follow_rejects_position_notional_above_allocation_and_leverage():
+    calls = []
+    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    try:
+        adapter.follow("project-1", 50, leverage=3, max_position_value=151)
+    except BitgetError as exc:
+        assert "no greater than allocation multiplied by leverage" in str(exc)
+    else:
+        raise AssertionError("Expected position cap rejection")
+    assert calls == []
