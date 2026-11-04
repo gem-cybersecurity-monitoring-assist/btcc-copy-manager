@@ -7,7 +7,7 @@ import {
   verifyAuthCookie,
   verifyControlSecret,
   expectedAuthCookie,
-} from "../src/lib/steel-browser";
+} from "../src/lib/steel-browser.ts";
 
 function withSteelEnv(run: () => void) {
   const previous = {
