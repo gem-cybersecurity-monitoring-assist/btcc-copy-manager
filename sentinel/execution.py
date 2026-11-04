@@ -109,8 +109,9 @@ class BitgetAutoExecutor:
             if active:
                 try:
                     settings = self.adapter.copy_settings(project_id)
-                    self.adapter.current_copy(project_id)
-                    results.append({"action": "FOLLOW", "project_id": project_id, "status": "already_active", "settings": settings})
+                    current = self.adapter.current_copy(project_id)
+                    profit = self.adapter.profit_details(project_id)
+                    results.append({"action": "FOLLOW", "project_id": project_id, "status": "already_active", "settings": settings, "current_copy": current, "profit_details": profit})
                 except BitgetError as exc:
                     results.append({"action": "FOLLOW", "project_id": project_id, "status": "reconciliation_required", "reason": str(exc)[:300]})
                 continue
