@@ -83,3 +83,19 @@ def test_ai_review_uses_structured_output_and_can_only_veto(monkeypatch):
     assert "account" not in captured["payload"]["input"]
     assert updated["selected"] == []
     assert updated["excluded"][0]["ai_action"] == "REVIEW"
+
+
+def test_service_caches_ai_review_for_same_collector_snapshot(monkeypatch):
+    from datetime import datetime, timezone
+    from types import SimpleNamespace
+    import service as service_module
+    from service import SentinelService
+
+    calls = []
+    monkeypatch.setattr(service_module, "run_ai_review", lambda traders: calls.append(len(traders)) or {"status": "disabled", "enabled": False})
+    instance = SentinelService(store=None)
+    batch = SimpleNamespace(captured_at=datetime.now(timezone.utc), traders=[sample_trader()])
+    first = instance._ai_review_for(batch)
+    second = instance._ai_review_for(batch)
+    assert first == second
+    assert calls == [1]
