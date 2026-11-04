@@ -9,7 +9,7 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from bitget_copy import BitgetCopyAdapter, BitgetError
 from models import AccountState, CollectorBatch, Signal, TraderSnapshot
@@ -90,22 +90,53 @@ class BitgetProjectRequest(BaseModel):
 
 class BitgetFollowRequest(BaseModel):
     project_id: str
+    idempotency_key: str = Field(min_length=12, max_length=128)
     amount_usdt: float
     max_position_value: float
     leverage: int = 3
-    trading_pairs: list[str] = []
+    trading_pairs: list[str] | None = None
     margin_per_order: float = 5.0
 
 
 class BitgetUnfollowRequest(BaseModel):
     project_id: str
+    idempotency_key: str = Field(min_length=12, max_length=128)
     close_type: str = "follow_close"
 
 
+class BitgetCloseRequest(BaseModel):
+    project_id: str
+    idempotency_key: str = Field(min_length=12, max_length=128)
+
+
 def _bitget_control(token: str):
+    import hmac
     expected = os.getenv("SENTINEL_CONTROL_TOKEN", "").strip()
-    if not expected or not token or not __import__("hmac").compare_digest(expected, token):
+    if not expected or not token or not hmac.compare_digest(expected, token):
         raise HTTPException(status_code=403, detail="Sentinel control authentication failed.")
+
+
+def _run_bitget_mutation(idempotency_key: str, action_type: str, project_id: str, payload: dict, operation):
+    try:
+        created, existing = store.begin_exchange_action(
+            idempotency_key, "bitget", action_type, project_id, payload
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    if not created:
+        if existing["status"] == "EXECUTED":
+            return json.loads(existing["response_json"] or "{}")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Idempotent action already exists in {existing['status']} state; reconcile exchange state before any retry.",
+        )
+    try:
+        result = operation()
+        store.finish_exchange_action(idempotency_key, "EXECUTED", response=result if isinstance(result, dict) else {"result": result})
+        return result
+    except Exception as exc:
+        store.finish_exchange_action(idempotency_key, "UNKNOWN", error=str(exc)[:500])
+        raise HTTPException(status_code=503, detail=f"Bitget action outcome is uncertain; reconcile before retry: {exc}") from None
 
 
 @app.get("/health")
@@ -281,12 +312,16 @@ def bitget_current_positions(req: BitgetProjectRequest):
 def bitget_follow(req: BitgetFollowRequest, x_sentinel_control: str = Header(default="")):
     _bitget_control(x_sentinel_control)
     try:
-        return BitgetCopyAdapter().follow(
-            req.project_id, req.amount_usdt, copy_type="fixed_margin",
-            leverage=req.leverage, auto_copy="off",
-            max_position_value=req.max_position_value,
-            trading_pairs=req.trading_pairs or None,
-            margin_per_order=req.margin_per_order,
+        return _run_bitget_mutation(
+            req.idempotency_key, "FOLLOW", req.project_id,
+            req.model_dump(exclude={"idempotency_key"}),
+            lambda: BitgetCopyAdapter().follow(
+                req.project_id, req.amount_usdt, copy_type="fixed_margin",
+                leverage=req.leverage, auto_copy="off",
+                max_position_value=req.max_position_value,
+                trading_pairs=req.trading_pairs or None,
+                margin_per_order=req.margin_per_order,
+            ),
         )
     except BitgetError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
@@ -296,15 +331,23 @@ def bitget_follow(req: BitgetFollowRequest, x_sentinel_control: str = Header(def
 def bitget_unfollow(req: BitgetUnfollowRequest, x_sentinel_control: str = Header(default="")):
     _bitget_control(x_sentinel_control)
     try:
-        return BitgetCopyAdapter().unfollow(req.project_id, close_type=req.close_type)
+        return _run_bitget_mutation(
+            req.idempotency_key, "UNFOLLOW", req.project_id,
+            req.model_dump(exclude={"idempotency_key"}),
+            lambda: BitgetCopyAdapter().unfollow(req.project_id, close_type=req.close_type),
+        )
     except BitgetError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
 
 
 @app.post("/bitget/close-all")
-def bitget_close_all(req: BitgetProjectRequest, x_sentinel_control: str = Header(default="")):
+def bitget_close_all(req: BitgetCloseRequest, x_sentinel_control: str = Header(default="")):
     _bitget_control(x_sentinel_control)
     try:
-        return BitgetCopyAdapter().close_all(req.project_id)
+        return _run_bitget_mutation(
+            req.idempotency_key, "CLOSE_ALL", req.project_id,
+            req.model_dump(exclude={"idempotency_key"}),
+            lambda: BitgetCopyAdapter().close_all(req.project_id),
+        )
     except BitgetError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
