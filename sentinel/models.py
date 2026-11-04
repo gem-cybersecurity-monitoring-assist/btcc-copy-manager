@@ -56,6 +56,7 @@ class TraderSnapshot(BaseModel):
 
 
 class AccountState(BaseModel):
+    exchange: Literal["btcc", "bitget"] = "btcc"
     total_usdt: float = Field(ge=0)
     futures_free_usdt: float = Field(ge=0)
     wallet_usdt: float = Field(ge=0)
