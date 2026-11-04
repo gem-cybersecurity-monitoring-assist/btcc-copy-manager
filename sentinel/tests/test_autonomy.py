@@ -64,3 +64,18 @@ def test_daily_loss_circuit_breaker_blocks_new_allocations():
     assert plan["selected"] == []
     assert any("Daily realized-loss circuit breaker" in reason
                for item in plan["excluded"] for reason in item["reasons"])
+
+
+def test_bitget_candidate_requires_native_project_mapping():
+    now = datetime.now(timezone.utc)
+    trader, account = sample(now)
+    trader.exchange = "bitget"
+    plan = build_copy_plan([trader], account, now=now)
+    assert plan["selected"] == []
+    assert any("project ID is missing" in reason
+               for item in plan["excluded"] for reason in item["reasons"])
+
+    trader.exchange_project_id = "bg-project-123"
+    plan = build_copy_plan([trader], account, now=now)
+    assert plan["selected"][0]["exchange"] == "bitget"
+    assert plan["selected"][0]["exchange_project_id"] == "bg-project-123"
