@@ -64,3 +64,8 @@ An optional structured-output reviewer is included in sentinel/agent_review.py. 
 The model can only veto a deterministic candidate (KEEP / REVIEW / REJECT). It cannot promote a candidate, choose allocations, set leverage or execute exchange actions. If AI review is explicitly enabled but the API is unavailable, new allocations fail closed. Reviews are cached per collector snapshot so a 60-second scan does not repeatedly bill for identical evidence.
 
 To enable later, set OPENAI_API_KEY, OPENAI_MODEL and GEM_AI_REVIEW_ENABLED=true in the Sentinel host's secret environment. The default remains false. Model calls use the OpenAI Responses API with strict JSON Schema structured output; no model name or paid API key is assumed by the code.
+
+
+### Bitget subscription funding boundary
+
+Bitget's create-copy endpoint accepts an accountType source for automatic funding of the copy account and defaults to all eligible sources if omitted. The adapter therefore requires both BITGET_COPY_INTERNAL_TRANSFER_ENABLED=true and an explicit BITGET_COPY_FUND_SOURCE (funding, uta or otc) before it will submit a follow request. The Render Blueprint defaults this permission to false. This is separate from live trading permission. No withdrawal or free-form transfer API is exposed.
