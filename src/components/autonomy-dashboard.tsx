@@ -110,7 +110,14 @@ export function AutonomyDashboard() {
 
   const plan = scan?.autonomy_plan;
   const maintenance = scan?.maintenance_plan;
-  const account = bitgetAccount || plan?.account || {};
+  const account = {
+    ...(plan?.account || {}),
+    equity_usdt: bitgetAccount?.total_usdt ?? plan?.account?.equity_usdt,
+    futures_free_usdt: bitgetAccount?.futures_free_usdt ?? plan?.account?.futures_free_usdt,
+    wallet_usdt: bitgetAccount?.wallet_usdt,
+    open_margin_usdt: bitgetAccount?.open_margin_usdt,
+    realized_pnl_today_usdt: bitgetAccount?.realized_pnl_today_usdt,
+  };
 
   return <div className="page-grid">
     <section className="hero-card span-2">
