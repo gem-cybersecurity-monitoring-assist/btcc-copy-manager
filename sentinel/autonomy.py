@@ -77,6 +77,8 @@ def build_copy_plan(
             reasons.append(f"Observed leverage exceeds {policy.max_trader_leverage:g}x autonomous limit.")
         if trader.executable_min_margin_usdt is None:
             reasons.append("Exchange minimum executable margin is unknown.")
+        if trader.exchange == "bitget" and not trader.exchange_project_id:
+            reasons.append("Bitget native copy project ID is missing; trader identity cannot be mapped safely.")
         reasons.extend(circuit_reasons)
         if reasons:
             excluded.append({"trader": trader.name, "trader_id": trader.trader_id, "reasons": reasons})
@@ -99,6 +101,8 @@ def build_copy_plan(
         allocations.append({
             "trader": trader.name,
             "trader_id": trader.trader_id,
+            "exchange": trader.exchange,
+            "exchange_project_id": trader.exchange_project_id,
             "score": candidate["rank"]["score"],
             "allocation_usdt": round(amount, 2),
             "margin_per_order_usdt": round(min(amount * 0.10, 5.0), 2),
