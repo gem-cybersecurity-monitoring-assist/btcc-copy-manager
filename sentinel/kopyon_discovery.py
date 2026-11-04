@@ -88,7 +88,7 @@ class KopyonBitgetDiscovery:
         sort_by: str = "pnl",
         max_candidates: int = 8,
     ) -> list[TraderSnapshot]:
-        if period not in {"7D", "30D", "90D", "180D"}:
+        if period != "30D":
             raise KopyonError("Unsupported Kopyon performance period.")
         if sort_by not in {"pnl", "roi", "aum", "copierPnl"}:
             raise KopyonError("Unsupported Kopyon ranking sort.")
@@ -115,12 +115,11 @@ class KopyonBitgetDiscovery:
                 roi = item.get("roi")
                 if net_pnl is None or leverage <= 0 or roi is None:
                     continue
-                max_open = float(item.get("maxOpenInterest") or 0)
                 trades.append(TradeRecord(
                     symbol=str(item.get("symbol") or "UNKNOWN"),
                     direction=str(item.get("side") or "UNKNOWN").lower(),
                     leverage=leverage,
-                    margin_usdt=max(0.0, max_open / leverage) if max_open else 0.0,
+                    margin_usdt=0.0,
                     pnl_usdt=float(net_pnl),
                     pnl_ratio_pct=float(roi) * 100.0,
                     opened_at=self._dt(item.get("openedAt")),
