@@ -28,6 +28,10 @@ services:
         sync: false
       - key: BITGET_COPY_ALLOWED_PROJECT_IDS
         sync: false
+      - key: BITGET_COPY_FUND_SOURCE
+        sync: false
+      - key: BITGET_COPY_INTERNAL_TRANSFER_ENABLED
+        value: "false"
       - key: BITGET_COPY_LIVE_ENABLED
         value: "false"
       - key: GEM_AI_REVIEW_ENABLED
