@@ -209,6 +209,15 @@ def browserbase_credential_check():
     }
 
 
+@app.post("/collector/bitget-batch")
+def bitget_collector_batch(batch: CollectorBatch):
+    if batch.account.exchange != "bitget":
+        raise HTTPException(status_code=422, detail="Bitget collector batch must carry a Bitget account snapshot.")
+    if any(t.exchange != "bitget" or not t.exchange_project_id for t in batch.traders):
+        raise HTTPException(status_code=422, detail="Every Bitget trader requires exchange=bitget and a verified exchange_project_id.")
+    return service.ingest(batch)
+
+
 @app.post("/collector/batch")
 def collector_batch(batch: CollectorBatch):
     return service.ingest(batch)
