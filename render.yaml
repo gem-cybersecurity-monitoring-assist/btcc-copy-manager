@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: gem-btcc-sentinel
+    runtime: python
+    plan: 0.5c-512mb
+    rootDir: sentinel
+    buildCommand: pip install -e .
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    disk:
+      name: sentinel-state
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: SENTINEL_DB
+        value: /var/data/sentinel.db
+      - key: SENTINEL_REQUIRE_AUTH
+        value: "true"
+      - key: SENTINEL_CONTROL_TOKEN
+        sync: false
+      - key: SENTINEL_SCAN_INTERVAL
+        value: "60"
+      - key: BITGET_API_KEY
+        sync: false
+      - key: BITGET_API_SECRET
+        sync: false
+      - key: BITGET_API_PASSPHRASE
+        sync: false
+      - key: BITGET_COPY_ALLOWED_PROJECT_IDS
+        sync: false
+      - key: BITGET_COPY_LIVE_ENABLED
+        value: "false"
