@@ -17,10 +17,21 @@ class SentinelService:
         self.scan_interval_seconds = max(10, scan_interval_seconds)
         self.monitor = TraderMonitor()
         self._stop = asyncio.Event()
+        self._last_ai_review_key: str | None = None
+        self._last_ai_review: dict | None = None
+
+    def _ai_review_for(self, batch: CollectorBatch) -> dict:
+        key = batch.captured_at.isoformat()
+        if key == self._last_ai_review_key and self._last_ai_review is not None:
+            return self._last_ai_review
+        review = run_ai_review(batch.traders)
+        self._last_ai_review_key = key
+        self._last_ai_review = review
+        return review
 
     def _build_plans(self, batch: CollectorBatch) -> tuple[dict, dict, dict]:
         plan = build_copy_plan(batch.traders, batch.account)
-        ai_review = run_ai_review(batch.traders)
+        ai_review = self._ai_review_for(batch)
         plan = apply_ai_veto(plan, ai_review)
         maintenance = build_maintenance_plan(batch.traders, batch.account)
         if ai_review.get("enabled"):
