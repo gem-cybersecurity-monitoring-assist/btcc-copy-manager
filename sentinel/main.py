@@ -8,9 +8,10 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
+from bitget_copy import BitgetCopyAdapter, BitgetError
 from models import AccountState, CollectorBatch, Signal, TraderSnapshot
 from monitor import TraderMonitor
 from risk import approve_signal
@@ -81,6 +82,30 @@ class EarnRequest(BaseModel):
 class BrowserGateRequest(BaseModel):
     action: WorkflowAction
     last_browser_step: BrowserStepResult | None = None
+
+
+class BitgetProjectRequest(BaseModel):
+    project_id: str
+
+
+class BitgetFollowRequest(BaseModel):
+    project_id: str
+    amount_usdt: float
+    max_position_value: float
+    leverage: int = 3
+    trading_pairs: list[str] = []
+    margin_per_order: float = 5.0
+
+
+class BitgetUnfollowRequest(BaseModel):
+    project_id: str
+    close_type: str = "follow_close"
+
+
+def _bitget_control(token: str):
+    expected = os.getenv("SENTINEL_CONTROL_TOKEN", "").strip()
+    if not expected or not token or not __import__("hmac").compare_digest(expected, token):
+        raise HTTPException(status_code=403, detail="Sentinel control authentication failed.")
 
 
 @app.get("/health")
@@ -222,3 +247,56 @@ if __name__ == "__main__":
 
     port = int(os.getenv("PORT", "8421"))
     uvicorn.run(app, host="127.0.0.1", port=port)
+
+@app.get("/bitget/status")
+def bitget_status():
+    return BitgetCopyAdapter().status()
+
+
+@app.post("/bitget/current-copy")
+def bitget_current_copy(req: BitgetProjectRequest):
+    try:
+        return BitgetCopyAdapter().current_copy(req.project_id)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+@app.post("/bitget/current-positions")
+def bitget_current_positions(req: BitgetProjectRequest):
+    try:
+        return BitgetCopyAdapter().current_positions(req.project_id)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+@app.post("/bitget/follow")
+def bitget_follow(req: BitgetFollowRequest, x_sentinel_control: str = Header(default="")):
+    _bitget_control(x_sentinel_control)
+    try:
+        return BitgetCopyAdapter().follow(
+            req.project_id, req.amount_usdt, copy_type="fixed_margin",
+            leverage=req.leverage, auto_copy="off",
+            max_position_value=req.max_position_value,
+            trading_pairs=req.trading_pairs or None,
+            margin_per_order=req.margin_per_order,
+        )
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+@app.post("/bitget/unfollow")
+def bitget_unfollow(req: BitgetUnfollowRequest, x_sentinel_control: str = Header(default="")):
+    _bitget_control(x_sentinel_control)
+    try:
+        return BitgetCopyAdapter().unfollow(req.project_id, close_type=req.close_type)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+@app.post("/bitget/close-all")
+def bitget_close_all(req: BitgetProjectRequest, x_sentinel_control: str = Header(default="")):
+    _bitget_control(x_sentinel_control)
+    try:
+        return BitgetCopyAdapter().close_all(req.project_id)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
