@@ -81,7 +81,7 @@ class BitgetCopyAdapter:
             "live_enabled": self.config.live_enabled,
             "allowlisted_project_count": len(self.config.allowed_project_ids),
             "minimum_subscription_usdt": self.MIN_SUBSCRIPTION_USDT,
-            "supported": ["current_copy", "current_positions", "profit_details", "follow", "modify", "unfollow", "close_all"],
+            "supported": ["current_copy", "copy_settings", "current_positions", "profit_details", "follow", "modify", "unfollow", "close_all"],
             "unsupported_by_design": ["withdraw", "address_management", "fund_transfer"],
         }
 
@@ -136,6 +136,9 @@ class BitgetCopyAdapter:
 
     def current_copy(self, project_id: str):
         return self._request("GET", "/api/v3/copy/futures/current-copy", {"projectId": self._project(project_id)})
+
+    def copy_settings(self, project_id: str):
+        return self._request("GET", "/api/v3/copy/futures/copy-settings", {"projectId": self._project(project_id)})
 
     def current_positions(self, project_id: str):
         return self._request("GET", "/api/v3/copy/futures/current-positions", {"projectId": self._project(project_id)})
