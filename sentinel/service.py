@@ -36,6 +36,12 @@ class SentinelService:
             return review
 
     def _build_plans(self, batch: CollectorBatch) -> tuple[dict, dict, dict]:
+        active_projects = {
+            row["project_id"] for row in self.store.list_active_subscriptions()
+        }
+        for trader in batch.traders:
+            if trader.exchange == "bitget" and trader.exchange_project_id in active_projects:
+                trader.currently_following = True
         if batch.account.exchange == "bitget":
             if self.executor.adapter.config.configured:
                 try:
