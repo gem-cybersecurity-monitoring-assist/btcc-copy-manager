@@ -31,6 +31,8 @@ type Scan = {
 type BitgetStatus = {
   configured?: boolean;
   live_enabled?: boolean;
+  internal_transfer_enabled?: boolean;
+  copy_fund_source?: string | null;
   allowlisted_project_count?: number;
   minimum_subscription_usdt?: number;
   required_account_mode?: string;
@@ -114,6 +116,7 @@ export function AutonomyDashboard() {
       <p className="eyebrow">Bitget adapter</p>
       <h2>{bitget?.configured ? "Credentials configured" : "Awaiting secure credentials"}</h2>
       <p className="subtle">Live actions: {bitget?.live_enabled ? "Enabled by server policy" : "Disabled"}.</p>
+      <p className="subtle">Internal copy-account funding transfer: {bitget?.internal_transfer_enabled ? `Enabled from ${text(bitget?.copy_fund_source)}` : "Disabled"}.</p>
       <p className="subtle">Allowed projects: {text(bitget?.allowlisted_project_count)} · Minimum copy amount: {amount(bitget?.minimum_subscription_usdt)}</p>
       <p className="subtle">Account mode: {text(bitget?.required_account_mode)}.</p>
       <p className="subtle">No withdrawals or address changes are available to the agent.</p>
