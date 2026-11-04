@@ -59,7 +59,7 @@ function Rows({ rows, empty }: { rows: Row[]; empty: string }) {
     <div className="autonomy-row" key={String(row.trader_id || row.project_id || row.trader || index)}>
       <strong>{text(row.trader || row.name || row.trader_id)}</strong>
       <span>{text(row.exchange || row.action)} {row.score !== undefined ? `· Score ${text(row.score)}` : ""}</span>
-      <span>{row.allocation_usdt !== undefined ? amount(row.allocation_usdt) : text(row.decision)}</span>
+      <span>{row.allocation_usdt !== undefined ? amount(row.allocation_usdt) : text(row.status || row.decision)}</span>
       {Array.isArray(row.reasons) && <small>{text(row.reasons)}</small>}
     </div>
   ))}</div>;
