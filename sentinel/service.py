@@ -87,8 +87,8 @@ class SentinelService:
 
     def ingest(self, batch: CollectorBatch) -> dict:
         inserted = self.store.save_batch(batch)
-        ranked = self.monitor.rank(batch.traders, batch.account)
         plan, maintenance, ai_review = self._build_plans(batch)
+        ranked = self.monitor.rank(batch.traders, batch.account)
         execution = self.executor.execute(batch, plan, maintenance)
         action_ids: list[int] = []
         if inserted:
@@ -141,8 +141,8 @@ class SentinelService:
         batch = self.store.latest_batch()
         if not batch:
             return {"status": "no_data", "ranked": [], "autonomy_plan": None, "maintenance_plan": None}
-        ranked = self.monitor.rank(batch.traders, batch.account)
         plan, maintenance, ai_review = self._build_plans(batch)
+        ranked = self.monitor.rank(batch.traders, batch.account)
         execution = self.executor.execute(batch, plan, maintenance)
         self._emit_material_alerts(ranked)
         action_ids = self._prepare_workflows(batch, ranked)
