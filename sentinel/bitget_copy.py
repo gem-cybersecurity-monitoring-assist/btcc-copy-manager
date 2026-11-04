@@ -148,14 +148,14 @@ class BitgetCopyAdapter:
 
     def account_snapshot(self, timezone_name: str | None = None) -> AccountState:
         """Read UTA equity and today's realized futures PnL for a venue-tagged snapshot."""
-        assets = self._request("GET", "/api/v3/account/assets")
-        if not isinstance(assets, dict) or not assets.get("usdtEquity"):
-            raise BitgetError("Bitget account-assets response did not include USDT equity.")
         now = datetime.now(timezone.utc)
         try:
             tz = ZoneInfo(timezone_name or os.getenv("SENTINEL_TIMEZONE", "Africa/Lagos"))
         except Exception:
             raise BitgetError("SENTINEL_TIMEZONE is not a valid IANA timezone.") from None
+        assets = self._request("GET", "/api/v3/account/assets")
+        if not isinstance(assets, dict) or not assets.get("usdtEquity"):
+            raise BitgetError("Bitget account-assets response did not include USDT equity.")
         local_midnight = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
         start_ms = int(local_midnight.astimezone(timezone.utc).timestamp() * 1000)
         end_ms = int(now.timestamp() * 1000)
