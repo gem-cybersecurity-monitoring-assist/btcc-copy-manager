@@ -55,6 +55,18 @@ class BitgetAutoExecutor:
             if not active:
                 continue
             latest = self.store.latest_exchange_action("bitget", project_id)
+            if latest and latest["action_type"] == "UNFOLLOW" and latest["status"] == "EXECUTED":
+                try:
+                    positions = self.adapter.current_positions(project_id)
+                    position_list = positions.get("list", []) if isinstance(positions, dict) else positions
+                    if not position_list:
+                        self.store.mark_subscription_inactive(project_id)
+                        results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "reconciled_inactive"})
+                    else:
+                        results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "reconciliation_required", "open_positions": len(position_list)})
+                except BitgetError as exc:
+                    results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "reconciliation_required", "reason": str(exc)[:300]})
+                continue
             if latest and latest["status"] in {"PENDING", "UNKNOWN"}:
                 results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "reconciliation_required"})
                 continue
