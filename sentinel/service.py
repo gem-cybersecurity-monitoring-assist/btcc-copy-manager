@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from autonomy import build_copy_plan
+from agent_review import apply_ai_veto, run_ai_review
 from models import Alert, CollectorBatch
 from monitor import TraderMonitor
 from maintenance import build_maintenance_plan
@@ -17,10 +18,26 @@ class SentinelService:
         self.monitor = TraderMonitor()
         self._stop = asyncio.Event()
 
+    def _build_plans(self, batch: CollectorBatch) -> tuple[dict, dict, dict]:
+        plan = build_copy_plan(batch.traders, batch.account)
+        ai_review = run_ai_review(batch.traders)
+        plan = apply_ai_veto(plan, ai_review)
+        maintenance = build_maintenance_plan(batch.traders, batch.account)
+        if ai_review.get("enabled"):
+            if ai_review.get("status") != "ok":
+                maintenance["replacement_candidates"] = []
+            else:
+                veto_ids = set(ai_review.get("veto_ids", []))
+                maintenance["replacement_candidates"] = [
+                    row for row in maintenance.get("replacement_candidates", [])
+                    if (row.get("trader_id") or row.get("exchange_project_id") or row.get("trader")) not in veto_ids
+                ]
+        return plan, maintenance, ai_review
+
     def ingest(self, batch: CollectorBatch) -> dict:
         inserted = self.store.save_batch(batch)
         ranked = self.monitor.rank(batch.traders, batch.account)
-        plan = build_copy_plan(batch.traders, batch.account)
+        plan, maintenance, ai_review = self._build_plans(batch)
         action_ids: list[int] = []
         if inserted:
             self._emit_material_alerts(ranked)
@@ -29,7 +46,8 @@ class SentinelService:
             "stored": inserted,
             "ranked": ranked,
             "autonomy_plan": plan,
-            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
+            "maintenance_plan": maintenance,
+            "ai_review": ai_review,
             "prepared_action_ids": action_ids,
         }
 
@@ -71,7 +89,7 @@ class SentinelService:
         if not batch:
             return {"status": "no_data", "ranked": [], "autonomy_plan": None, "maintenance_plan": None}
         ranked = self.monitor.rank(batch.traders, batch.account)
-        plan = build_copy_plan(batch.traders, batch.account)
+        plan, maintenance, ai_review = self._build_plans(batch)
         self._emit_material_alerts(ranked)
         action_ids = self._prepare_workflows(batch, ranked)
         return {
@@ -79,7 +97,8 @@ class SentinelService:
             "captured_at": batch.captured_at.isoformat(),
             "ranked": ranked,
             "autonomy_plan": plan,
-            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
+            "maintenance_plan": maintenance,
+            "ai_review": ai_review,
             "prepared_action_ids": action_ids,
         }
 
