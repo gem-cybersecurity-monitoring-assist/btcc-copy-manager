@@ -43,6 +43,26 @@ class SentinelService:
                     row for row in maintenance.get("replacement_candidates", [])
                     if (row.get("trader_id") or row.get("exchange_project_id") or row.get("trader")) not in veto_ids
                 ]
+                active_ids = {
+                    t.trader_id or t.exchange_project_id or t.name
+                    for t in batch.traders if t.currently_following
+                }
+                for review in ai_review.get("reviews", []):
+                    if review.get("trader_id") not in active_ids:
+                        continue
+                    if review.get("action") == "REJECT":
+                        maintenance["stop_review"].append({
+                            "trader_id": review["trader_id"],
+                            "decision": "STOP_AND_REPLACE_REVIEW",
+                            "status": "REVIEW_ONLY",
+                            "reasons": ["AI risk panel rejection: " + "; ".join(review.get("reasons", []))],
+                        })
+                    elif review.get("action") == "REVIEW":
+                        maintenance["retain"].append({
+                            "trader_id": review["trader_id"],
+                            "decision": "REVIEW_FOLLOWER",
+                            "reasons": review.get("reasons", []),
+                        })
         return plan, maintenance, ai_review
 
     def ingest(self, batch: CollectorBatch) -> dict:
