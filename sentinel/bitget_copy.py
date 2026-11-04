@@ -156,6 +156,7 @@ class BitgetCopyAdapter:
         max_position_value: float,
         trading_pairs: list[str] | None = None,
         margin_per_order: float | None = None,
+        max_margin_ratio: int = 10,
     ):
         self._require_live()
         project_id = self._project(project_id)
@@ -165,6 +166,8 @@ class BitgetCopyAdapter:
             raise BitgetError("Unsupported Bitget copy type.")
         if not 1 <= leverage <= self.MAX_LEVERAGE:
             raise BitgetError("Leverage must be between 1x and 10x.")
+        if not 5 <= max_margin_ratio <= 95:
+            raise BitgetError("Maximum single-order margin ratio must be between 5% and 95%.")
         if auto_copy != "off":
             raise BitgetError("Automatic new-pair following must remain off.")
         if max_position_value <= 0 or max_position_value > amount_usdt * leverage:
@@ -178,6 +181,7 @@ class BitgetCopyAdapter:
             "autoCopy": "off",
             "leverage": str(leverage),
             "maxEntrySlippage": str(max_entry_slippage),
+            "maxMarginRatio": str(max_margin_ratio),
             "maxPostionValue": f"{max_position_value:.2f}",
         }
         if trading_pairs:
@@ -186,16 +190,17 @@ class BitgetCopyAdapter:
             params["marginPerOrder"] = f"{margin_per_order:.2f}"
         return self._request("POST", "/api/v3/copy/futures/follower-settings", params)
 
-    def modify(self, project_id: str, *, leverage: int, auto_copy: str = "off", max_position_value: float):
+    def modify(self, project_id: str, *, leverage: int, auto_copy: str = "off", max_position_value: float, max_margin_ratio: int = 10):
         self._require_live()
         project_id = self._project(project_id)
-        if not 1 <= leverage <= self.MAX_LEVERAGE or auto_copy != "off" or max_position_value <= 0:
+        if not 1 <= leverage <= self.MAX_LEVERAGE or auto_copy != "off" or max_position_value <= 0 or not 5 <= max_margin_ratio <= 95:
             raise BitgetError("Unsafe or invalid copy settings.")
         return self._request("POST", "/api/v3/copy/futures/modify-follower-settings", {
             "projectId": project_id,
             "leverage": str(leverage),
             "autoCopy": "off",
             "maxPostionValue": f"{max_position_value:.2f}",
+            "maxMarginRatio": str(max_margin_ratio),
         })
 
     def unfollow(self, project_id: str, *, close_type: str = "follow_close"):
