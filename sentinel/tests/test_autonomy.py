@@ -71,6 +71,7 @@ def test_bitget_candidate_requires_native_project_mapping():
     trader, account = sample(now)
     trader.exchange = "bitget"
     account.exchange = "bitget"
+    account.provenance.source = "xhr"
     plan = build_copy_plan([trader], account, now=now)
     assert plan["selected"] == []
     assert any("project ID is missing" in reason
