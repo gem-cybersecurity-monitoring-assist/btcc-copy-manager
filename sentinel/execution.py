@@ -26,6 +26,8 @@ class BitgetAutoExecutor:
             return {"status": "blocked", "actions": [], "reason": "The account snapshot is not from Bitget."}
         if not self.adapter.config.live_enabled:
             return {"status": "blocked", "actions": [], "reason": "Bitget live mutation flag is disabled."}
+        if not self.adapter.config.configured:
+            return {"status": "blocked", "actions": [], "reason": "Bitget API credentials are not configured."}
 
         actions: list[dict[str, Any]] = []
         snapshot_key = batch.captured_at.isoformat()
