@@ -11,7 +11,7 @@ def sample(now):
         for i in range(12)
     ]
     trader = TraderSnapshot(
-        name="Steady", trader_id="steady-1", win_rate_pct=75,
+        name="Steady", trader_id="steady-1", win_rate_pct=75, max_drawdown_pct=15,
         executable_min_margin_usdt=50, recent_trades=trades,
         source_timestamp=now,
         provenance=Provenance(source="manual", confidence=0.99),
