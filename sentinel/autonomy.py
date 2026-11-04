@@ -21,6 +21,7 @@ class AutonomyPolicy:
     min_trades: int = 10
     min_score: int = 82
     max_trader_leverage: float = 10.0
+    execution_leverage: int = 3
     max_daily_loss_ratio: float = 0.03
     min_allocation_usdt: float = 50.0
 
@@ -106,7 +107,8 @@ def build_copy_plan(
             "score": candidate["rank"]["score"],
             "allocation_usdt": round(amount, 2),
             "margin_per_order_usdt": round(min(amount * 0.10, 5.0), 2),
-            "max_leverage": policy.max_trader_leverage,
+            "max_leverage": policy.execution_leverage,
+            "max_position_value_usdt": round(amount * policy.execution_leverage, 2),
             "copy_existing_positions": False,
             "auto_follow_new_pairs": False,
             "status": "PLAN_ONLY",
