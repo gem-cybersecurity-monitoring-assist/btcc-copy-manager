@@ -34,10 +34,18 @@ REVIEW_SCHEMA = {
 }
 
 
+def _bounded_env_int(name: str, default: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    return max(1, min(value, maximum))
+
+
 def _public_evidence(traders: list[TraderSnapshot]) -> list[dict[str, Any]]:
     """Only send bounded public trader metrics; never send account balances or credentials."""
-    max_traders = max(1, min(int(os.getenv("GEM_AI_REVIEW_MAX_TRADERS", "20")), 50))
-    max_trades = max(1, min(int(os.getenv("GEM_AI_REVIEW_MAX_TRADES", "15")), 30))
+    max_traders = _bounded_env_int("GEM_AI_REVIEW_MAX_TRADERS", 20, 50)
+    max_trades = _bounded_env_int("GEM_AI_REVIEW_MAX_TRADES", 15, 30)
     evidence = []
     for trader in traders[:max_traders]:
         evidence.append({
