@@ -22,7 +22,7 @@ Extend this repository rather than fork a second trading application.
 
 ## Current implementation status
 
-The deterministic planning engine and a signed Bitget v3 futures-copy adapter are implemented with unit tests. The adapter supports current-copy, positions, profit details, follow, modify, unfollow and close-all. Mutations require an explicit live flag, an allowlisted project ID and a separate Sentinel control token. It exposes no transfer or withdrawal method. The decision planner still returns PLAN_ONLY until a supported trader-discovery feed and reconciled end-to-end execution loop are verified.
+The deterministic planning engine and a signed Bitget v3 futures-copy adapter are implemented with unit tests. The adapter supports current-copy, positions, profit details, follow, modify, unfollow and close-all. Mutations require an explicit live flag, an allowlisted project ID and a separate Sentinel control token. It exposes no transfer or withdrawal method. The decision planner still returns PLAN_ONLY until a supported trader-discovery feed and reconciled end-to-end execution loop are verified. Sentinel now also emits a maintenance review: it flags deteriorating active followers for stop/replacement review, pauses new allocations on stale observations, and lists replacement candidates. These are review decisions, not exchange side effects.
 
 ### Why Bitget first
 
@@ -37,7 +37,7 @@ The verified Bitget v3 follower API is an execution/account-management surface, 
 - Bounded trading/copy decisions can become autonomous after exchange adapters pass contract tests and the owner enables a specific policy.
 - The LLM is advisory reasoning support, never the final risk authority.
 - Stale data, missing provenance, unknown minimums, exceeded drawdown limits or uncertain exchange state stop new allocations.
-- Before enabling autonomous execution, add durable idempotency keys and an action ledger, reconcile subscription and position state after every mutation, record exchange request IDs/results, handle rate limits and partial failures, and wire the global kill switch. Do not retry non-idempotent follow/unfollow/close requests blindly.
+- A durable SQLite exchange-action ledger is now included. Mutation routes require a unique idempotency key, the Sentinel control token, a project allowlist and the live flag. Replayed completed actions return the recorded result; PENDING or UNKNOWN actions are blocked until reconciled. Before autonomous execution, wire exchange-state reconciliation and the global kill switch into the scheduler. Do not retry non-idempotent follow/unfollow/close requests blindly.
 - Transfers are disabled in this first stage. Withdrawals and address changes remain forbidden to the agent.
 - No system can promise profit. Backtest, paper and small controlled live validation are required before increasing limits.
 
