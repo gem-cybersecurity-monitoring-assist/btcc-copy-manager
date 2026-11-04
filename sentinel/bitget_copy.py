@@ -172,12 +172,12 @@ class BitgetCopyAdapter:
             if cursor:
                 params["cursor"] = cursor
             fills = self._request("GET", "/api/v3/trade/fills", params)
-            rows = fills.get("list", []) if isinstance(fills, dict) else []
+            rows = (fills.get("list") or []) if isinstance(fills, dict) else []
             for fill in rows:
                 pnl = float(fill.get("execPnl") or 0)
                 fees = sum(
                     float(fee.get("fee") or 0)
-                    for fee in fill.get("feeDetail", [])
+                    for fee in (fill.get("feeDetail") or [])
                     if fee.get("feeCoin") == "USDT"
                 )
                 realized += pnl - fees
@@ -187,7 +187,7 @@ class BitgetCopyAdapter:
         else:
             complete = False
 
-        usdt_asset = next((row for row in assets.get("assets", []) if row.get("coin") == "USDT"), {})
+        usdt_asset = next((row for row in (assets.get("assets") or []) if row.get("coin") == "USDT"), {})
         confidence = 0.99 if complete else 0.80
         usdt_available = max(0.0, float(usdt_asset.get("available") or 0))
         effective_equity = max(0.0, float(assets.get("effEquity") or 0))
