@@ -105,7 +105,7 @@ class BrowserGateRequest(BaseModel):
 
 
 class BitgetDiscoveryRequest(BaseModel):
-    period: Literal["7D", "30D", "90D", "180D"] = "30D"
+    period: Literal["30D"] = "30D"
     sort_by: Literal["pnl", "roi", "aum", "copierPnl"] = "pnl"
     max_candidates: int = Field(default=8, ge=1, le=8)
 
