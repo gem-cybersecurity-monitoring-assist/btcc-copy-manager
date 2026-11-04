@@ -5,7 +5,8 @@ import asyncio
 from autonomy import build_copy_plan
 from agent_review import apply_ai_veto, run_ai_review
 from execution import BitgetAutoExecutor
-from models import Alert, CollectorBatch
+from bitget_copy import BitgetError
+from models import Alert, CollectorBatch, Provenance
 from monitor import TraderMonitor
 from maintenance import build_maintenance_plan
 from storage import EventStore
@@ -32,6 +33,14 @@ class SentinelService:
         return review
 
     def _build_plans(self, batch: CollectorBatch) -> tuple[dict, dict, dict]:
+        if batch.account.exchange == "bitget":
+            if self.executor.adapter.config.configured:
+                try:
+                    batch.account = self.executor.adapter.account_snapshot()
+                except BitgetError:
+                    batch.account.provenance = Provenance(source="unknown", confidence=0.0)
+            else:
+                batch.account.provenance = Provenance(source="unknown", confidence=0.0)
         plan = build_copy_plan(batch.traders, batch.account)
         ai_review = self._ai_review_for(batch)
         plan = apply_ai_veto(plan, ai_review)
