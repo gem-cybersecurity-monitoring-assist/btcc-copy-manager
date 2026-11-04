@@ -4,6 +4,7 @@ import asyncio
 
 from autonomy import build_copy_plan
 from agent_review import apply_ai_veto, run_ai_review
+from execution import BitgetAutoExecutor
 from models import Alert, CollectorBatch
 from monitor import TraderMonitor
 from maintenance import build_maintenance_plan
@@ -17,6 +18,7 @@ class SentinelService:
         self.scan_interval_seconds = max(10, scan_interval_seconds)
         self.monitor = TraderMonitor()
         self._stop = asyncio.Event()
+        self.executor = BitgetAutoExecutor(store)
         self._last_ai_review_key: str | None = None
         self._last_ai_review: dict | None = None
 
@@ -69,6 +71,7 @@ class SentinelService:
         inserted = self.store.save_batch(batch)
         ranked = self.monitor.rank(batch.traders, batch.account)
         plan, maintenance, ai_review = self._build_plans(batch)
+        execution = self.executor.execute(batch, plan, maintenance)
         action_ids: list[int] = []
         if inserted:
             self._emit_material_alerts(ranked)
@@ -79,6 +82,7 @@ class SentinelService:
             "autonomy_plan": plan,
             "maintenance_plan": maintenance,
             "ai_review": ai_review,
+            "execution": execution,
             "prepared_action_ids": action_ids,
         }
 
@@ -121,6 +125,7 @@ class SentinelService:
             return {"status": "no_data", "ranked": [], "autonomy_plan": None, "maintenance_plan": None}
         ranked = self.monitor.rank(batch.traders, batch.account)
         plan, maintenance, ai_review = self._build_plans(batch)
+        execution = self.executor.execute(batch, plan, maintenance)
         self._emit_material_alerts(ranked)
         action_ids = self._prepare_workflows(batch, ranked)
         return {
