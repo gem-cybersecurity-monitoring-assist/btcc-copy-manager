@@ -21,7 +21,7 @@ class AutonomyPolicy:
     min_score: int = 82
     max_trader_leverage: float = 10.0
     max_daily_loss_ratio: float = 0.03
-    min_allocation_usdt: float = 5.0
+    min_allocation_usdt: float = 50.0
 
 
 def _fresh(timestamp: datetime, now: datetime, max_age: int) -> bool:
@@ -95,7 +95,7 @@ def build_copy_plan(
             "trader_id": trader.trader_id,
             "score": candidate["rank"]["score"],
             "allocation_usdt": round(amount, 2),
-            "max_per_order_usdt": round(min(amount, policy.min_allocation_usdt), 2),
+            "margin_per_order_usdt": round(min(amount * 0.10, 5.0), 2),
             "max_leverage": policy.max_trader_leverage,
             "copy_existing_positions": False,
             "auto_follow_new_pairs": False,
@@ -126,7 +126,7 @@ def build_copy_plan(
         "execution_blockers": [
             "Plan generation is not exchange execution.",
             "BTCC native copy follow/unfollow API is not verified.",
-            "Bitget requires a separately implemented authenticated copy-trading adapter.",
-            "Live autonomy remains disabled until reconciliation, idempotency, kill-switch and account policy are tested.",
+            "Bitget adapter is implemented, but live actions remain disabled pending credentials, allowlist and end-to-end contract verification.",
+            "Live autonomy remains disabled until exchange reconciliation, idempotency, kill-switch and account policy are tested.",
         ],
     }
