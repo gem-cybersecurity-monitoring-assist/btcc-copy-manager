@@ -73,6 +73,7 @@ class FakeAdapter:
         live_enabled = True
         internal_transfer_enabled = True
         copy_fund_source = "uta"
+        allowed_project_ids = frozenset({"project-1"})
     def __init__(self):
         self.config = self.Config()
         self.follow_calls = []
