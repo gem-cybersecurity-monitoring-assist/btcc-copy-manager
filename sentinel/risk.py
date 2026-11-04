@@ -16,6 +16,8 @@ class RiskPolicy:
     max_positions: int = 2
     min_signal_confidence: float = 0.72
     stale_after_seconds: int = 180
+    hard_reject_drawdown_pct: float = 50.0
+    elevated_drawdown_pct: float = 30.0
 
 
 def classify_trader(t: TraderSnapshot, available_capital_usdt: float, p: RiskPolicy = RiskPolicy()):
@@ -26,6 +28,8 @@ def classify_trader(t: TraderSnapshot, available_capital_usdt: float, p: RiskPol
 
     max_lev = max(x.leverage for x in trades)
     worst = min(x.pnl_ratio_pct for x in trades)
+    if t.max_drawdown_pct is not None and t.max_drawdown_pct >= p.hard_reject_drawdown_pct:
+        reasons.append(f"Maximum observed drawdown {t.max_drawdown_pct:.1f}% reached hard reject threshold {p.hard_reject_drawdown_pct:.1f}%")
     if max_lev >= p.hard_reject_leverage:
         reasons.append(f"Recent leverage reached {max_lev:.0f}x (hard reject >= {p.hard_reject_leverage:.0f}x)")
     if worst <= p.catastrophic_loss_pct:
@@ -45,6 +49,8 @@ def classify_trader(t: TraderSnapshot, available_capital_usdt: float, p: RiskPol
 
     score = 65
     score -= int(high_lev_share * 35)
+    if t.max_drawdown_pct is not None and t.max_drawdown_pct >= p.elevated_drawdown_pct:
+        score -= 20
     score += 10 if worst > -20 else -8
     score += 8 if avg_pnl > 0 else -10
     score += 7 if profit_factor >= 1.3 else (-8 if profit_factor < 1 else 0)
