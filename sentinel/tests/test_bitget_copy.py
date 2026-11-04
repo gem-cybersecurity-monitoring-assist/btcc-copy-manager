@@ -11,7 +11,8 @@ def fake_transport(calls):
 def config(**kwargs):
     values = dict(
         api_key="key", secret_key="secret", passphrase="pass",
-        live_enabled=False, allowed_project_ids=frozenset({"project-1"}),
+        live_enabled=False, internal_transfer_enabled=False, copy_fund_source="",
+        allowed_project_ids=frozenset({"project-1"}),
     )
     values.update(kwargs)
     return BitgetConfig(**values)
@@ -74,7 +75,7 @@ def test_bitget_minimum_subscription_is_enforced():
 
 def test_follow_enforces_safe_settings_and_uses_verified_endpoint():
     calls = []
-    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    adapter = BitgetCopyAdapter(config(live_enabled=True, internal_transfer_enabled=True, copy_fund_source="uta"), fake_transport(calls))
     adapter.follow(
         "project-1", 50, copy_type="fixed_margin", leverage=3,
         auto_copy="off", max_position_value=50, margin_per_order=5,
@@ -85,6 +86,7 @@ def test_follow_enforces_safe_settings_and_uses_verified_endpoint():
     assert "autoCopy=off" in path
     assert "leverage=3" in path
     assert "amount=50.00" in path
+    assert "accountType=uta" in path
     assert "marginPerOrder=5.00" in path
     assert "maxMarginRatio=10" in path
     assert body == ""
@@ -99,7 +101,7 @@ def test_unfollow_requires_live_and_allowlist():
 
 def test_follow_rejects_position_notional_above_allocation_and_leverage():
     calls = []
-    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    adapter = BitgetCopyAdapter(config(live_enabled=True, internal_transfer_enabled=True, copy_fund_source="uta"), fake_transport(calls))
     try:
         adapter.follow("project-1", 50, leverage=3, max_position_value=151)
     except BitgetError as exc:
