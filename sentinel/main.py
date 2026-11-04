@@ -98,6 +98,13 @@ class BitgetFollowRequest(BaseModel):
     margin_per_order: float = 5.0
 
 
+class BitgetModifyRequest(BaseModel):
+    project_id: str
+    idempotency_key: str = Field(min_length=12, max_length=128)
+    leverage: int = 3
+    max_position_value: float
+
+
 class BitgetUnfollowRequest(BaseModel):
     project_id: str
     idempotency_key: str = Field(min_length=12, max_length=128)
@@ -315,6 +322,23 @@ def bitget_follow(req: BitgetFollowRequest, x_sentinel_control: str = Header(def
                 max_position_value=req.max_position_value,
                 trading_pairs=req.trading_pairs or None,
                 margin_per_order=req.margin_per_order,
+            ),
+        )
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+
+@app.post("/bitget/modify")
+def bitget_modify(req: BitgetModifyRequest, x_sentinel_control: str = Header(default="")):
+    _bitget_control(x_sentinel_control)
+    try:
+        return _run_bitget_mutation(
+            req.idempotency_key, "MODIFY", req.project_id,
+            req.model_dump(exclude={"idempotency_key"}),
+            lambda: BitgetCopyAdapter().modify(
+                req.project_id, leverage=req.leverage,
+                auto_copy="off", max_position_value=req.max_position_value,
             ),
         )
     except BitgetError as exc:
