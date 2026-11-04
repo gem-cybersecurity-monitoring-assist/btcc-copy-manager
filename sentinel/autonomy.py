@@ -59,6 +59,10 @@ def build_copy_plan(
         circuit_reasons.append("Account snapshot is stale or future-dated.")
     if account.provenance and account.provenance.confidence < policy.min_provenance_confidence:
         circuit_reasons.append("Account data provenance confidence is below policy.")
+    if account.exchange == "bitget" and (
+        account.provenance is None or account.provenance.source != "xhr"
+    ):
+        circuit_reasons.append("Bitget allocations require a live authenticated account snapshot.")
     if daily_loss >= daily_loss_limit and daily_loss_limit > 0:
         circuit_reasons.append("Daily realized-loss circuit breaker is active.")
 
