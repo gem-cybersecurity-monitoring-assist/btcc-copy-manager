@@ -105,3 +105,14 @@ def test_maintenance_pauses_new_allocations_when_followed_trader_data_is_stale()
     plan = build_maintenance_plan([trader], account, now=now)
     assert plan["retain"][0]["decision"] == "PAUSE_NEW_ALLOCATIONS"
     assert plan["stop_review"] == []
+
+
+def test_cross_exchange_account_snapshot_cannot_fund_bitget_candidate():
+    now = datetime.now(timezone.utc)
+    trader, account = sample(now)
+    trader.exchange = "bitget"
+    trader.exchange_project_id = "bg-project-123"
+    plan = build_copy_plan([trader], account, now=now)
+    assert plan["selected"] == []
+    assert any("does not match account snapshot venue" in reason
+               for item in plan["excluded"] for reason in item["reasons"])
