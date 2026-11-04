@@ -30,6 +30,18 @@ def build_maintenance_plan(
         trader = by_key[row["trader_id"] or row["trader"]]
         if not trader.currently_following:
             continue
+        if trader.exchange == "bitget" and (
+            account.provenance is None or account.provenance.source != "xhr"
+            or account.provenance.confidence < policy.min_provenance_confidence
+        ):
+            retain.append({
+                "exchange": trader.exchange,
+                "project_id": trader.exchange_project_id,
+                "trader": trader.name,
+                "decision": "PAUSE_NEW_ALLOCATIONS",
+                "reason": "Authenticated Bitget account snapshot is unavailable or below confidence threshold.",
+            })
+            continue
         if trader.exchange != account.exchange:
             retain.append({
                 "exchange": trader.exchange,
