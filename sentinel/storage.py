@@ -69,6 +69,17 @@ class EventStore:
                   response_json TEXT,
                   error_text TEXT
                 );
+                CREATE TABLE IF NOT EXISTS active_copy_subscriptions (
+                  project_id TEXT PRIMARY KEY,
+                  venue TEXT NOT NULL,
+                  trader_id TEXT,
+                  trader_name TEXT NOT NULL,
+                  amount_usdt REAL NOT NULL,
+                  leverage INTEGER NOT NULL,
+                  max_position_value_usdt REAL NOT NULL,
+                  status TEXT NOT NULL,
+                  verified_at TEXT NOT NULL
+                );
                 """
             )
 
@@ -212,3 +223,42 @@ class EventStore:
         if result.get("response_json"):
             result["response"] = json.loads(result["response_json"])
         return result
+
+
+    def get_active_subscription(self, project_id: str) -> dict | None:
+        with self._connect() as c:
+            row = c.execute(
+                "SELECT * FROM active_copy_subscriptions WHERE project_id=? AND status='ACTIVE'",
+                (project_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def mark_subscription_active(self, project_id: str, venue: str, trader_id: str | None, trader_name: str, amount_usdt: float, leverage: int, max_position_value_usdt: float) -> None:
+        from datetime import datetime, timezone
+        verified_at = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connect() as c:
+            c.execute(
+                """INSERT INTO active_copy_subscriptions
+                (project_id, venue, trader_id, trader_name, amount_usdt, leverage, max_position_value_usdt, status, verified_at)
+                VALUES(?,?,?,?,?,?,?,'ACTIVE',?)
+                ON CONFLICT(project_id) DO UPDATE SET
+                venue=excluded.venue, trader_id=excluded.trader_id, trader_name=excluded.trader_name,
+                amount_usdt=excluded.amount_usdt, leverage=excluded.leverage,
+                max_position_value_usdt=excluded.max_position_value_usdt,
+                status='ACTIVE', verified_at=excluded.verified_at""",
+                (project_id, venue, trader_id, trader_name, amount_usdt, leverage, max_position_value_usdt, verified_at),
+            )
+
+    def mark_subscription_inactive(self, project_id: str) -> None:
+        with self._lock, self._connect() as c:
+            c.execute(
+                "UPDATE active_copy_subscriptions SET status='INACTIVE' WHERE project_id=?",
+                (project_id,),
+            )
+
+    def list_active_subscriptions(self) -> list[dict]:
+        with self._connect() as c:
+            rows = c.execute(
+                "SELECT * FROM active_copy_subscriptions WHERE status='ACTIVE' ORDER BY verified_at DESC"
+            ).fetchall()
+        return [dict(row) for row in rows]
