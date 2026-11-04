@@ -186,11 +186,14 @@ class BitgetCopyAdapter:
 
         usdt_asset = next((row for row in assets.get("assets", []) if row.get("coin") == "USDT"), {})
         confidence = 0.99 if complete else 0.80
+        usdt_available = max(0.0, float(usdt_asset.get("available") or 0))
+        effective_equity = max(0.0, float(assets.get("effEquity") or 0))
+        conservative_free = min(usdt_available, effective_equity)
         return AccountState(
             exchange="bitget",
             total_usdt=max(0.0, float(assets.get("usdtEquity") or 0)),
-            futures_free_usdt=max(0.0, float(assets.get("effEquity") or 0)),
-            wallet_usdt=max(0.0, float(usdt_asset.get("available") or 0)),
+            futures_free_usdt=conservative_free,
+            wallet_usdt=usdt_available,
             open_margin_usdt=max(0.0, float(assets.get("imr") or 0)),
             realized_pnl_today_usdt=realized,
             active_positions=1 if float(assets.get("positionValue") or 0) > 0 else 0,
