@@ -43,6 +43,7 @@ class TraderSnapshot(BaseModel):
     trader_id: str | None = None
     exchange: Literal["btcc", "bitget"] = "btcc"
     exchange_project_id: str | None = None
+    currently_following: bool = False
     pnl_30d_pct: float | None = None
     aum_usdt: float | None = None
     win_rate_pct: float | None = None
