@@ -26,3 +26,13 @@ def test_signal_gate():
     s = Signal(source="test", symbol="BTCUSDT", direction="LONG", confidence=.8, entry=80000, stop=79600, target=80800, proposed_margin_usdt=10, leverage=10)
     d = approve_signal(s, a)
     assert d.allowed is True
+
+
+def test_rejects_extreme_observed_max_drawdown():
+    t = TraderSnapshot(
+        name="x", max_drawdown_pct=55,
+        recent_trades=[TradeRecord(symbol="BTC", direction="LONG", leverage=5, margin_usdt=10, pnl_usdt=1, pnl_ratio_pct=2)],
+    )
+    verdict, _, reasons = classify_trader(t, 100)
+    assert verdict.value == "REJECT"
+    assert any("drawdown" in reason.lower() for reason in reasons)
