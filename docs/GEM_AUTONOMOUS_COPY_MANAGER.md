@@ -94,3 +94,6 @@ The adapter now reads UTA account assets from /api/v3/account/assets and today's
 ### Bitget API key permissions
 
 Use a dedicated key with the minimum read/write scopes required by the enabled functions: UTA management read for account assets, UTA trade read for fills and realized PnL, and the copy-trading read/write scope for follower settings and follow/unfollow. Do not enable withdrawal permission. If the key is IP-restricted, the hosting service's outbound IP must be compatible with the Bitget whitelist.
+
+
+A strict /collector/bitget-batch endpoint is provided for the eventual leaderboard collector. It rejects batches that do not contain a Bitget account snapshot and a verified native projectId for every trader. The collector itself remains a separate data-source task because no supported public leaderboard endpoint was verified.
