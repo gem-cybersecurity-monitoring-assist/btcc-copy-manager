@@ -11,6 +11,7 @@ dependencies = [
   "pydantic>=2.8",
   "fastapi>=0.115",
   "uvicorn>=0.30",
+  "tzdata>=2024.1",
 ]
 
 [project.optional-dependencies]
@@ -18,7 +19,7 @@ ai = ["openai-agents>=0.2.0"]
 dev = ["pytest>=8.0"]
 
 [tool.setuptools]
-py-modules = ["models", "risk", "monitor", "autonomy", "maintenance", "bitget_copy", "workflow", "storage", "service", "main"]
+py-modules = ["models", "risk", "monitor", "autonomy", "maintenance", "agent_review", "bitget_copy", "execution", "workflow", "storage", "service", "main"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

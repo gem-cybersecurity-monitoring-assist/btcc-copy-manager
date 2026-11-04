@@ -3,12 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import hmac
 from contextlib import asynccontextmanager
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from bitget_copy import BitgetCopyAdapter, BitgetError
@@ -48,6 +50,22 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="BTCC Sentinel", version="0.3.1", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def require_sentinel_auth(request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    expected = os.getenv("SENTINEL_CONTROL_TOKEN", "").strip()
+    required = os.getenv("SENTINEL_REQUIRE_AUTH", "false").lower() == "true"
+    if not expected:
+        if required:
+            return JSONResponse({"detail": "Sentinel control authentication is not configured."}, status_code=503)
+        return await call_next(request)
+    supplied = request.headers.get("authorization", "")
+    if not hmac.compare_digest(supplied, f"Bearer {expected}"):
+        return JSONResponse({"detail": "Sentinel authentication required."}, status_code=401)
+    return await call_next(request)
 
 
 class RankRequest(BaseModel):
@@ -191,6 +209,15 @@ def browserbase_credential_check():
     }
 
 
+@app.post("/collector/bitget-batch")
+def bitget_collector_batch(batch: CollectorBatch):
+    if batch.account.exchange != "bitget":
+        raise HTTPException(status_code=422, detail="Bitget collector batch must carry a Bitget account snapshot.")
+    if any(t.exchange != "bitget" or not t.exchange_project_id for t in batch.traders):
+        raise HTTPException(status_code=422, detail="Every Bitget trader requires exchange=bitget and a verified exchange_project_id.")
+    return service.ingest(batch)
+
+
 @app.post("/collector/batch")
 def collector_batch(batch: CollectorBatch):
     return service.ingest(batch)
@@ -285,10 +312,26 @@ def bitget_status():
     return BitgetCopyAdapter().status()
 
 
+@app.get("/bitget/account-snapshot")
+def bitget_account_snapshot():
+    try:
+        return BitgetCopyAdapter().account_snapshot()
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
 @app.post("/bitget/current-copy")
 def bitget_current_copy(req: BitgetProjectRequest):
     try:
         return BitgetCopyAdapter().current_copy(req.project_id)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
+@app.post("/bitget/copy-settings")
+def bitget_copy_settings(req: BitgetProjectRequest):
+    try:
+        return BitgetCopyAdapter().copy_settings(req.project_id)
     except BitgetError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
 

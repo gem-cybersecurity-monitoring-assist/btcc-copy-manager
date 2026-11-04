@@ -5,8 +5,9 @@ import type { AuditEvent } from "@/lib/types";
 import type { LiveConfigurationStatus, LiveDirection, LiveOrderIntent, PreparedLiveOrder } from "@/lib/live-types";
 import { PwaRegister } from "./pwa-register";
 import { OpportunitiesDashboard } from "./opportunities-dashboard";
+import { AutonomyDashboard } from "./autonomy-dashboard";
 
-type View = "overview" | "live" | "positions" | "connection" | "audit" | "opportunities";
+type View = "overview" | "live" | "positions" | "connection" | "audit" | "opportunities" | "autonomy";
 type PositionPayload = { positions?: Array<Record<string, unknown>>; error?: string; [key: string]: unknown };
 
 const nav: { id: View; label: string; icon: string }[] = [
@@ -15,7 +16,8 @@ const nav: { id: View; label: string; icon: string }[] = [
   { id: "positions", label: "Positions", icon: "◫" },
   { id: "connection", label: "Connection", icon: "⛓" },
   { id: "audit", label: "Audit log", icon: "≡" },
-  { id: "opportunities", label: "Opportunities", icon: "◈" }
+  { id: "opportunities", label: "Opportunities", icon: "◈" },
+  { id: "autonomy", label: "AI Copy Manager", icon: "✧" }
 ];
 
 const initialStatus: LiveConfigurationStatus = {
@@ -64,6 +66,7 @@ export function ManagerShell() {
       {view === "connection" && <Connection status={status} refresh={refreshStatus}/>} 
       {view === "audit" && <Audit events={events}/>} 
       {view === "opportunities" && <OpportunitiesDashboard />}
+      {view === "autonomy" && <AutonomyDashboard />}
     </main>
   </div>;
 }

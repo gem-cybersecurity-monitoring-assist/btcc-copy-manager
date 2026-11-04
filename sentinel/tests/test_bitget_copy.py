@@ -11,7 +11,8 @@ def fake_transport(calls):
 def config(**kwargs):
     values = dict(
         api_key="key", secret_key="secret", passphrase="pass",
-        live_enabled=False, allowed_project_ids=frozenset({"project-1"}),
+        live_enabled=False, internal_transfer_enabled=False, copy_fund_source="",
+        allowed_project_ids=frozenset({"project-1"}),
     )
     values.update(kwargs)
     return BitgetConfig(**values)
@@ -74,7 +75,7 @@ def test_bitget_minimum_subscription_is_enforced():
 
 def test_follow_enforces_safe_settings_and_uses_verified_endpoint():
     calls = []
-    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    adapter = BitgetCopyAdapter(config(live_enabled=True, internal_transfer_enabled=True, copy_fund_source="uta"), fake_transport(calls))
     adapter.follow(
         "project-1", 50, copy_type="fixed_margin", leverage=3,
         auto_copy="off", max_position_value=50, margin_per_order=5,
@@ -85,7 +86,9 @@ def test_follow_enforces_safe_settings_and_uses_verified_endpoint():
     assert "autoCopy=off" in path
     assert "leverage=3" in path
     assert "amount=50.00" in path
+    assert "accountType=uta" in path
     assert "marginPerOrder=5.00" in path
+    assert "maxMarginRatio=10" in path
     assert body == ""
 
 
@@ -98,7 +101,7 @@ def test_unfollow_requires_live_and_allowlist():
 
 def test_follow_rejects_position_notional_above_allocation_and_leverage():
     calls = []
-    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    adapter = BitgetCopyAdapter(config(live_enabled=True, internal_transfer_enabled=True, copy_fund_source="uta"), fake_transport(calls))
     try:
         adapter.follow("project-1", 50, leverage=3, max_position_value=151)
     except BitgetError as exc:
@@ -106,3 +109,67 @@ def test_follow_rejects_position_notional_above_allocation_and_leverage():
     else:
         raise AssertionError("Expected position cap rejection")
     assert calls == []
+
+
+def test_copy_settings_uses_follower_settings_read_endpoint():
+    calls = []
+    adapter = BitgetCopyAdapter(config(), fake_transport(calls))
+    adapter.copy_settings("project-1")
+    assert calls[0][0] == "GET"
+    assert calls[0][1] == "/api/v3/copy/futures/copy-settings?projectId=project-1"
+
+
+def test_follow_rejects_implicit_internal_fund_transfer():
+    calls = []
+    adapter = BitgetCopyAdapter(config(live_enabled=True), fake_transport(calls))
+    try:
+        adapter.follow("project-1", 50, max_position_value=150)
+    except BitgetError as exc:
+        assert "internal-transfer permission is disabled" in str(exc)
+    else:
+        raise AssertionError("Expected internal transfer permission rejection")
+    assert calls == []
+
+
+def test_account_snapshot_uses_uta_assets_and_nets_today_futures_fees():
+    calls = []
+    def transport(method, path, headers, body):
+        calls.append((method, path))
+        if path == "/api/v3/account/assets":
+            return {
+                "usdtEquity": "1000",
+                "effEquity": "650",
+                "imr": "350",
+                "positionValue": "1200",
+                "assets": [{"coin": "USDT", "available": "500"}],
+            }
+        if path.startswith("/api/v3/trade/fills?"):
+            return {
+                "list": [
+                    {"execPnl": "12", "feeDetail": [{"feeCoin": "USDT", "fee": "1"}]},
+                    {"execPnl": "-3", "feeDetail": [{"feeCoin": "USDT", "fee": "0.5"}]},
+                ],
+                "cursor": None,
+            }
+        raise AssertionError(f"Unexpected endpoint: {path}")
+
+    adapter = BitgetCopyAdapter(config(), transport)
+    snapshot = adapter.account_snapshot("Africa/Lagos")
+    assert snapshot.exchange == "bitget"
+    assert snapshot.total_usdt == 1000
+    assert snapshot.futures_free_usdt == 500
+    assert snapshot.wallet_usdt == 500
+    assert snapshot.open_margin_usdt == 350
+    assert snapshot.realized_pnl_today_usdt == 7.5
+    assert snapshot.provenance.confidence == 0.99
+    assert len(calls) == 2
+
+
+def test_account_snapshot_rejects_invalid_timezone(monkeypatch):
+    adapter = BitgetCopyAdapter(config(), fake_transport([]))
+    try:
+        adapter.account_snapshot("Not/A_Timezone")
+    except BitgetError as exc:
+        assert "valid IANA timezone" in str(exc)
+    else:
+        raise AssertionError("Expected invalid timezone rejection")

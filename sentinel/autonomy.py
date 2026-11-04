@@ -59,6 +59,10 @@ def build_copy_plan(
         circuit_reasons.append("Account snapshot is stale or future-dated.")
     if account.provenance and account.provenance.confidence < policy.min_provenance_confidence:
         circuit_reasons.append("Account data provenance confidence is below policy.")
+    if account.exchange == "bitget" and (
+        account.provenance is None or account.provenance.source != "xhr"
+    ):
+        circuit_reasons.append("Bitget allocations require a live authenticated account snapshot.")
     if daily_loss >= daily_loss_limit and daily_loss_limit > 0:
         circuit_reasons.append("Daily realized-loss circuit breaker is active.")
 
@@ -66,6 +70,8 @@ def build_copy_plan(
         key = row["trader_id"] or row["trader"]
         trader = by_key[key]
         reasons: list[str] = []
+        if trader.exchange != account.exchange:
+            reasons.append(f"Trader venue {trader.exchange} does not match account snapshot venue {account.exchange}.")
         if row["verdict"] != "COPY" or row["score"] < policy.min_score:
             reasons.append("Deterministic trader rating is below the autonomous-copy threshold.")
         if len(trader.recent_trades) < policy.min_trades:

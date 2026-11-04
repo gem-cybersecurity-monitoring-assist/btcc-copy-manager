@@ -39,3 +39,14 @@ def test_exchange_action_ledger_records_success_and_unknown_without_retry(tmp_pa
     created, row = store.begin_exchange_action("unfollow-1", "bitget", "UNFOLLOW", "project-1", {})
     assert created is False
     assert row["status"] == "UNKNOWN"
+
+
+def test_active_subscription_registry_persists_and_marks_inactive(tmp_path):
+    store = EventStore(tmp_path / "ledger.db")
+    store.mark_subscription_active("project-1", "bitget", "trader-1", "Leader", 50, 3, 150)
+    active = store.get_active_subscription("project-1")
+    assert active["status"] == "ACTIVE"
+    assert active["amount_usdt"] == 50
+    assert store.list_active_subscriptions()[0]["project_id"] == "project-1"
+    store.mark_subscription_inactive("project-1")
+    assert store.get_active_subscription("project-1") is None

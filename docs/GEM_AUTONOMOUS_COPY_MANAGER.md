@@ -44,3 +44,56 @@ The verified Bitget v3 follower API is an execution/account-management surface, 
 ## Test
 
 Run the Sentinel Python test suite with pytest from the sentinel directory. The Bitget adapter tests use a fake transport and never call the exchange.
+
+
+## Web control room and persistent Sentinel deployment
+
+The Next.js control room now has an **AI Copy Manager** view. It reads the latest Sentinel scan, account allocation limits, selected/excluded traders, maintenance reviews and Bitget adapter readiness through authenticated server-side proxy routes.
+
+The Sentinel API now supports bearer-token authentication for every endpoint except the minimal health check. The Next.js proxy reads SENTINEL_CONTROL_TOKEN only on the server and sends it to Sentinel; the token is never exposed to browser code.
+
+A Render Blueprint is included at the repository root. It provisions a persistent Python web service with a mounted SQLite data disk and the 60-second monitor loop. It uses a paid always-on compute plan because an always-sleeping/free instance is not suitable for continuous monitoring or a persistent disk. Creating that service may incur charges; the blueprint is provided but is not deployed from this workflow.
+
+After the Render service is created, set the same SENTINEL_CONTROL_TOKEN in Render and the Vercel project, and set SENTINEL_URL in Vercel to the Render service URL. Add Bitget API credentials and the verified project ID list in Render's secret environment settings. Keep BITGET_COPY_LIVE_ENABLED=false until a read-only connection and end-to-end reconciliation test have passed.
+
+
+## LLM risk panel
+
+An optional structured-output reviewer is included in sentinel/agent_review.py. It asks a performance scout, a leverage/drawdown auditor and a portfolio skeptic to review public trader evidence. It sends only trader names, exchange labels and public performance/trade metrics; it does not send the connected account balance, API keys or exchange credentials.
+
+The model can only veto a deterministic candidate (KEEP / REVIEW / REJECT). It cannot promote a candidate, choose allocations, set leverage or execute exchange actions. If AI review is explicitly enabled but the API is unavailable, new allocations fail closed. Reviews are cached per collector snapshot so a 60-second scan does not repeatedly bill for identical evidence.
+
+To enable later, set OPENAI_API_KEY, OPENAI_MODEL and GEM_AI_REVIEW_ENABLED=true in the Sentinel host's secret environment. The default remains false. Model calls use the OpenAI Responses API with strict JSON Schema structured output; no model name or paid API key is assumed by the code.
+
+
+### Bitget subscription funding boundary
+
+Bitget's create-copy endpoint accepts an accountType source for automatic funding of the copy account and defaults to all eligible sources if omitted. The adapter therefore requires both BITGET_COPY_INTERNAL_TRANSFER_ENABLED=true and an explicit BITGET_COPY_FUND_SOURCE (funding, uta or otc) before it will submit a follow request. The Render Blueprint defaults this permission to false. This is separate from live trading permission. No withdrawal or free-form transfer API is exposed.
+
+
+## Autonomous execution coordinator
+
+The Sentinel scheduler now has a gated Bitget executor. When explicitly enabled, it can follow qualified Bitget projects using the planned fixed-margin allocation and up to three pairs supported by recent verified trade history. It verifies the resulting copy settings/current-copy state before recording the subscription. Active subscriptions are reconciled each scan and are not duplicated. A separate stop/replacement switch can unfollow a deteriorating follower with instant-close, then verify that its open positions are gone before marking it inactive.
+
+All live switches are false in the Render Blueprint:
+- BITGET_COPY_LIVE_ENABLED
+- GEM_AUTO_COPY_EXECUTION_ENABLED
+- GEM_AUTO_STOP_REPLACE_ENABLED
+- BITGET_COPY_INTERNAL_TRANSFER_ENABLED
+
+A follow subscription may automatically move funds from an exchange account into Bitget's copy account. The adapter therefore refuses to follow unless internal transfer is separately enabled and BITGET_COPY_FUND_SOURCE explicitly names funding, uta or otc. This permission is separate from trading permission. Withdrawals and free-form transfers remain unavailable.
+
+The planner now binds each trader to an explicit venue and requires the account snapshot to belong to that same venue. A BTCC balance snapshot cannot fund a Bitget plan. The remaining ingestion requirement is a verified Bitget data collector that supplies account equity/free balance, trader metrics, and the exact native projectId. The public leaderboard page is available, but the official follower API itself does not expose a public trader-discovery endpoint; do not infer a projectId from a display name.
+
+
+## Bitget account-state collection
+
+The adapter now reads UTA account assets from /api/v3/account/assets and today's USDT-futures fills from /api/v3/trade/fills. It builds a Bitget-tagged AccountState with total USDT equity, USDT available balance, initial margin and net realized PnL after USDT fees. The spendable balance is conservatively capped at the lower of available UTA USDT and effective margin equity. The daily window is based on SENTINEL_TIMEZONE (default Africa/Lagos). If fill pagination is incomplete, provenance confidence is lowered; if credentials or required read permissions are unavailable, the planner fails closed. When a Bitget batch is scanned, Sentinel refreshes this account snapshot before allocation and maintenance evaluation.
+
+
+### Bitget API key permissions
+
+Use a dedicated key with the minimum read/write scopes required by the enabled functions: UTA management read for account assets, UTA trade read for fills and realized PnL, and the copy-trading read/write scope for follower settings and follow/unfollow. Do not enable withdrawal permission. If the key is IP-restricted, the hosting service's outbound IP must be compatible with the Bitget whitelist.
+
+
+A strict /collector/bitget-batch endpoint is provided for the eventual leaderboard collector. It rejects batches that do not contain a Bitget account snapshot and a verified native projectId for every trader. The collector itself remains a separate data-source task because no supported public leaderboard endpoint was verified.

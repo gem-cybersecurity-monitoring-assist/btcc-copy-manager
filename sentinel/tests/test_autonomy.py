@@ -33,6 +33,7 @@ def test_plan_is_bounded_and_never_executes():
     assert plan["account"]["copy_exposure_cap_usdt"] == 200
     assert plan["selected"][0]["allocation_usdt"] == 50
     assert plan["selected"][0]["status"] == "PLAN_ONLY"
+    assert plan["selected"][0]["margin_per_order_usdt"] == 5
     assert plan["maintenance_policy"]["withdrawals_enabled"] is False
 
 
@@ -70,6 +71,8 @@ def test_bitget_candidate_requires_native_project_mapping():
     now = datetime.now(timezone.utc)
     trader, account = sample(now)
     trader.exchange = "bitget"
+    account.exchange = "bitget"
+    account.provenance.source = "xhr"
     plan = build_copy_plan([trader], account, now=now)
     assert plan["selected"] == []
     assert any("project ID is missing" in reason
@@ -104,3 +107,14 @@ def test_maintenance_pauses_new_allocations_when_followed_trader_data_is_stale()
     plan = build_maintenance_plan([trader], account, now=now)
     assert plan["retain"][0]["decision"] == "PAUSE_NEW_ALLOCATIONS"
     assert plan["stop_review"] == []
+
+
+def test_cross_exchange_account_snapshot_cannot_fund_bitget_candidate():
+    now = datetime.now(timezone.utc)
+    trader, account = sample(now)
+    trader.exchange = "bitget"
+    trader.exchange_project_id = "bg-project-123"
+    plan = build_copy_plan([trader], account, now=now)
+    assert plan["selected"] == []
+    assert any("does not match account snapshot venue" in reason
+               for item in plan["excluded"] for reason in item["reasons"])
