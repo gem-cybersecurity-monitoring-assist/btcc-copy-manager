@@ -70,6 +70,7 @@ def test_bitget_candidate_requires_native_project_mapping():
     now = datetime.now(timezone.utc)
     trader, account = sample(now)
     trader.exchange = "bitget"
+    account.exchange = "bitget"
     plan = build_copy_plan([trader], account, now=now)
     assert plan["selected"] == []
     assert any("project ID is missing" in reason
