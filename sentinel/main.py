@@ -12,8 +12,10 @@ from urllib.request import Request, urlopen
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from typing import Literal
 
 from bitget_copy import BitgetCopyAdapter, BitgetError
+from kopyon_discovery import KopyonBitgetDiscovery, KopyonError
 from models import AccountState, CollectorBatch, Signal, TraderSnapshot
 from monitor import TraderMonitor
 from risk import approve_signal
@@ -100,6 +102,12 @@ class EarnRequest(BaseModel):
 class BrowserGateRequest(BaseModel):
     action: WorkflowAction
     last_browser_step: BrowserStepResult | None = None
+
+
+class BitgetDiscoveryRequest(BaseModel):
+    period: Literal["7D", "30D", "90D", "180D"] = "30D"
+    sort_by: Literal["pnl", "roi", "aum", "copierPnl"] = "pnl"
+    max_candidates: int = Field(default=8, ge=1, le=8)
 
 
 class BitgetProjectRequest(BaseModel):
@@ -305,6 +313,28 @@ def reject_action(action_id: int):
 def browser_gate(req: BrowserGateRequest):
     allowed, reason = side_effect_allowed(req.action, req.last_browser_step)
     return {"allowed": allowed, "reason": reason}
+
+
+@app.post("/discovery/bitget/kopyon")
+def discover_bitget_kopyon(req: BitgetDiscoveryRequest):
+    """Manually refresh public Bitget trader evidence; never places exchange orders."""
+    try:
+        traders = KopyonBitgetDiscovery().discover(
+            period=req.period, sort_by=req.sort_by, max_candidates=req.max_candidates,
+        )
+        account = BitgetCopyAdapter().account_snapshot()
+    except (KopyonError, BitgetError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    batch = CollectorBatch(account=account, traders=traders, collector_id="kopyon-bitget-discovery")
+    result = service.ingest(batch)
+    return {
+        "discovery_source": "Kopyon Bitget public trader API",
+        "period": req.period,
+        "candidate_count": len(traders),
+        "mapped_project_count": sum(bool(row.exchange_project_id) for row in traders),
+        "execution_note": "Discovery is read-only. Unmapped or insufficiently evidenced traders remain ineligible for autonomous following.",
+        "result": result,
+    }
 
 
 @app.get("/bitget/status")
