@@ -311,6 +311,14 @@ def bitget_current_copy(req: BitgetProjectRequest):
         raise HTTPException(status_code=503, detail=str(exc)) from None
 
 
+@app.post("/bitget/copy-settings")
+def bitget_copy_settings(req: BitgetProjectRequest):
+    try:
+        return BitgetCopyAdapter().copy_settings(req.project_id)
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
 @app.post("/bitget/profit-details")
 def bitget_profit_details(req: BitgetProjectRequest):
     try:
