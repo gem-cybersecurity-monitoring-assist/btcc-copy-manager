@@ -33,6 +33,7 @@ type BitgetStatus = {
   live_enabled?: boolean;
   allowlisted_project_count?: number;
   minimum_subscription_usdt?: number;
+  required_account_mode?: string;
   supported?: string[];
   error?: string;
 };
@@ -114,6 +115,7 @@ export function AutonomyDashboard() {
       <h2>{bitget?.configured ? "Credentials configured" : "Awaiting secure credentials"}</h2>
       <p className="subtle">Live actions: {bitget?.live_enabled ? "Enabled by server policy" : "Disabled"}.</p>
       <p className="subtle">Allowed projects: {text(bitget?.allowlisted_project_count)} · Minimum copy amount: {amount(bitget?.minimum_subscription_usdt)}</p>
+      <p className="subtle">Account mode: {text(bitget?.required_account_mode)}.</p>
       <p className="subtle">No withdrawals or address changes are available to the agent.</p>
     </section>
 
