@@ -167,10 +167,10 @@ class BitgetCopyAdapter:
             raise BitgetError("Leverage must be between 1x and 10x.")
         if auto_copy != "off":
             raise BitgetError("Automatic new-pair following must remain off.")
-        if max_position_value <= 0:
-            raise BitgetError("A positive maximum position value is required.")
-        if copy_type == "fixed_margin" and (margin_per_order is None or margin_per_order <= 0):
-            raise BitgetError("fixed_margin requires positive margin_per_order.")
+        if max_position_value <= 0 or max_position_value > amount_usdt * leverage:
+            raise BitgetError("Maximum position value must be positive and no greater than allocation multiplied by leverage.")
+        if copy_type == "fixed_margin" and (margin_per_order is None or margin_per_order <= 0 or margin_per_order > amount_usdt):
+            raise BitgetError("fixed_margin requires a positive per-order margin no greater than the subscription amount.")
         params: dict[str, Any] = {
             "projectId": project_id,
             "type": copy_type,
