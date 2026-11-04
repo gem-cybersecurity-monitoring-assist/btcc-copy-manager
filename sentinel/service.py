@@ -5,6 +5,7 @@ import asyncio
 from autonomy import build_copy_plan
 from models import Alert, CollectorBatch
 from monitor import TraderMonitor
+from maintenance import build_maintenance_plan
 from storage import EventStore
 from workflow import propose_copy_configuration
 
@@ -28,6 +29,7 @@ class SentinelService:
             "stored": inserted,
             "ranked": ranked,
             "autonomy_plan": plan,
+            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
             "prepared_action_ids": action_ids,
         }
 
@@ -67,7 +69,7 @@ class SentinelService:
     def scan_latest(self) -> dict:
         batch = self.store.latest_batch()
         if not batch:
-            return {"status": "no_data", "ranked": [], "autonomy_plan": None}
+            return {"status": "no_data", "ranked": [], "autonomy_plan": None, "maintenance_plan": None}
         ranked = self.monitor.rank(batch.traders, batch.account)
         plan = build_copy_plan(batch.traders, batch.account)
         self._emit_material_alerts(ranked)
