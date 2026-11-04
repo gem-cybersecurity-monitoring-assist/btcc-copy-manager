@@ -71,6 +71,7 @@ class FakeStore:
 class FakeAdapter:
     class Config:
         live_enabled = True
+        configured = True
         internal_transfer_enabled = True
         copy_fund_source = "uta"
         allowed_project_ids = frozenset({"project-1"})
