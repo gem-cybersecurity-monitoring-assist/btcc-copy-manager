@@ -44,3 +44,14 @@ The verified Bitget v3 follower API is an execution/account-management surface, 
 ## Test
 
 Run the Sentinel Python test suite with pytest from the sentinel directory. The Bitget adapter tests use a fake transport and never call the exchange.
+
+
+## Web control room and persistent Sentinel deployment
+
+The Next.js control room now has an **AI Copy Manager** view. It reads the latest Sentinel scan, account allocation limits, selected/excluded traders, maintenance reviews and Bitget adapter readiness through authenticated server-side proxy routes.
+
+The Sentinel API now supports bearer-token authentication for every endpoint except the minimal health check. The Next.js proxy reads SENTINEL_CONTROL_TOKEN only on the server and sends it to Sentinel; the token is never exposed to browser code.
+
+A Render Blueprint is included at the repository root. It provisions a persistent Python web service with a mounted SQLite data disk and the 60-second monitor loop. It uses a paid always-on compute plan because an always-sleeping/free instance is not suitable for continuous monitoring or a persistent disk. Creating that service may incur charges; the blueprint is provided but is not deployed from this workflow.
+
+After the Render service is created, set the same SENTINEL_CONTROL_TOKEN in Render and the Vercel project, and set SENTINEL_URL in Vercel to the Render service URL. Add Bitget API credentials and the verified project ID list in Render's secret environment settings. Keep BITGET_COPY_LIVE_ENABLED=false until a read-only connection and end-to-end reconciliation test have passed.
