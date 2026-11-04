@@ -34,6 +34,9 @@ export type SentinelTradeRecord = {
 export type SentinelTraderSnapshot = {
   name: string;
   trader_id?: string | null;
+  exchange?: "btcc" | "bitget";
+  exchange_project_id?: string | null;
+  currently_following?: boolean;
   pnl_30d_pct?: number | null;
   aum_usdt?: number | null;
   win_rate_pct?: number | null;
