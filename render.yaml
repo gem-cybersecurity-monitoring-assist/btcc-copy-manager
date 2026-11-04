@@ -20,6 +20,8 @@ services:
         sync: false
       - key: SENTINEL_SCAN_INTERVAL
         value: "60"
+      - key: SENTINEL_TIMEZONE
+        value: Africa/Lagos
       - key: BITGET_API_KEY
         sync: false
       - key: BITGET_API_SECRET
