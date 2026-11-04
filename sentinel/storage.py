@@ -262,3 +262,19 @@ class EventStore:
                 "SELECT * FROM active_copy_subscriptions WHERE status='ACTIVE' ORDER BY verified_at DESC"
             ).fetchall()
         return [dict(row) for row in rows]
+
+
+    def latest_exchange_action(self, venue: str, project_id: str) -> dict | None:
+        with self._connect() as c:
+            row = c.execute(
+                """SELECT * FROM exchange_action_ledger
+                WHERE venue=? AND project_id=?
+                ORDER BY updated_at DESC LIMIT 1""",
+                (venue, project_id),
+            ).fetchone()
+        if not row:
+            return None
+        result = dict(row)
+        if result.get("response_json"):
+            result["response"] = json.loads(result["response_json"])
+        return result
