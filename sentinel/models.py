@@ -41,6 +41,8 @@ class TradeRecord(BaseModel):
 class TraderSnapshot(BaseModel):
     name: str
     trader_id: str | None = None
+    exchange: Literal["btcc", "bitget"] = "btcc"
+    exchange_project_id: str | None = None
     pnl_30d_pct: float | None = None
     aum_usdt: float | None = None
     win_rate_pct: float | None = None
