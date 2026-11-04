@@ -73,7 +73,8 @@ class BitgetAutoExecutor:
             if latest and latest["status"] in {"PENDING", "UNKNOWN"}:
                 results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "reconciliation_required"})
                 continue
-            key = "auto-unfollow:" + hashlib.sha256(f"{project_id}:{snapshot_key}".encode()).hexdigest()[:40]
+            generation = latest.get("updated_at", "initial") if latest else "initial"
+            key = "auto-unfollow:" + hashlib.sha256(f"{project_id}:{generation}".encode()).hexdigest()[:40]
             payload = {"project_id": project_id, "close_type": "instant_close", "reasons": item.get("reasons", [])}
             try:
                 created, existing = self.store.begin_exchange_action(key, "bitget", "UNFOLLOW", project_id, payload)
@@ -143,7 +144,8 @@ class BitgetAutoExecutor:
                 results.append({"action": "FOLLOW", "project_id": project_id, "status": "blocked", "reason": "No verified trading-pair history."})
                 continue
 
-            key = "auto-follow:" + hashlib.sha256(f"{project_id}:{snapshot_key}".encode()).hexdigest()[:40]
+            generation = latest.get("updated_at", "initial") if latest else "initial"
+            key = "auto-follow:" + hashlib.sha256(f"{project_id}:{generation}".encode()).hexdigest()[:40]
             payload = {
                 "project_id": project_id,
                 "amount_usdt": candidate["allocation_usdt"],
