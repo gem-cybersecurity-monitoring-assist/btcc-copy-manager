@@ -90,6 +90,12 @@ export async function sentinelRequest<T>(path: string, init?: RequestInit): Prom
     cache: "no-store",
     headers: {
       "content-type": "application/json",
+      ...(process.env.SENTINEL_CONTROL_TOKEN
+        ? {
+            authorization: `Bearer ${process.env.SENTINEL_CONTROL_TOKEN}`,
+            "x-sentinel-control": process.env.SENTINEL_CONTROL_TOKEN,
+          }
+        : {}),
       ...(init?.headers || {}),
     },
     signal: AbortSignal.timeout(10_000),
