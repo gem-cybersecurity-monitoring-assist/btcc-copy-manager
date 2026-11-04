@@ -86,6 +86,7 @@ def test_follow_enforces_safe_settings_and_uses_verified_endpoint():
     assert "leverage=3" in path
     assert "amount=50.00" in path
     assert "marginPerOrder=5.00" in path
+    assert "maxMarginRatio=10" in path
     assert body == ""
 
 
