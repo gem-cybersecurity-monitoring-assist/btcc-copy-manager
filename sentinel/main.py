@@ -303,6 +303,14 @@ def bitget_status():
     return BitgetCopyAdapter().status()
 
 
+@app.get("/bitget/account-snapshot")
+def bitget_account_snapshot():
+    try:
+        return BitgetCopyAdapter().account_snapshot()
+    except BitgetError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+
+
 @app.post("/bitget/current-copy")
 def bitget_current_copy(req: BitgetProjectRequest):
     try:
