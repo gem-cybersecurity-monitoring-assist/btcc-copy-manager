@@ -30,6 +30,8 @@ Bitget's official documentation describes authenticated futures-copy follower op
 
 BTCC remains connected for existing account observations and futures execution. Public BTCC material confirms its native copy product, but the currently verified BTCC TradeOpenAPI surface in this repository does not include a documented follow/unfollow API. We will not automate private UI controls as a substitute for a supported API.
 
+The verified Bitget v3 follower API is an execution/account-management surface, not a public leaderboard discovery API. Each candidate must therefore arrive with a verified Bitget projectId and evidence-backed performance snapshot. The data model now carries the exchange and exchange_project_id explicitly; the planner rejects Bitget records without that mapping. Do not substitute a display name or an unrelated trader UID for projectId.
+
 ## Autonomy and safety boundary
 
 - Bounded trading/copy decisions can become autonomous after exchange adapters pass contract tests and the owner enables a specific policy.
