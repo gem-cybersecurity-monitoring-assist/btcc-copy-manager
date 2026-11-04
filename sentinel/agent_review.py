@@ -47,7 +47,10 @@ def _public_evidence(traders: list[TraderSnapshot]) -> list[dict[str, Any]]:
     max_traders = _bounded_env_int("GEM_AI_REVIEW_MAX_TRADERS", 20, 50)
     max_trades = _bounded_env_int("GEM_AI_REVIEW_MAX_TRADES", 15, 30)
     evidence = []
-    for trader in traders[:max_traders]:
+    ordered_traders = [t for t in traders if t.currently_following] + [
+        t for t in traders if not t.currently_following
+    ]
+    for trader in ordered_traders[:max_traders]:
         evidence.append({
             "trader_id": trader.trader_id or trader.exchange_project_id or trader.name,
             "exchange": trader.exchange,
