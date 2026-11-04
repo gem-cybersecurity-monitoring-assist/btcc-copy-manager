@@ -69,3 +69,18 @@ To enable later, set OPENAI_API_KEY, OPENAI_MODEL and GEM_AI_REVIEW_ENABLED=true
 ### Bitget subscription funding boundary
 
 Bitget's create-copy endpoint accepts an accountType source for automatic funding of the copy account and defaults to all eligible sources if omitted. The adapter therefore requires both BITGET_COPY_INTERNAL_TRANSFER_ENABLED=true and an explicit BITGET_COPY_FUND_SOURCE (funding, uta or otc) before it will submit a follow request. The Render Blueprint defaults this permission to false. This is separate from live trading permission. No withdrawal or free-form transfer API is exposed.
+
+
+## Autonomous execution coordinator
+
+The Sentinel scheduler now has a gated Bitget executor. When explicitly enabled, it can follow qualified Bitget projects using the planned fixed-margin allocation and up to three pairs supported by recent verified trade history. It verifies the resulting copy settings/current-copy state before recording the subscription. Active subscriptions are reconciled each scan and are not duplicated. A separate stop/replacement switch can unfollow a deteriorating follower with instant-close, then verify that its open positions are gone before marking it inactive.
+
+All live switches are false in the Render Blueprint:
+- BITGET_COPY_LIVE_ENABLED
+- GEM_AUTO_COPY_EXECUTION_ENABLED
+- GEM_AUTO_STOP_REPLACE_ENABLED
+- BITGET_COPY_INTERNAL_TRANSFER_ENABLED
+
+A follow subscription may automatically move funds from an exchange account into Bitget's copy account. The adapter therefore refuses to follow unless internal transfer is separately enabled and BITGET_COPY_FUND_SOURCE explicitly names funding, uta or otc. This permission is separate from trading permission. Withdrawals and free-form transfers remain unavailable.
+
+The planner now binds each trader to an explicit venue and requires the account snapshot to belong to that same venue. A BTCC balance snapshot cannot fund a Bitget plan. The remaining ingestion requirement is a verified Bitget data collector that supplies account equity/free balance, trader metrics, and the exact native projectId. The public leaderboard page is available, but the official follower API itself does not expose a public trader-discovery endpoint; do not infer a projectId from a display name.
