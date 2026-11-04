@@ -51,6 +51,9 @@ class BitgetAutoExecutor:
             if item.get("exchange") != "bitget" or not item.get("project_id"):
                 continue
             project_id = item["project_id"]
+            if project_id not in self.adapter.config.allowed_project_ids:
+                results.append({"action": "UNFOLLOW", "project_id": project_id, "status": "blocked", "reason": "Project ID is not allowlisted."})
+                continue
             active = self.store.get_active_subscription(project_id)
             if not active:
                 continue
@@ -104,6 +107,12 @@ class BitgetAutoExecutor:
                 continue
             project_id = candidate.get("exchange_project_id")
             if not project_id:
+                continue
+            if project_id not in self.adapter.config.allowed_project_ids:
+                results.append({"action": "FOLLOW", "project_id": project_id, "status": "blocked", "reason": "Project ID is not allowlisted."})
+                continue
+            if self.adapter.config.copy_fund_source not in {"funding", "uta", "otc"}:
+                results.append({"action": "FOLLOW", "project_id": project_id, "status": "blocked", "reason": "Explicit Bitget funding source is not configured."})
                 continue
             active = self.store.get_active_subscription(project_id)
             if active:
