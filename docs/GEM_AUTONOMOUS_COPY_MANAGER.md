@@ -84,3 +84,8 @@ All live switches are false in the Render Blueprint:
 A follow subscription may automatically move funds from an exchange account into Bitget's copy account. The adapter therefore refuses to follow unless internal transfer is separately enabled and BITGET_COPY_FUND_SOURCE explicitly names funding, uta or otc. This permission is separate from trading permission. Withdrawals and free-form transfers remain unavailable.
 
 The planner now binds each trader to an explicit venue and requires the account snapshot to belong to that same venue. A BTCC balance snapshot cannot fund a Bitget plan. The remaining ingestion requirement is a verified Bitget data collector that supplies account equity/free balance, trader metrics, and the exact native projectId. The public leaderboard page is available, but the official follower API itself does not expose a public trader-discovery endpoint; do not infer a projectId from a display name.
+
+
+## Bitget account-state collection
+
+The adapter now reads UTA account assets from /api/v3/account/assets and today's USDT-futures fills from /api/v3/trade/fills. It builds a Bitget-tagged AccountState with equity, effective margin equity, USDT available balance, initial margin and net realized PnL after USDT fees. The daily window is based on SENTINEL_TIMEZONE (default Africa/Lagos). If fill pagination is incomplete, provenance confidence is lowered; if credentials or required read permissions are unavailable, the planner fails closed. When a Bitget batch is scanned, Sentinel refreshes this account snapshot before allocation and maintenance evaluation.
