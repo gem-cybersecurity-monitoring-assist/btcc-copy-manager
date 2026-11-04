@@ -6,7 +6,6 @@ from threading import Lock
 from autonomy import build_copy_plan
 from agent_review import apply_ai_veto, run_ai_review
 from execution import BitgetAutoExecutor
-from bitget_copy import BitgetError
 from models import Alert, CollectorBatch, Provenance
 from monitor import TraderMonitor
 from maintenance import build_maintenance_plan
