@@ -107,3 +107,11 @@ def test_follow_rejects_position_notional_above_allocation_and_leverage():
     else:
         raise AssertionError("Expected position cap rejection")
     assert calls == []
+
+
+def test_copy_settings_uses_follower_settings_read_endpoint():
+    calls = []
+    adapter = BitgetCopyAdapter(config(), fake_transport(calls))
+    adapter.copy_settings("project-1")
+    assert calls[0][0] == "GET"
+    assert calls[0][1] == "/api/v3/copy/futures/copy-settings?projectId=project-1"
