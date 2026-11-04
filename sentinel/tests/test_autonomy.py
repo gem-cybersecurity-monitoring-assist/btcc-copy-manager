@@ -12,12 +12,12 @@ def sample(now):
     ]
     trader = TraderSnapshot(
         name="Steady", trader_id="steady-1", win_rate_pct=75,
-        executable_min_margin_usdt=5, recent_trades=trades,
+        executable_min_margin_usdt=50, recent_trades=trades,
         source_timestamp=now,
         provenance=Provenance(source="manual", confidence=0.99),
     )
     account = AccountState(
-        total_usdt=100, futures_free_usdt=100, wallet_usdt=0, open_margin_usdt=0,
+        total_usdt=1000, futures_free_usdt=500, wallet_usdt=0, open_margin_usdt=0,
         source_timestamp=now,
         provenance=Provenance(source="manual", confidence=0.99),
     )
@@ -29,9 +29,9 @@ def test_plan_is_bounded_and_never_executes():
     trader, account = sample(now)
     plan = build_copy_plan([trader], account, now=now)
     assert plan["status"] == "PLAN_ONLY"
-    assert plan["account"]["reserve_usdt"] == 50
-    assert plan["account"]["copy_exposure_cap_usdt"] == 20
-    assert plan["selected"][0]["allocation_usdt"] <= 5
+    assert plan["account"]["reserve_usdt"] == 500
+    assert plan["account"]["copy_exposure_cap_usdt"] == 200
+    assert plan["selected"][0]["allocation_usdt"] == 50
     assert plan["selected"][0]["status"] == "PLAN_ONLY"
     assert plan["maintenance_policy"]["withdrawals_enabled"] is False
 
@@ -59,7 +59,7 @@ def test_low_confidence_source_is_excluded():
 def test_daily_loss_circuit_breaker_blocks_new_allocations():
     now = datetime.now(timezone.utc)
     trader, account = sample(now)
-    account.realized_pnl_today_usdt = -4
+    account.realized_pnl_today_usdt = -40
     plan = build_copy_plan([trader], account, now=now)
     assert plan["selected"] == []
     assert any("Daily realized-loss circuit breaker" in reason
