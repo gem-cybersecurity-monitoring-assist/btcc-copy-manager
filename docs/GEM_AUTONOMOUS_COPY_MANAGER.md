@@ -22,11 +22,11 @@ Extend this repository rather than fork a second trading application.
 
 ## Current implementation status
 
-The first deterministic planning engine is implemented with unit tests. It deliberately returns PLAN_ONLY; it does not place orders, subscribe/unsubscribe traders, transfer funds or withdraw assets.
+The deterministic planning engine and a signed Bitget v3 futures-copy adapter are implemented with unit tests. The adapter supports current-copy, positions, profit details, follow, modify, unfollow and close-all. Mutations require an explicit live flag, an allowlisted project ID and a separate Sentinel control token. It exposes no transfer or withdrawal method. The decision planner still returns PLAN_ONLY until a supported trader-discovery feed and reconciled end-to-end execution loop are verified.
 
 ### Why Bitget first
 
-Bitget's official documentation currently describes authenticated futures-copy follower operations, including subscription creation/settings, unfollow, copy-account balances/positions, close-all and copy-account transfer. These APIs make a real native-copy adapter technically plausible. Adapter implementation still needs exact account product eligibility, request signing, permission scopes, idempotency strategy and integration tests.
+Bitget's official documentation describes authenticated futures-copy follower operations: create subscription, modify settings, unfollow, current-copy, current positions, profit details and close-all. The documented minimum subscription amount is 50 USDT; the planner now enforces that floor. Follow settings are constrained to at most 10x leverage, auto-follow of new pairs off, a bounded position value and a fixed per-order margin. The adapter signs requests using Bitget's timestamp/method/path/body HMAC scheme, requires a project allowlist and defaults live mutations off. The owner must provision a dedicated API key with the required copy-trading read/write scopes in the Bitget account settings.
 
 BTCC remains connected for existing account observations and futures execution. Public BTCC material confirms its native copy product, but the currently verified BTCC TradeOpenAPI surface in this repository does not include a documented follow/unfollow API. We will not automate private UI controls as a substitute for a supported API.
 
@@ -35,10 +35,10 @@ BTCC remains connected for existing account observations and futures execution. 
 - Bounded trading/copy decisions can become autonomous after exchange adapters pass contract tests and the owner enables a specific policy.
 - The LLM is advisory reasoning support, never the final risk authority.
 - Stale data, missing provenance, unknown minimums, exceeded drawdown limits or uncertain exchange state stop new allocations.
-- All actions require durable idempotency keys, exchange reconciliation, event audit, rate-limit handling and a global kill switch.
+- Before enabling autonomous execution, add durable idempotency keys and an action ledger, reconcile subscription and position state after every mutation, record exchange request IDs/results, handle rate limits and partial failures, and wire the global kill switch. Do not retry non-idempotent follow/unfollow/close requests blindly.
 - Transfers are disabled in this first stage. Withdrawals and address changes remain forbidden to the agent.
 - No system can promise profit. Backtest, paper and small controlled live validation are required before increasing limits.
 
 ## Test
 
-Run the Sentinel Python test suite with pytest from the sentinel directory.
+Run the Sentinel Python test suite with pytest from the sentinel directory. The Bitget adapter tests use a fake transport and never call the exchange.
