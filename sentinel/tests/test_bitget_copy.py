@@ -42,7 +42,7 @@ def test_project_not_allowlisted_is_rejected_before_request():
     try:
         adapter.current_copy("unknown")
     except BitgetError as exc:
-        assert "allowlisted" in str(exc)
+        assert "BITGET_COPY_ALLOWED_PROJECT_IDS" in str(exc)
     else:
         raise AssertionError("Expected allowlist rejection")
     assert calls == []
