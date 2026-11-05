@@ -28,6 +28,12 @@ test("desktop and phone navigation expose both Copy Center and research", () => 
   assert.match(read("src/app/copy-center/page.tsx"), /CopyCenterWorkspace/);
 });
 
+test("iPhone navigation remains scrollable with both Copy Center choices", () => {
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.mobile-nav \{[^}]*overflow-x:auto/);
+  assert.match(css, /\.mobile-nav button \{[^}]*flex:0 0 76px/);
+});
+
 test("core execution and read-only paths remain mounted separately", () => {
   for (const path of [
     "src/app/api/v1/live/status/route.ts",
