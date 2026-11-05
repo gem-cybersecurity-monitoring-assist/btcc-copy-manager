@@ -55,12 +55,12 @@ export async function POST(request: NextRequest) {
     });
     const permissionPayload = await permissionResponse.json().catch(() => ({})) as {
       code?: string;
-      data?: { permissions?: unknown };
+      data?: { permissions?: unknown; permType?: unknown };
     };
-    if (!permissionResponse.ok || permissionPayload.code !== "00000" || !isReadOnlyUtaPermissions(permissionPayload.data?.permissions)) {
+    if (!permissionResponse.ok || permissionPayload.code !== "00000" || !isReadOnlyUtaPermissions(permissionPayload.data?.permissions, permissionPayload.data?.permType)) {
       return NextResponse.json({
         ok: false,
-        error: "This key could not be verified as read-only. Create a Bitget API key with UTA management/read permission only; remove trading, copy-trading, withdrawal, and other permissions."
+        error: "This key is not strictly read-only. Create a Bitget API key with permission type read-only and UTA management as its only permission; remove trading, copy-trading, withdrawal, and all other permissions."
       }, { status: 403, headers: noStore });
     }
 
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       accountEquityUsd: numberOrNull(payload.data.accountEquity),
       usdtEquity: numberOrNull(payload.data.usdtEquity),
       btcEquity: numberOrNull(payload.data.btcEquity),
-      permissionsVerified: "uta_mgt only",
+      permissionsVerified: "read-only key; uta_mgt only",
       credentialsStored: false,
       message: "Read-only permission and account assets were verified for this request only. Credentials were not stored. Re-enter them for a later verification."
     }, { status: 200, headers: noStore });
