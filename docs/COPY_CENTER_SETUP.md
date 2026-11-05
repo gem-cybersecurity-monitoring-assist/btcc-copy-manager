@@ -14,13 +14,13 @@ All balances and provider states must be treated as unverified unless the UI exp
 
 ## Local setup
 
-Set `SUPABASE_URL`, `SUPABASE_ANON_KEY` (public anon/publishable key only), and `COPY_CENTER_SITE_URL` in the server environment if cloud accounts and sync are required. Without these values, the page still supports browser-local planning and wallet-address checks; cloud account features report setup required.
+Set `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public anon/publishable key only), and `COPY_CENTER_SITE_URL` in the server environment if cloud accounts and sync are required. Without these values, the page still supports browser-local planning and wallet-address checks; cloud account features report setup required.
 
 Never configure a Supabase service-role key for this feature. The server uses the signed-in user's access token and database row-level security.
 
 ## Supabase database
 
-If cloud sync is enabled, apply these migrations in order using the approved Supabase SQL Editor:
+The existing connected Supabase project already has both workspace migrations applied and verified (November 5, 2026). For a new project, apply them in this order:
 
 1. `supabase/migrations/20261024_copy_center_workspaces.sql`
 2. `supabase/migrations/20261025_copy_center_workspace_hardening.sql`
@@ -34,3 +34,10 @@ The migrations create one JSON workspace per authenticated user, enforce owner-o
 - Bitget account verification is read-only and does not configure copy-trading permissions.
 - Cloud sync stores planning preferences, activity, and public wallet addresses only. It does not store API credentials or wallet secrets.
 - A connected wallet address is not proof of asset ownership or permission to transact.
+
+## Email confirmation and deployment validation
+
+- Confirmation redirects from `/api/auth/signup` and `/api/auth/resend` point to `/copy-center`. Add `https://btcc-copy-manager.vercel.app/copy-center` to the Supabase Auth redirect allow-list.
+- The mobile Copy Center reads confirmation results, clears access/refresh token fragments from the browser URL, and shows the sign-in screen; it never imports the tokens as application cookies. An owner must still complete sign-in.
+- Confirm email delivery requires a real sign-up/confirmation test; a successful Supabase API response only means the request was accepted, not that a message reached the inbox. Review Auth logs and custom SMTP configuration if needed.
+- Provider and wallet authorization require direct user action and remain disconnected until independently confirmed. This deployment does not initiate a trade.
