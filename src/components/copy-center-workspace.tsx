@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = { id: string; name: string; kind: ProviderKind; description: string; state: "not-connected" | "connected" | "verified-once"; note: string };
@@ -58,6 +59,23 @@ export function CopyCenterWorkspace() {
   const [bgMessage, setBgMessage] = useState("");
   const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
+
+  useEffect(() => {
+    // Confirmation links return here. Never retain their tokens in the address bar
+    // or treat a callback token as a signed-in app session.
+    const hash = window.location.hash;
+    const outcome = readConfirmationRedirect(hash);
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    if (params.has("access_token") || params.has("refresh_token") || params.has("error") || params.has("error_code")) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    if (!outcome) return;
+    setAuthMode("signin");
+    setView("settings");
+    setCloudMessage(outcome.kind === "confirmed"
+      ? "Email confirmation link received. Sign in with your email and password to access your cloud workspace."
+      : outcome.message);
+  }, []);
 
   useEffect(() => {
     try {
