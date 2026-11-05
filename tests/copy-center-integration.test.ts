@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 
 test("Copy Center and BTCC control room have separate pages", () => {
   assert.ok(existsSync(new URL("../src/app/page.tsx", import.meta.url)));
+  assert.ok(existsSync(new URL("../src/app/copy-center/page.tsx", import.meta.url)));
   assert.ok(existsSync(new URL("../src/app/copy-trading/page.tsx", import.meta.url)));
   assert.ok(existsSync(new URL("../src/app/copy-trading/layout.tsx", import.meta.url)));
   assert.match(read("src/app/page.tsx"), /ManagerShell/);
@@ -20,10 +21,11 @@ test("all Copy Center components and supporting files are present", () => {
   ]) assert.ok(existsSync(new URL(`../src/app/copy-trading/${name}`, import.meta.url)), name);
 });
 
-test("desktop and phone navigation use the actual Copy Center route", () => {
+test("desktop and phone navigation expose both Copy Center and research", () => {
   const shell = read("src/components/manager-shell.tsx");
   assert.equal((shell.match(/window\.location\.assign\("\/copy-trading"\)/g) || []).length, 2);
-  assert.doesNotMatch(shell, /window\.location\.assign\("\/copy-center"\)/);
+  assert.equal((shell.match(/window\.location\.assign\("\/copy-center"\)/g) || []).length, 2);
+  assert.match(read("src/app/copy-center/page.tsx"), /CopyCenterWorkspace/);
 });
 
 test("core execution and read-only paths remain mounted separately", () => {
