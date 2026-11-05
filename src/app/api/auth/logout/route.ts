@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import { cloudService, guardMutation, sessionCookiesFrom, toResponse } from "../../../../lib/cloud-auth.ts";
-import { clearedCookies } from "../../../../lib/cloud-core.ts";
+import { cloudService, guardMutation, sessionCookiesFrom, toResponse } from "../../../../../lib/cloud-auth.ts";
+import { clearedCookies } from "../../../../../lib/cloud-core.ts";
 export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const blocked = guardMutation(request, "auth", { requireJson: false });
