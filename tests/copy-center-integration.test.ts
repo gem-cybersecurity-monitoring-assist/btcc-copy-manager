@@ -28,6 +28,12 @@ test("desktop and phone navigation expose both Copy Center and research", () => 
   assert.match(read("src/app/copy-center/page.tsx"), /CopyCenterWorkspace/);
 });
 
+test("Copy Center advanced tools link routes to existing BTCC live manager", () => {
+  const dashboard = read("src/components/copy-center-workspace.tsx");
+  assert.doesNotMatch(dashboard, /href="\/advanced-btcc"/);
+  assert.match(dashboard, /href="\/"[^>]*>Open advanced tools/);
+});
+
 test("iPhone navigation remains scrollable with both Copy Center choices", () => {
   const css = read("src/app/globals.css");
   assert.match(css, /\.mobile-nav \{[^}]*overflow-x:auto/);
