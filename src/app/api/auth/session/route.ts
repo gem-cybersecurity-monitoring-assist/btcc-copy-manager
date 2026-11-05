@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cloudService, sessionCookiesFrom, toResponse } from "../../../../lib/cloud-auth.ts";
+import { cloudService, sessionCookiesFrom, toResponse } from "../../../../../lib/cloud-auth.ts";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest) {
   const service = cloudService();
