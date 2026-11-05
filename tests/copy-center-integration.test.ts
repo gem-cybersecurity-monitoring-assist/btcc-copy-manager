@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 
 test("Copy Center and BTCC control room have separate pages", () => {
   assert.ok(existsSync(new URL("../src/app/page.tsx", import.meta.url)));
+  assert.ok(existsSync(new URL("../src/app/copy-center/page.tsx", import.meta.url)));
   assert.ok(existsSync(new URL("../src/app/copy-trading/page.tsx", import.meta.url)));
   assert.ok(existsSync(new URL("../src/app/copy-trading/layout.tsx", import.meta.url)));
   assert.match(read("src/app/page.tsx"), /ManagerShell/);
@@ -20,10 +21,23 @@ test("all Copy Center components and supporting files are present", () => {
   ]) assert.ok(existsSync(new URL(`../src/app/copy-trading/${name}`, import.meta.url)), name);
 });
 
-test("desktop and phone navigation use the actual Copy Center route", () => {
+test("desktop and phone navigation expose both Copy Center and research", () => {
   const shell = read("src/components/manager-shell.tsx");
   assert.equal((shell.match(/window\.location\.assign\("\/copy-trading"\)/g) || []).length, 2);
-  assert.doesNotMatch(shell, /window\.location\.assign\("\/copy-center"\)/);
+  assert.equal((shell.match(/window\.location\.assign\("\/copy-center"\)/g) || []).length, 2);
+  assert.match(read("src/app/copy-center/page.tsx"), /CopyCenterWorkspace/);
+});
+
+test("Copy Center advanced tools link routes to existing BTCC live manager", () => {
+  const dashboard = read("src/components/copy-center-workspace.tsx");
+  assert.doesNotMatch(dashboard, /href="\/advanced-btcc"/);
+  assert.match(dashboard, /href="\/"[^>]*>Open advanced tools/);
+});
+
+test("iPhone navigation remains scrollable with both Copy Center choices", () => {
+  const css = read("src/app/globals.css");
+  assert.match(css, /\.mobile-nav \{[^}]*overflow-x:auto/);
+  assert.match(css, /\.mobile-nav button \{[^}]*flex:0 0 76px/);
 });
 
 test("core execution and read-only paths remain mounted separately", () => {
