@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { readLocalWorkspace } from "../app/copy-trading/storage.ts";
 import { summarizeRecordedEquity, type EquityChange } from "../../lib/performance.ts";
 import { LiquidityPanel } from "./liquidity-panel";
+import { EconomyPanel } from "./economy-panel";
 
 function money(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
@@ -71,6 +72,7 @@ export function PerformancePanel() {
         </section>
       )}
       <LiquidityPanel />
+      <EconomyPanel />
       <section className="cc-notice">
         <div>
           <strong>Return evidence</strong>

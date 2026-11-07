@@ -1,0 +1,23 @@
+.gem-economy {--ee-ink:#19383a;--ee-muted:#587071;--ee-line:#dce8e1; color:var(--ee-ink);background:#fff;border:1px solid var(--ee-line);border-radius:16px;padding:clamp(16px,3vw,24px);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.gem-economy * {box-sizing:border-box}
+.gem-economy h2,.gem-economy p{margin:0}
+.gem-economy-head {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.gem-economy-eyebrow {font-size:10px;letter-spacing:.13em;color:#288265;font-weight:800}
+.gem-economy-head h2 {font-size:22px;margin:4px 0 7px}
+.gem-economy-head p {color:var(--ee-muted)}
+.gem-economy button {background:#126c52;color:#fff;border:0;border-radius:10px;min-height:44px;padding:11px 15px;cursor:pointer;white-space:nowrap;font-weight:650}
+.gem-economy button:disabled {opacity:.5}
+.gem-economy button:focus-visible {outline:3px solid #2da87c;outline-offset:3px}
+.gem-economy-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.gem-economy-grid article {min-width:0;border:1px solid var(--ee-line);padding:16px;border-radius:12px}
+.gem-economy-metric-name {font-size:13px;font-weight:700}
+.gem-economy-latest {display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin:10px 0}
+.gem-economy-latest strong {font-size:27px;font-variant-numeric:tabular-nums}
+.gem-economy-latest span {font-size:11px;color:var(--ee-muted)}
+.gem-economy-grid svg {display:block;overflow:visible;width:100%;height:auto;max-height:150px}
+.gem-economy-axis {display:flex;justify-content:space-between;color:var(--ee-muted);font-size:10px}
+.gem-economy-grid small,.gem-economy-footnote {font-size:11px;color:var(--ee-muted)}
+.gem-economy-footnote {margin-top:11px!important}
+.gem-economy-empty {padding:15px;border-radius:9px;background:#f5f9f6;color:var(--ee-muted)}
+@media(max-width:900px) {.gem-economy-grid{grid-template-columns:1fr}}
+@media(max-width:560px) {.gem-economy-head{flex-direction:column;align-items:stretch}.gem-economy button{align-self:flex-start}}
