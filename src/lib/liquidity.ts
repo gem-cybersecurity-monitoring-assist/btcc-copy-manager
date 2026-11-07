@@ -1,6 +1,6 @@
 /** Source-observed spot order books. Not copy-trading execution quotes. */
 export type LiquidityObservation = {
-  provider: "Bitget" | "Kraken";
+  provider: "Bitget" | "Kraken" | "Gate" | "OKX";
   symbol: "BTC" | "ETH";
   quoteCurrency: "USD" | "USDT";
   bid: number; ask: number; mid: number; spreadBps: number;
@@ -24,7 +24,7 @@ function parseLevels(value: unknown): Array<[number, number]> {
 
 /** Validated top-ten quote depth and spread; reject stale/crossed markets. */
 export function normalizeOrderBook(
-  provider: "Bitget" | "Kraken",
+  provider: "Bitget" | "Kraken" | "Gate" | "OKX",
   symbol: "BTC" | "ETH",
   raw: unknown, retrieved = new Date(),
 ): LiquidityObservation | null {
@@ -34,6 +34,14 @@ export function normalizeOrderBook(
   if (provider === "Bitget") {
     if (body.code !== "00000" || !body.data || typeof body.data !== "object") return null;
     book = body.data as Record<string, unknown>;
+    timestamp = Number(book.ts);
+  } else if (provider === "Gate") {
+    book = body;
+    timestamp = Number(body.update ?? body.current);
+  } else if (provider === "OKX") {
+    if (body.code !== "0" || !Array.isArray(body.data) || body.data.length !== 1) return null;
+    if (!body.data[0] || typeof body.data[0] !== "object") return null;
+    book = body.data[0] as Record<string, unknown>;
     timestamp = Number(book.ts);
   } else {
     if (!Array.isArray(body.error) || body.error.length || !body.result || typeof body.result !== "object") return null;
@@ -57,7 +65,7 @@ export function normalizeOrderBook(
   const sum = bidDepthQuote+askDepthQuote;
   if (!Number.isFinite(sum) || sum <= 0) return null;
   return {
-    provider, symbol, quoteCurrency: provider === "Bitget" ? "USDT" : "USD",
+    provider, symbol, quoteCurrency: provider === "Kraken" ? "USD" : "USDT",
     bid, ask, mid, spreadBps: (ask-bid)/mid * 10_000,
     bidDepthQuote, askDepthQuote,
     depthImbalancePct: (bidDepthQuote-askDepthQuote)/sum*100,

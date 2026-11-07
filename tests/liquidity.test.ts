@@ -37,3 +37,21 @@ test("stale or invalid and crossed order books fail closed", () => {
   assert.equal(normalizeOrderBook("Kraken","BTC",{error:["EQuery:Bad"],result:kraken.result},NOW),null);
   assert.equal(normalizeOrderBook("Kraken","BTC",{error:[],result:{}},NOW),null);
 });
+
+test("Gate source validates update timestamp and USDT quote levels", () => {
+  const data={ update: NOW.getTime()-1000,
+    bids: [["100","2"],["99","1"]], asks: [["101","2"],["102","1"]] };
+  const result=normalizeOrderBook("Gate","BTC",data,NOW);
+  assert.equal(result?.provider,"Gate");
+  assert.equal(result?.quoteCurrency,"USDT");
+  assert.equal(result?.bidDepthQuote,299);
+});
+test("OKX source validates its nested book and rejects failed response", () => {
+  const data={code:"0",msg:"",data:[{ts:String(NOW.getTime()-1000),
+    bids:[["100","1","0","1"]],asks:[["101","2","0","1"]]}]};
+  const result=normalizeOrderBook("OKX","ETH",data,NOW);
+  assert.equal(result?.provider,"OKX");
+  assert.equal(result?.levels,1);
+  assert.equal(result?.askDepthQuote,202);
+  assert.equal(normalizeOrderBook("OKX","ETH",{...data,code:"500"},NOW),null);
+});
