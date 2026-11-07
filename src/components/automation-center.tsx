@@ -5,6 +5,7 @@ import { AUTOMATION_EVENT, inspectLocalAutomation, runLocalRiskReview } from "@/
 import { LiquidityPanel } from "@/components/liquidity-panel";
 import { EconomyPanel } from "@/components/economy-panel";
 import { TraderDiscoveryPanel } from "@/components/trader-discovery-panel";
+import { CombinedDecisionPanel } from "@/components/combined-decision-panel";
 import "./automation-center.css";
 
 type BrowserState = ReturnType<typeof inspectLocalAutomation>;
@@ -108,6 +109,7 @@ export function AutomationCenter() {
       </div>
     </section>
 
+    <CombinedDecisionPanel />
     <div className="gem-auto-liquidity"><LiquidityPanel /></div>
     <div className="gem-auto-liquidity"><EconomyPanel /></div>
     <div className="gem-auto-liquidity"><TraderDiscoveryPanel /></div>
