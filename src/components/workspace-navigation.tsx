@@ -18,7 +18,6 @@ const sections = [
 ] as const;
 
 const tools = [
-  { href: "/advanced-btcc", label: "Advanced BTCC controls" },
   { href: "/purchase", label: "Purchase console" },
   { href: "/steel", label: "Browser session controls" },
   { href: "/copy-center/positions", label: "Local paper positions" },
