@@ -54,6 +54,9 @@
   letter-spacing: -0.6px;
 }
 .cc-shell h3 {
+  text-transform: none;
+  color: inherit;
+  letter-spacing: -0.2px;
   font-size: 18px;
   line-height: 1.4;
 }
@@ -169,6 +172,7 @@
   margin-top: 7px;
 }
 .cc-main {
+  width: auto;
   margin-left: 220px;
   max-width: 1600px;
   padding: 0 44px 56px;

@@ -1,48 +1,86 @@
-# GEM Copy Center — ChatGPT Workspace Handoff
+# GEM Copy Center — ChatGPT continuation handoff
 
-**Verified:** 2026-11-07 (UTC). **Owner workspace:** GitHub organization `gem-cybersecurity-monitoring-assist`. This is a project handoff, not evidence that an external ChatGPT Work session has been opened or updated.
+Verified 7 November 2026. This file is the entry point for a new ChatGPT chat. It records observed results; it does not open a new chat, grant connector access, extend credits, or guarantee an always-on Codespace.
 
-## Primary links
-- Private source repository: https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager
-- Existing Codespace editor: https://orange-waddle-q7g66xg5p5j5f5q7.github.dev/
-- Production dashboard: https://btcc-copy-manager.vercel.app/copy-center
-- Paper positions and approval queue: https://btcc-copy-manager.vercel.app/copy-center/positions
-- Copy-trading research/trader workspace: https://btcc-copy-manager.vercel.app/copy-trading
-- Pairing script: `connect-chatgpt.sh`
-- Copilot agent prompt: `.github/prompts/connect-chatgpt.prompt.md`
+## Start here
 
-## Completed and verified
-1. Connected GitHub access to the **private** `btcc-copy-manager` repository (read/write).
-2. Preserved the existing Next.js Copy Center dashboard with provider guides/connections, mobile layout, risk controls, cloud authentication and workspace APIs, and the separate copy-trading research workspace. Some capabilities have not been owner-tested.
-3. Added `/copy-center/positions` (PR #44, merged): **paper-only** position records with venue/trader/symbol/side/notional/entry/mark, illustrative P&L, configurable paper-entry cap and planned-loss percentage, request/approve/reject flow for simulated closures. Positions and approvals are stored only in the current browser's localStorage, not synced to the cloud. No exchange execution is wired into this new route.
-4. Extended `scripts/smoke-production.mjs` to cover `/copy-center/positions` (PR #45, merged). The PR's CI and production smoke checks passed.
-5. Explicit Vercel production deployment `dpl_62D78Hc9hHeN3tWHBFUCHJ98tpws`, commit `5e9ab410ceeb24cc1998e3fbdb4babe35c51d312`, reported **READY** and assigned `btcc-copy-manager.vercel.app`. Later main-branch commits for Codespace pairing documentation passed GitHub Actions; no claim that those documentation commits were redeployed.
-6. Added `connect-chatgpt.sh` (commit `deb7461b7`) to invoke `npx --yes @wonderwhy-er/desktop-commander@latest remote` in a user-controlled Codespace terminal.
-7. Added Copilot agent prompt `.github/prompts/connect-chatgpt.prompt.md` (commit `9657b99c2`) so Copilot Agent can run the connection sequence without the owner pasting terminal commands. Both CI and smoke checks on that commit passed.
+- Repository: https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager
+- Existing Codespace: https://orange-waddle-q7g66xg5p5j5f5q7.github.dev/
+- Production: https://btcc-copy-manager.vercel.app/copy-center
+- Paper positions: https://btcc-copy-manager.vercel.app/copy-center/positions
+- Research: /copy-trading; opportunities: /opportunities
+- Existing BTCC control room: /advanced-btcc after the UI release. Root / now redirects to /copy-center.
+- Remote connection instructions: .github/prompts/connect-chatgpt.prompt.md
 
-## Important current access boundary
-- The Codespace URL was supplied by the owner, but no terminal access has been established from this ChatGPT session.
-- Desktop Commander currently lists **only GEM-ASSIST, offline**, last seen approximately 60 hours before inspection.
-- The user has difficulty pasting into the Codespace terminal on an iPhone. Use the Copilot Agent prompt above, with Copilot executing shell commands and the owner only verifying/approving pairing. **Do not say the pairing succeeded until the new remote device is online in Desktop Commander and a harmless command has been executed there.**
-- GitHub repository access and Vercel API access do not confer a Codespace shell, nor permit bypassing pairing.
+Read this complete file, the connection prompt, and the repository status before changing files. Use the existing Codespace; do not create another or depend on the owner's PC.
 
-## Remaining acceptance work, prioritized
-1. **Codespace access:** In the existing Codespace, have Copilot Agent follow `.github/prompts/connect-chatgpt.prompt.md`. Preserve any uncommitted files; safely fetch main before running `bash connect-chatgpt.sh`. Owner must approve pairing and verify code. Check the connected device and then run harmless shell checks (`pwd`, `git status`, `node -v`).
-2. **iPhone owner authentication:** Open the real production dashboard, sign in, verify email/session persistence, verify logout and authorization on protected endpoints. Do not fabricate completion from build logs.
-3. **Cloud save and restore:** In authenticated owner session, create non-sensitive sample workspace settings, explicitly save, sign out/reload as appropriate, restore and compare, check tenant isolation and absence of credentials in persisted payloads. Existing issue #43 noted cloud row count zero and owner save/restore unproven.
-4. **Sentinel:** Configure a secure reachable persistent endpoint only after verifying service compatibility and authentication; inspect configuration without exposing control tokens. Historically `SENTINEL_URL` and `SENTINEL_CONTROL_TOKEN` were not configured in the deployed project, and no remote Sentinel was proven. Running a service inside a Codespace does not imply it will be online 24/7.
-5. **Read-only integrations:** Review and test Bitget in genuinely read-only mode only with owner-approved credentials and appropriate permissions; provider integrations that are guide-only must remain clearly labeled. Do not request or read real exchange secrets for setup without authorization.
-6. **Mobile UI:** Validate navigation, overlays, auth, position entry, approvals, persistence and accessibility in an actual iPhone browser; automated desktop builds are not a substitute.
-7. **Private access:** Vercel project reports SSO protection enabled, type `all_except_custom_domains`, and older smoke tests intentionally require anonymous access to production pages. Determine exactly which domains/routes are genuinely private and implement owner-only gating where required. A private GitHub repo does not imply a private website.
-8. **Live-action safeguards:** An older separate BTCC live-order adapter exists in the codebase behind configuration and confirmation; do not assume all application routes are non-executing. Inspect existing guards, trading-mode flags, risk limits, and request owner approval before any live credential connection or action. Never initiate orders, transfers, withdrawals, follow/unfollow, or funds movement as part of tests.
+## Owner's current requests
 
-## Execution rules
-- Use **existing Codespace**; do not create another.
-- Prioritize free/existing infrastructure. No PC dependency.
-- Preserve main application and paper/testnet modes; do not overwrite existing code or infrastructure.
-- Keep profits/funds and sensitive actions behind explicit owner approval; **never move money automatically**.
-- Report observed, completed, pending, and blocked work separately. Cite GitHub Actions, GitHub PRs, and Vercel deployment IDs when claiming success.
-- Do not display, copy, or persist private keys, API secrets, access tokens, or credentials in chat, commits, logs, or screenshots.
+Finish a clearer, easier phone interface and leave a durable continuation report for another ChatGPT chat. Keep existing infrastructure, free/existing services, paper mode, and approval safeguards. Avoid repeated setup and unnecessary credit use. The owner said they do not yet have a GEM cloud account; signup/login and cloud acceptance remain pending.
 
-## Immediate next action for an agent operating inside the Codespace
-Open `.github/prompts/connect-chatgpt.prompt.md`, follow it in Copilot **Agent mode**, start remote device pairing, and request the owner's approval. After device registration, re-check ChatGPT Remote Desktop Commander access and proceed with safe read-only acceptance tests.
+## Verified terminal access
+
+Desktop Commander device `codespaces-c39052`, ID `2a742b71-6dff-4373-bd15-c6185fb43f24`, was online and executed shell commands in the existing Codespace. A controlled remote-agent process restart reused the saved registration and subsequent commands succeeded. This verifies process restart, **not** a complete Codespace stop/start or rebuild.
+
+New chats must discover the installed Remote Desktop Commander tools and check device status. If online, use start_process directly with the device ID and an explicit working directory. Copilot is a fallback for reconnecting; it is not required to execute every command after the connector works. If offline, use the existing Codespace and the connection prompt. Owner pairing/approval is required only when registration is absent or expired; never fabricate a successful connection.
+
+Persistent-startup work is isolated in draft PR #46:
+https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/pull/46
+Branch `codex/copy-center-readiness`, commit `cfc5253f0adfe3c04ee5369bfca221a7b0b2ab56`. It pins Desktop Commander 0.3.1, adds a duplicate-safe resume helper and a devcontainer post-start hook. Bash syntax, JSON, typecheck, 103 tests and build passed. The devcontainer hook has not been exercised by a full rebuild or merged. Current-container shell startup invokes the helper. Do not read or print saved remote-device credentials or private logs.
+
+## Checkouts and preservation
+
+- Original: /workspaces/btcc-copy-manager. Existing owner changes to README.md and untracked package-lock.json / next-env.d.ts were preserved.
+- Remote-access worktree: /workspaces/btcc-copy-manager-acceptance.
+- UI worktree: /workspaces/btcc-copy-manager-ui, branch `codex/copy-center-simple-ui`.
+- These are git worktrees in the same Codespace, not new Codespaces.
+- Generated next-env.d.ts is untracked; do not accidentally stage unrelated files.
+- Node v24.22.2; pnpm 10.28.0; Python3 and authenticated gh are available. rg is not installed; use grep/find/Python as needed.
+- Do not symlink node_modules between worktrees: Turbopack rejected the outside-root symlink. Dependencies were copied into the UI worktree.
+
+## UI work completed and locally verified
+
+Initial UI commit: `7d07b66ddbd7f955d2d1476989b3e079d5ceb37d`, followed by a desktop width correction.
+
+- Four primary navigation items: Home, Accounts, Positions, Limits.
+- One Connect account entry point. Connections remain separate per provider; there is no universal credential or automatic multi-exchange connection.
+- Cleaner cards, readable typography, SVG icons, larger touch controls, and a four-item phone navigation bar.
+- Sign in / Join opens the existing GEM account and cloud save/restore controls.
+- Optional wallets are collapsed. Unimplemented Farcaster / MT5 status and technical tools are under Settings > Advanced tools.
+- Preserved research and opportunity routes. Moved the existing ManagerShell to /advanced-btcc.
+- Preserved paper position logic and approvals. Position entry and paper risk settings expand on demand.
+- Preserved authentication/API handlers, storage keys, and financial guards; no backend financial capability was added.
+- Connection dialogs support Escape, focus containment/restore, and body-scroll lock.
+- Fixed legacy global main width causing desktop horizontal overflow, and reset inherited uppercase heading styles.
+
+Validation: pnpm typecheck passed; pnpm test passed **103/103**; pnpm build passed; git diff --check passed. Automated Chromium checks passed at **320x740, 390x844, and 1440x1000**: root redirect, primary navigation, no horizontal overflow, optional wallets, signed-out Bitget gate, modal Escape, signup form, paper create/reject/approve, reload persistence, no API writes and no page errors. Paper examples were confined to disposable browser contexts. These are viewport tests, **not an actual iPhone owner-session acceptance**.
+
+Browser QA tooling was installed under /tmp/gem-ui-qa, outside the repository. System-wide browser dependency installation was rejected by the remote tool. Required official Ubuntu libraries were instead downloaded/extracted into that temporary user-owned directory; no system packages or permissions were changed. Temporary QA files may disappear. The checked-in application gained no new package dependency.
+
+The existing Vercel project is `prj_ddcEn1p6ok6mI8JV4FaJuAacWotJ`, team `team_7lMXW95WSLeyK4yAObe8FptW`.
+Initial preview `dpl_C7ZMa6GFsxhzt4YRrVgzrSUZ4uYJ` contains 7d07b66 and precedes the desktop width fix. Do not treat that preview as the final release. Vercel protection remained enabled. A private Codespace preview was used for interactive inspection.
+
+## Remaining acceptance, in order
+
+1. Owner creates/signs into a GEM account and confirms email if required. Verify real production session persistence, logout, and protected API boundaries. Never enter a new password on the owner's behalf or ask for it in chat.
+2. In that owner session, explicitly save non-sensitive planning data, reload/restore and compare. Test isolation with separately authorized accounts. Existing table RLS configuration was inspected, but no authenticated owner round-trip or runtime tenant isolation was proven; observed workspace row count was zero.
+3. Verify Sentinel service compatibility, authentication and an existing persistent endpoint. Production previously had no SENTINEL_URL / SENTINEL_CONTROL_TOKEN and health returned unavailable. A Codespace process is not a persistent 24/7 service. Do not publish an unauthenticated control endpoint.
+4. Bitget verification only with owner-authorized genuinely read-only credentials. No live financial credentials were connected or tested. BTCC remains guide-only.
+5. Actual iPhone owner-session checks: navigation, keyboard, overlays, signup/login, cloud restore, paper entry, approval and reload persistence.
+6. Owner-only website gating. Private repository and protected previews do not prove the production website is private; existing smoke checks intentionally allow anonymous production pages.
+7. Inspect existing live-adapter safeguards without exercising financial routes. AI chat /api/agent remains explicitly disabled; do not claim a working trading AI chat.
+8. Review existing dependency security alerts separately. GitHub reported 84 default-branch alerts during push; no broad dependency upgrade was included in the UI change.
+
+## Credit and usage discipline
+
+Start each session from this report and git status; reuse verified commits/tests instead of repeating pairing and setup. Run focused checks after material changes. Avoid duplicate agents, duplicate deployments and background research. Codespaces, ChatGPT and Copilot have separate limits; none of this setup increases quotas or guarantees unlimited/full permissions.
+
+Let the Codespace stop when unused. Do not add keep-alive loops or promise 24/7 uptime. Saved device registration can survive an ordinary agent restart; reconnection still requires the Codespace and connector to be online. Stop temporary preview servers after verification; retain the approved remote connector. Do not stop the owner's work or delete checkouts.
+
+## Non-negotiable financial boundaries
+
+Preserve existing infrastructure, deployments, paper/testnet modes and approval controls. No exchange order, follow/unfollow, transfer, deposit, withdrawal or other money-moving action has been tested or authorized. Do not connect live financial credentials or execute such actions without the owner's explicit authorization. Hidden advanced UI is not a security boundary: the older live adapter still exists behind its existing guards.
+
+## Suggested prompt for a new chat
+
+Continue GEM Copy Center. Read docs/CHATGPT_WORKSPACE_HANDOFF.md completely in gem-cybersecurity-monitoring-assist/btcc-copy-manager. Check the existing Codespace device codespaces-c39052 through Remote Desktop Commander and reuse authenticated terminal access if online. Inspect git status and release evidence, then complete the remaining acceptance tasks in priority order. Preserve paper mode, existing infrastructure and approval safeguards. Do not create another Codespace or connect live financial credentials or move money without my explicit authorization.
