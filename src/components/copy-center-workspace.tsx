@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
+import { PerformancePanel } from "./performance-panel";
+import { MarketOverview } from "./market-overview";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = {
@@ -98,6 +100,7 @@ const nav = [
   { id: "overview", label: "Home", icon: "⌂" },
   { id: "providers", label: "Accounts", icon: "⛓" },
   { id: "portfolio", label: "Positions", icon: "▤" },
+  { id: "performance", label: "Performance", icon: "↗" },
   { id: "risk", label: "Limits", icon: "◈" },
   { id: "activity", label: "Activity", icon: "≡" },
   { id: "settings", label: "Settings", icon: "⚙" },
@@ -989,8 +992,8 @@ export function CopyCenterWorkspace() {
         </header>
         <div className="cc-mode-bar">
           <span className="cc-status-dot" />
-          <strong>Paper mode</strong>
-          <span>Practice and plan. No live transactions here.</span>
+          <strong>Connection status</strong>
+          <span>{exchangeCount ? "Exchange access checked; trading permissions not enabled" : "No active exchange trading session"}</span>
         </div>
         <nav className="cc-mobile-nav" aria-label="Mobile navigation">
           {mainNav.map((item) => (
@@ -1017,15 +1020,15 @@ export function CopyCenterWorkspace() {
           <div className="cc-page">
             <section className="cc-welcome">
               <div>
-                <span className="cc-hero-label">A CLEARER WAY TO START</span>
+                <span className="cc-hero-label">YOUR TRADING CONTROL CENTER</span>
                 <h2>
                   Your accounts.
                   <br />
                   One simple workspace.
                 </h2>
                 <p>
-                  Start with an account check, set your limits, and practice
-                  with paper positions.
+                  Connect supported accounts, monitor activity, compare traders,
+                  and track performance from one place.
                 </p>
                 <button
                   className="cc-button"
@@ -1084,18 +1087,18 @@ export function CopyCenterWorkspace() {
             </section>
             <section className="cc-section-head">
               <div>
-                <h2>What would you like to do?</h2>
+                <h2>Manage your trading</h2>
                 <p className="cc-lead">
-                  Just the essentials, with room to explore later.
+                  Live account information and portfolio controls in one place.
                 </p>
               </div>
             </section>
             <section className="cc-step-grid">
               <a href="/copy-center/positions">
                 <WorkspaceIcon name="portfolio" />
-                <strong>Practice a position</strong>
-                <p>Add paper positions and review approval requests.</p>
-                <span className="cc-step-link">Open paper workspace →</span>
+                <strong>Positions and approvals</strong>
+                <p>Inspect position records and approval requests.</p>
+                <span className="cc-step-link">Open positions →</span>
               </a>
               <button onClick={() => setView("risk")}>
                 <WorkspaceIcon name="risk" />
@@ -1103,11 +1106,17 @@ export function CopyCenterWorkspace() {
                 <p>Choose your planning amount and loss threshold.</p>
                 <span className="cc-step-link">Review limits →</span>
               </button>
+              <button onClick={() => setView("performance")}>
+                <WorkspaceIcon name="portfolio" />
+                <strong>Performance</strong>
+                <p>Inspect recorded account equity and return evidence.</p>
+                <span className="cc-step-link">Open performance →</span>
+              </button>
               <a href="/copy-trading">
                 <WorkspaceIcon name="traders" />
-                <strong>Review traders</strong>
-                <p>Explore the existing trader research workspace.</p>
-                <span className="cc-step-link">Open research →</span>
+                <strong>Trader intelligence</strong>
+                <p>Compare trader metrics and risk-adjusted candidates.</p>
+                <span className="cc-step-link">View traders →</span>
               </a>
             </section>
             {!cloudSession.authenticated && (
@@ -1151,8 +1160,8 @@ export function CopyCenterWorkspace() {
                 .map(renderProvider)}
             </div>
             <p className="cc-footnote">
-              Bitget checks are one-time and read-only. BTCC is a setup guide;
-              it is not connected to GEM.
+              Provider access is shown only when verified. BTCC native copy operations
+              are not connected; Bitget currently supports a one-time account check.
             </p>
             <details className="cc-disclosure">
               <summary>
@@ -1170,14 +1179,20 @@ export function CopyCenterWorkspace() {
             </details>
           </div>
         )}
+        {view === "performance" && (
+          <div className="cc-page">
+            <PerformancePanel />
+            <MarketOverview />
+          </div>
+        )}
         {view === "portfolio" && (
           <div className="cc-page">
             <section className="cc-section-head">
               <div>
                 <h2>Your positions</h2>
                 <p className="cc-lead">
-                  Start with practice. Exchange positions have not been
-                  imported.
+                  Exchange positions are displayed only after a verified account
+                  connection. Existing local position records remain available.
                 </p>
               </div>
             </section>
@@ -1186,19 +1201,18 @@ export function CopyCenterWorkspace() {
                 <WorkspaceIcon name="portfolio" />
               </span>
               <div>
-                <span className="cc-pill cc-pill-safe">Paper trading</span>
-                <h2>Practice before going live</h2>
+                <span className="cc-pill cc-pill-muted">No live positions synced</span>
+                <h2>Positions and approvals</h2>
                 <p>
-                  Manage simulated positions, inspect risk limits, and review
-                  approval requests in your paper workspace.
+                  View existing locally recorded positions and owner approvals.
+                  These are separate from exchange-confirmed positions.
                 </p>
                 <a className="cc-button" href="/copy-center/positions">
                   Open positions &amp; approvals{" "}
                   <span aria-hidden="true">→</span>
                 </a>
                 <small>
-                  Practice data is saved in this browser. No exchange orders are
-                  sent.
+                  Local position records are not live exchange orders.
                 </small>
               </div>
             </section>
@@ -1334,8 +1348,8 @@ export function CopyCenterWorkspace() {
                 <div className="cc-empty-icon">≡</div>
                 <h3>No activity recorded yet</h3>
                 <p>
-                  Reviewing a provider setup guide will add an entry here.
-                  Trades are not initiated from this activity page.
+                  Account verification and workspace actions appear here.
+                  This history does not substitute for exchange trade records.
                 </p>
                 <button
                   className="cc-button"

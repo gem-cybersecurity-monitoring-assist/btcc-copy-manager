@@ -1294,3 +1294,17 @@
   min-height: 44px;
   align-items: center;
 }
+
+/* Evidence-backed performance cards use the existing mobile-responsive grid. */
+.cc-performance-card {
+  display: grid;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--cc-border);
+  border-radius: 16px;
+  padding: 22px;
+  min-width: 0;
+}
+.cc-performance-card strong { font-size: 24px; color: var(--cc-ink); }
+.cc-performance-card p { font-size: 13px; }
+.cc-performance-card small { color: var(--cc-muted); line-height: 1.5; }
