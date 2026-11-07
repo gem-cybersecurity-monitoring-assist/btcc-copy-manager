@@ -45,3 +45,5 @@
 .gem-auto-disclaimer {padding:0 4px;font-size:12px;line-height:1.65;color:var(--gem-muted)}
 @media(max-width:850px){.gem-auto-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.gem-auto-service-grid,.gem-auto-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.gem-auto-hero{flex-direction:column;align-items:stretch}.gem-auto-service-grid,.gem-auto-links{grid-template-columns:1fr}.gem-auto-metrics article{padding:15px}.gem-auto-metrics article strong{font-size:24px}.gem-auto-panel{padding:17px}.gem-auto-actions{flex-direction:column}.gem-auto-actions a,.gem-auto-actions button{text-align:center}.gem-auto-service{padding:15px}}
+
+.gem-auto-liquidity { margin-bottom: 18px; }

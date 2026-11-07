@@ -1,0 +1,24 @@
+.gem-liquidity {--lm-ink:#18363b;--lm-muted:#5b7477;--lm-line:#d8e5df; color:var(--lm-ink);background:#fff;border:1px solid var(--lm-line);border-radius:16px;padding:clamp(16px,3vw,24px);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.gem-liquidity * {box-sizing:border-box}
+.gem-liquidity h2,.gem-liquidity p{margin:0}
+.gem-liquidity-head {display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:17px}
+.gem-liquidity-overline {font-size:10px;letter-spacing:.12em;font-weight:800;color:#23846c}
+.gem-liquidity-head h2 {font-size:22px;margin:4px 0 7px}
+.gem-liquidity-head p {color:var(--lm-muted);max-width:590px}
+.gem-liquidity button {background:#126c52;color:white;border:0;border-radius:10px;padding:11px 16px;min-height:44px;white-space:nowrap;cursor:pointer;font-weight:650}
+.gem-liquidity button:disabled {opacity:.65;cursor:not-allowed}
+.gem-liquidity button:focus-visible {outline:3px solid #29a881;outline-offset:2px}
+.gem-liquidity-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gem-liquidity-grid article {display:grid;gap:8px;min-width:0;border:1px solid var(--lm-line);border-radius:12px;padding:16px}
+.gem-liquidity-card-head {display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.gem-liquidity-card-head strong {font-size:15px}
+.gem-liquidity-card-head span {color:var(--lm-muted);font-size:12px}
+.gem-liquidity-price {display:grid;gap:3px;margin:7px 0}
+.gem-liquidity-price span,.gem-liquidity-row span {color:var(--lm-muted);font-size:12px}
+.gem-liquidity-price strong {font-size:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.gem-liquidity-row {display:flex;justify-content:space-between;gap:10px;border-top:1px solid #edf3ef;padding-top:8px}
+.gem-liquidity-row strong {font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.gem-liquidity-grid small,.gem-liquidity-footnote {color:var(--lm-muted);font-size:11px}
+.gem-liquidity-footnote {margin-top:12px!important}
+.gem-liquidity-empty {color:var(--lm-muted);padding:16px;background:#f3f8f5;border-radius:10px}
+@media(max-width:680px) {.gem-liquidity-grid{grid-template-columns:1fr}.gem-liquidity-head{flex-direction:column;align-items:stretch}.gem-liquidity button{align-self:flex-start}}
