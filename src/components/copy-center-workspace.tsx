@@ -120,6 +120,7 @@ function WorkspaceIcon({ name }: { name: string }) {
     overview: "M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z",
     providers: "M8 3h8v5H8z M8 16h8v5H8z M12 8v8 M3 12h18",
     portfolio: "M3 6h18v15H3z M8 6V3h8v3 M3 11h18 M10 14h4",
+    performance: "M3 17l6-6 4 4 7-9 M15 6h5v5 M3 21h18",
     risk: "m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z M8 12l3 3 5-6",
     settings:
       "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2",
@@ -171,6 +172,10 @@ export function CopyCenterWorkspace() {
   const [bgMessage, setBgMessage] = useState("");
   const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    if (requested && nav.some(item => item.id === requested)) setView(requested as View);
+  }, []);
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [view]);
@@ -889,7 +894,7 @@ export function CopyCenterWorkspace() {
   }
 
   const mainNav = nav.filter((item) =>
-    ["overview", "providers", "portfolio", "risk"].includes(item.id),
+    ["overview", "providers", "portfolio", "performance", "risk"].includes(item.id),
   );
   const renderProvider = (provider: Provider) => (
     <article className="cc-provider-card" key={provider.id}>
@@ -968,9 +973,12 @@ export function CopyCenterWorkspace() {
           </button>
           <div className="cc-side-note">
             <span className="cc-status-dot" />
-            <span>
-              Paper workspace<small>Live actions stay disabled here</small>
-            </span>
+            <span>Trading status<small>Verify account permissions before live actions</small></span>
+          </div>
+          <div className="cc-cross-links" aria-label="Related dashboards">
+            <a href="/copy-trading">Trader intelligence</a>
+            <a href="/opportunities">Opportunities</a>
+            <a href="/advanced-btcc">Advanced controls</a>
           </div>
         </div>
       </aside>
@@ -1112,6 +1120,12 @@ export function CopyCenterWorkspace() {
                 <p>Inspect recorded account equity and return evidence.</p>
                 <span className="cc-step-link">Open performance →</span>
               </button>
+              <a href="/opportunities">
+                <WorkspaceIcon name="traders" />
+                <strong>Opportunities</strong>
+                <p>Monitor candidates backed by verified market and trader data.</p>
+                <span className="cc-step-link">View opportunities →</span>
+              </a>
               <a href="/copy-trading">
                 <WorkspaceIcon name="traders" />
                 <strong>Trader intelligence</strong>
@@ -1240,10 +1254,10 @@ export function CopyCenterWorkspace() {
             <section className="cc-section-head">
               <div>
                 <p className="cc-eyebrow">RISK FIRST</p>
-                <h2>Plan limits before providers</h2>
+                <h2>Risk limits</h2>
                 <p className="cc-lead">
-                  These are planning controls only. They do not place orders or
-                  configure exchange-side risk.
+                  Set workspace limits and inspect risk exposure. Exchange-side
+                  enforcement requires a verified supported connection.
                 </p>
               </div>
               <span className="cc-pill cc-pill-safe">Planning only</span>

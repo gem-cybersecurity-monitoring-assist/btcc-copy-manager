@@ -67,3 +67,13 @@ h1,h2,h3,p { margin-top:0; } h1 { font-size:28px; margin-bottom:0; } h2 { font-s
   .autonomy-row { grid-template-columns: 1fr 1fr; }
   .autonomy-row strong { grid-column: 1 / -1; }
 }
+
+/* Opportunity-specific empty state for incomplete but accurate live feeds. */
+.op-empty { margin: 22px 0; padding: clamp(20px,4vw,32px); border: 1px solid #35505f; border-radius: 16px; background: #11243a; }
+.op-empty h2 { color: #f0f8fc; margin-bottom: 10px; }
+.op-empty p { max-width: 660px; line-height: 1.6; color: #b8cada; }
+.op-empty-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.op-empty-actions .button { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
+.op-empty-actions .button.secondary { color: #eaf7f5; background: #1d3851; }
+.op-error { color: #ffdce0; background: #3a1b28; border: 1px solid #864459; border-radius: 10px; padding: 14px; }
+@media(max-width:620px){ .op-empty-actions { flex-direction: column; } .op-empty-actions .button { justify-content: center; } }

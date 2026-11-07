@@ -1308,3 +1308,18 @@
 .cc-performance-card strong { font-size: 24px; color: var(--cc-ink); }
 .cc-performance-card p { font-size: 13px; }
 .cc-performance-card small { color: var(--cc-muted); line-height: 1.5; }
+
+/* Group secondary dashboards without mixing them into primary trading controls. */
+.cc-cross-links { display: grid; gap: 5px; margin-top: 12px; }
+.cc-cross-links a { padding: 9px 11px; border-radius: 8px; color: var(--cc-muted); font-size: 13px; text-decoration: none; }
+.cc-cross-links a:hover,.cc-cross-links a:focus-visible { background: #eff7f2; color: var(--cc-green); }
+
+/* Five persistent mobile destinations, including Performance. */
+@media (max-width: 760px) {
+  .cc-mobile-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); padding-inline: 4px; }
+  .cc-mobile-nav button { min-width: 0; padding-inline: 2px; font-size: 10px; }
+}
+@media (max-width: 350px) {
+  .cc-mobile-nav button { font-size: 9px; gap: 5px; }
+  .cc-mobile-nav svg { width: 19px; height: 19px; }
+}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./usability.css";
+import { WorkspaceNavigation } from "@/components/workspace-navigation";
 
 export const metadata: Metadata = {
   title: { default: "BTCC Copy Manager", template: "%s | BTCC Copy Manager" },
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><WorkspaceNavigation />{children}</body>
     </html>
   );
 }
