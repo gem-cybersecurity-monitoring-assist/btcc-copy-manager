@@ -17,8 +17,9 @@
     "connect:btcc": "pnpm browser:doctor && pnpm browser:scan:once",
     "monitor:btcc": "pnpm browser:doctor && pnpm browser:scan",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.ts",
-    "check": "pnpm typecheck && pnpm test && pnpm build"
+    "test": "node --test tests/*.test.ts tests/*.test.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "muse:check": "node scripts/check-muse-bridge.mjs"
   },
   "dependencies": {
     "next": "16.4.5",
