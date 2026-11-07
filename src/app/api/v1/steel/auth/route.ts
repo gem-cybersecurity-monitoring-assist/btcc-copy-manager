@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { steelConfigStatus, verifyControlSecret } from "@/lib/steel-browser";
 import { clearSteelAuth, isSteelAuthorized, jsonError, sameOrigin, setSteelAuth } from "@/lib/steel-route";
@@ -6,33 +6,12 @@ import { clearSteelAuth, isSteelAuthorized, jsonError, sameOrigin, setSteelAuth 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const RECOVERY_PASSPHRASE_SHA256 = "31973d30418ba1da6ab119e321a092d1dce183db54fa248a4e52b85d67cedc8a";
-const RECOVERY_CANONICAL_SHA256 = "ecf999103c7f208a2d92c656b5c329b1f4009a9cc485789050883325fe26ef1c";
-
-function sameHex(left: string, right: string) {
-  const expected = Buffer.from(left, "utf8");
-  const supplied = Buffer.from(right, "utf8");
-  return expected.length === supplied.length && timingSafeEqual(expected, supplied);
-}
-
 function verifyLegacyControlSecret(candidate: string) {
   const legacy = process.env.STELL_CONTROL_SECRET?.trim();
   if (!legacy) return false;
   const expected = Buffer.from(legacy, "utf8");
   const supplied = Buffer.from(candidate, "utf8");
   return expected.length === supplied.length && timingSafeEqual(expected, supplied);
-}
-
-function verifyRecoveryPassphrase(candidate: string) {
-  if (!candidate) return false;
-  const exact = createHash("sha256").update(candidate.trim(), "utf8").digest("hex");
-  if (sameHex(RECOVERY_PASSPHRASE_SHA256, exact)) return true;
-  const canonical = Array.from(candidate.normalize("NFKC"))
-    .filter((char) => /[A-Za-z0-9]/.test(char))
-    .join("")
-    .toLowerCase();
-  const normalized = createHash("sha256").update(canonical, "utf8").digest("hex");
-  return sameHex(RECOVERY_CANONICAL_SHA256, normalized);
 }
 
 export async function GET(request: NextRequest) {
@@ -44,7 +23,7 @@ export async function GET(request: NextRequest) {
     missing: config.missing,
     controlSecretStrongEnough: config.controlSecretStrongEnough,
     legacyControlSecretPresent: Boolean(process.env.STELL_CONTROL_SECRET?.trim()),
-    recoveryPassphraseEnabled: true,
+    recoveryPassphraseEnabled: false,
   }, { headers: { "cache-control": "no-store, max-age=0" } });
 }
 
@@ -61,7 +40,7 @@ export async function POST(request: NextRequest) {
     return jsonError("Invalid request.", 400);
   }
 
-  if (!verifyControlSecret(secret) && !verifyLegacyControlSecret(secret) && !verifyRecoveryPassphrase(secret)) {
+  if (!verifyControlSecret(secret) && !verifyLegacyControlSecret(secret)) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     return jsonError("Authorization failed.", 401);
   }
