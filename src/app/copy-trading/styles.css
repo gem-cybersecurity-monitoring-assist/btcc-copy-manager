@@ -261,3 +261,9 @@
 .copy-shell .agent-input button { border:0; cursor:pointer; }
 .copy-shell .agent-input .secondary-btn { border:1px solid var(--line); }
 @media(max-width:600px) { .copy-shell .agent-msg { max-width:100%; } }
+
+/* Keep the research workspace inside iPhone viewports while preserving
+   independent horizontal scrolling for wide analytical tables and tab strips. */
+.copy-shell { width: 100%; min-width: 0; overflow-x: clip; }
+.copy-shell .table-wrap { max-width: 100%; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.copy-shell [role="tablist"] { max-width: 100%; }

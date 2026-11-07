@@ -10,12 +10,6 @@ import { isWorkspaceEmpty, LIMITS, parseBackupText, toCsv, traderKey, workspaceC
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const demoTraders: Trader[] = [
-  { name: "Steady BTC", venue: "BTCC", period: "90 days", roi: 12.4, drawdown: 6.8, winRate: 61, trades: 184, leverage: "Low–moderate", profitShare: "Check venue terms", history: "Demo data", note: "Illustrative profile; replace with verified observations." },
-  { name: "Trend Rider", venue: "Bitget", period: "90 days", roi: 24.1, drawdown: 18.7, winRate: 48, trades: 96, leverage: "High", profitShare: "Check venue terms", history: "Demo data", note: "Higher return is paired with materially higher drawdown." },
-  { name: "Balanced Swing", venue: "BTCC", period: "180 days", roi: 16.2, drawdown: 9.1, winRate: 57, trades: 231, leverage: "Moderate", profitShare: "Check venue terms", history: "Demo data", note: "Longer illustrative history; still needs source verification." },
-];
-
 const exchanges = [
   { name: "BTCC", url: "https://www.btcc.com/", action: "Open BTCC", detail: "Sign in directly, then open Copy / Futures Copy Trading to review traders and configure copying." },
   { name: "Bitget", url: "https://www.bitget.com/", action: "Open Bitget", detail: "Sign in directly and use Bitget's native copy-trading interface for enrollment and settings." },
@@ -49,7 +43,6 @@ export default function CopyTradingPage() {
   const [riskCap, setRiskCap] = useState("10");
   const [saved, setSaved] = useState<string[]>([]);
   const [manualTraders, setManualTraders] = useState<Trader[]>([]);
-  const [showDemo, setShowDemo] = useState(true);
   const [form, setForm] = useState(emptyTraderForm);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [formMessage, setFormMessage] = useState("");
@@ -193,7 +186,7 @@ export default function CopyTradingPage() {
     if (!window.confirm(`Delete the ${t.venue} trader record "${t.name}"? This cannot be undone unless you have a backup.`)) return;
     const key = traderKey(t);
     const next = manualTraders.filter((m) => traderKey(m) !== key);
-    const stillUsed = next.some((m) => m.name === t.name) || demoTraders.some((d) => d.name === t.name);
+    const stillUsed = next.some((m) => m.name === t.name);
     const error = persist({ ...currentWorkspace(), traders: next, savedReviews: stillUsed ? saved : saved.filter((n) => n !== t.name) });
     if (editingKey === key) cancelEdit();
     setFormMessage(error ?? `Deleted ${t.name} (${t.venue}).`);
@@ -222,10 +215,10 @@ export default function CopyTradingPage() {
     return persist(workspace);
   }, [persist]);
 
-  const traders = useMemo(() => [...(showDemo ? demoTraders : []), ...manualTraders]
+  const traders = useMemo(() => [...manualTraders]
     .filter((t) => venue === "All" || t.venue === venue)
     .filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => scoreTrader(b) - scoreTrader(a)), [query, venue, manualTraders, showDemo]);
+    .sort((a, b) => scoreTrader(b) - scoreTrader(a)), [query, venue, manualTraders]);
 
   const allocation = Math.max(0, Number(capital) || 0);
   const perTrader = Math.max(0, Number(riskCap) || 0);
@@ -279,9 +272,8 @@ export default function CopyTradingPage() {
       </section>
 
       <section id="traders" className="section-block">
-        <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} user-entered · {showDemo ? "demo visible" : "demo hidden"}</span></div>
-        {showDemo && <div className="demo-warning"><strong>Demo only.</strong> These trader names and statistics are examples to demonstrate the comparison UI. They are not live exchange results and must not be used to choose a real trader. <button type="button" onClick={() => setShowDemo(false)}>Hide demo rows</button></div>}
-        <div className="demo-toggle-row"><button type="button" className="review-btn" onClick={() => setShowDemo((v) => !v)}>{showDemo ? "Hide demo rows" : "Show demo rows"}</button><span className="footnote">Manually entered trader stats are stored only in this browser.</span></div>
+        <div className="section-heading"><div><p className="eyebrow">02 / RESEARCH & SCREENING</p><h2>Trader comparison</h2></div><span className="demo-label">{manualTraders.length} recorded · Not exchange-verified</span></div>
+        <div className="demo-toggle-row"><span className="footnote">Only your recorded profiles appear here. Scores are screening estimates, not verified live exchange performance.</span><a href="/copy-center?view=providers" className="review-btn">View accounts</a></div>
         <div className="data-tools">
           <div><strong>Move your records between devices</strong><span>Stored in this browser · Export a backup file or use cloud upload above to move records</span></div>
           <div className="data-tool-actions">
@@ -298,7 +290,7 @@ export default function CopyTradingPage() {
         </div>
         <div className="table-wrap"><table>
           <thead><tr><th>Trader / venue</th><th>Period</th><th>ROI*</th><th>Max drawdown*</th><th>Win rate*</th><th>Trades*</th><th>Risk screen</th><th>Actions</th></tr></thead>
-          <tbody>{traders.length === 0 && <tr><td colSpan={8} className="empty-cell">{!loaded ? "Loading records…" : manualTraders.length === 0 && !showDemo ? "No trader records yet. Add a profile you reviewed on the exchange using the form below." : "No traders match the current search or exchange filter."}</td></tr>}
+          <tbody>{traders.length === 0 && <tr><td colSpan={8} className="empty-cell">{!loaded ? "Loading records…" : manualTraders.length === 0 ? "No trader records yet. Add a profile you reviewed on the exchange using the form below." : "No traders match the current search or exchange filter."}</td></tr>}
           {traders.map((t) => <tr key={(t.history === "Demo data" ? "demo:" : "user:") + traderKey(t)}>
             <td><strong>{t.name}</strong><span className="cell-sub">{t.venue} · {t.history}</span></td>
             <td>{t.period}</td><td className={t.roi >= 0 ? "positive" : "negative"}>{t.roi.toFixed(1)}%</td><td>{t.drawdown.toFixed(1)}%</td><td>{t.winRate}%</td><td>{t.trades}</td>

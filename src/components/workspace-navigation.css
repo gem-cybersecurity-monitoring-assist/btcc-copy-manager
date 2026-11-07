@@ -1,0 +1,37 @@
+.gem-route-header {
+  position: relative; z-index: 60; background: #11283a;
+  color: #f5faf8; border-bottom: 1px solid #35505f;
+  font: 500 13px/1.35 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+.gem-route-header * { box-sizing: border-box; }
+.gem-route-header-inner {
+  max-width: 1480px; margin: 0 auto; display: flex; align-items: center;
+  gap: 16px; padding: 9px clamp(12px,2vw,28px);
+}
+.gem-route-header a { color: inherit; text-decoration: none; }
+.gem-route-brand { flex: 0 0 auto; display: flex; align-items: center; gap: 9px; font-weight: 800; white-space: nowrap; }
+.gem-route-brand small { display: block; font-size: 10px; font-weight: 500; color: #b1c6ce; }
+.gem-route-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #b7f3d9; color: #164d3d; font-weight: 900; font-size: 21px; }
+.gem-route-links { display: flex; align-items: center; flex: 1; min-width: 0; gap: 3px; }
+.gem-route-links a { display: inline-flex; align-items: center; white-space: nowrap; min-height: 41px; padding: 9px 10px; border-radius: 8px; }
+.gem-route-links a:hover,.gem-route-links a[aria-current="page"] { background: #264958; }
+.gem-route-more { position: relative; flex: 0 0 auto; }
+.gem-route-more summary { border: 1px solid #456271; padding: 10px 12px; border-radius: 9px; min-height: 41px; cursor: pointer; list-style: none; white-space: nowrap; }
+.gem-route-more summary::-webkit-details-marker { display: none; }
+.gem-route-more summary::after { content: "⌄"; padding-left: 8px; }
+.gem-route-more-panel { position: absolute; top: calc(100% + 8px); right: 0; display: grid; gap: 4px; min-width: 235px; padding: 8px; border: 1px solid #456271; border-radius: 12px; background: #11283a; box-shadow: 0 16px 35px #0005; }
+.gem-route-more-panel a { display: block; padding: 12px; border-radius: 7px; white-space: nowrap; }
+.gem-route-more-panel a:hover,.gem-route-more-panel a[aria-current="page"] { background: #264958; }
+.gem-route-header :focus-visible { outline: 3px solid #94efc9; outline-offset: 3px; }
+@media(max-width:1000px) {
+  .gem-route-header-inner { flex-wrap: wrap; row-gap: 8px; }
+  .gem-route-brand { order: 0; }
+  .gem-route-more { order: 1; margin-left: auto; }
+  .gem-route-links { order: 2; flex: 1 0 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  .gem-route-links a { min-height: 44px; flex-shrink: 0; padding-inline: 13px; }
+}
+@media(max-width:420px) {
+ .gem-route-header-inner { padding: 8px 12px 6px; }
+ .gem-route-links { margin-inline: -12px; padding-inline: 12px; }
+}
