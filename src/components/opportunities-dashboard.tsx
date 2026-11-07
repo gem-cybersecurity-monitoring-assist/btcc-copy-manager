@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Opportunity } from "@/lib/opportunities";
+import { TraderDiscoveryPanel } from "@/components/trader-discovery-panel";
 
 type ScannerResponse = {
   watchlist?: Opportunity[];
@@ -58,8 +59,8 @@ export function OpportunitiesDashboard() {
     </section>
     {error && <p role="alert" className="op-error">{error}</p>}
     {!loading && items.length === 0 && <section className="op-empty" role="status">
-      <h2>No verified trader opportunities</h2>
-      <p>Trader discovery has not returned any authenticated candidates. You can connect a supported account, review your saved trader records, or inspect public market references without placing an order.</p>
+      <h2>No exchange-authorized opportunities</h2>
+      <p>No exchange-authenticated trader is approved for automatic copying. Third-party ranking observations, when available, appear below as research candidates only.</p>
       <div className="op-empty-actions">
         <a href="/copy-center?view=providers" className="button">Accounts</a>
         <a href="/copy-trading" className="button secondary">Trader records</a>
@@ -81,6 +82,7 @@ export function OpportunitiesDashboard() {
         {expanded === item.id && <div className="evidence"><p className="eyebrow">Candidate evidence</p><ul>{item.rationale.map((reason, index) => <li key={index}>{reason}</li>)}</ul><small>Source: {item.source}{item.degraded ? " · limited confidence" : ""}</small></div>}
       </article>)}
     </section>
+    <TraderDiscoveryPanel />
     <p className="op-footnote">Source verification, liquidity confidence and risk limits are mandatory before any candidate becomes actionable. This page never places trades.</p>
   </main>;
 }
