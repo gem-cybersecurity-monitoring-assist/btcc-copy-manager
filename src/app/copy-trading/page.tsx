@@ -351,17 +351,7 @@ export default function CopyTradingPage() {
         </div>
       </section>
 
-      <section className="section-block checklist">
-        <div><p className="eyebrow">05 / BEFORE YOU COPY</p><h2>Quick risk checklist</h2></div>
-        <ul>
-          <li><span>01</span><div><strong>Check the full history</strong><p>Look at 30/90/180-day performance, worst drawdown, and performance during different market conditions.</p></div></li>
-          <li><span>02</span><div><strong>Understand the cost</strong><p>Include trading fees, funding, slippage, and any copy-trading profit share before comparing net returns.</p></div></li>
-          <li><span>03</span><div><strong>Limit exposure</strong><p>Set a small initial allocation and check leverage, margin mode, open positions, and liquidation risk.</p></div></li>
-          <li><span>04</span><div><strong>Know how to stop</strong><p>Find the exchange's native stop-copy and position-close options before activating copy trading.</p></div></li>
-        </ul>
-      </section>
-
-      <footer className="footer"><span>GEM Copy Center · Working preview</span><span>Browser-local records · Manual account snapshots · No trade execution</span></footer>
+      <footer className="footer"><span>GEM Copy Center · Trading intelligence</span><span>Browser-local records · Manual account snapshots · No trade execution</span></footer>
     </main>
   );
 }
