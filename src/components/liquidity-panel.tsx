@@ -24,7 +24,7 @@ export function LiquidityPanel() {
   useEffect(() => { void refresh(); }, []);
   return <section className="gem-liquidity" aria-label="Market liquidity intelligence">
     <header className="gem-liquidity-head">
-      <div><span className="gem-liquidity-overline">LIVE MARKET EVIDENCE</span><h2>Liquidity &amp; spreads</h2><p>Public spot order-book depth from Bitget and Kraken, independent of copied traders.</p></div>
+      <div><span className="gem-liquidity-overline">LIVE MARKET EVIDENCE</span><h2>Liquidity &amp; spreads</h2><p>Public spot order-book depth from Bitget, Kraken, OKX and Gate, independent of copied traders.</p></div>
       <button type="button" onClick={() => void refresh()} disabled={loading}>{loading ? "Checking…" : "Refresh depth"}</button>
     </header>
     {report?.books.length ? <div className="gem-liquidity-grid">
@@ -38,7 +38,7 @@ export function LiquidityPanel() {
         <small>Source quote: {new Date(book.sourceTimestamp).toLocaleTimeString()}</small>
       </article>)}
     </div> : <p role="status" className="gem-liquidity-empty">{loading ? "Loading source-verified order books…" : "Verified liquidity observations are unavailable. No execution assumptions are made."}</p>}
-    {report?.books.length ? <p className="gem-liquidity-footnote">Showing {report.books.length} of 4 requested spot books. Missing or stale feeds are omitted.</p> : null}
+    {report?.books.length ? <p className="gem-liquidity-footnote">Showing {report.books.length} of 8 requested spot books. Missing or stale feeds are omitted.</p> : null}
     <p className="gem-liquidity-footnote">Liquidity metrics describe the best ten quoted levels per side, not guaranteed fill size or exchange copy-trading futures depth. USD and USDT values are kept separate. Quotes can change immediately.</p>
   </section>;
 }

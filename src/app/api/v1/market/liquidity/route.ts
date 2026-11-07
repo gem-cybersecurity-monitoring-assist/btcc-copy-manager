@@ -8,6 +8,10 @@ export async function GET() {
     { provider: "Bitget", symbol: "ETH", url: "https://api.bitget.com/api/v2/spot/market/orderbook?symbol=ETHUSDT&type=step0&limit=10" },
     { provider: "Kraken", symbol: "BTC", url: "https://api.kraken.com/0/public/Depth?pair=XBTUSD&count=10" },
     { provider: "Kraken", symbol: "ETH", url: "https://api.kraken.com/0/public/Depth?pair=ETHUSD&count=10" },
+    { provider: "OKX", symbol: "BTC", url: "https://www.okx.com/api/v5/market/books?instId=BTC-USDT&sz=10" },
+    { provider: "OKX", symbol: "ETH", url: "https://www.okx.com/api/v5/market/books?instId=ETH-USDT&sz=10" },
+    { provider: "Gate", symbol: "BTC", url: "https://api.gateio.ws/api/v4/spot/order_book?currency_pair=BTC_USDT&limit=10" },
+    { provider: "Gate", symbol: "ETH", url: "https://api.gateio.ws/api/v4/spot/order_book?currency_pair=ETH_USDT&limit=10" },
   ] as const;
   const settled = await Promise.allSettled(targets.map(async target => {
     const response = await fetch(target.url, {
