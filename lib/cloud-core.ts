@@ -323,37 +323,137 @@ export class CloudService {
     return { status: 200, body: { ok: true, snapshots: rows, source: "owner_scoped_ledger", limit: 25 }, cookies: auth.cookies };
   }
 
-  async putWorkspace(cookies: SessionCookies, rawBody: string, now = new Date()): Promise<Result> {
+  async putWorkspace(
+    cookies: SessionCookies,
+    rawBody: string,
+    now = new Date(),
+  ): Promise<Result> {
     if (new TextEncoder().encode(rawBody).byteLength > LIMITS.maxBytes) {
-      return { status: 413, body: { error: "Workspace backup is too large (maximum 750 KB).", code: "payload_too_large" } };
+      return {
+        status: 413,
+        body: {
+          error: "Workspace backup is too large (maximum 750 KB).",
+          code: "payload_too_large",
+        },
+      };
     }
     let body: unknown;
     try {
       body = JSON.parse(rawBody);
     } catch {
-      return { status: 400, body: { error: "Request body must be valid JSON.", code: "invalid_json" } };
+      return {
+        status: 400,
+        body: {
+          error: "Request body must be valid JSON.",
+          code: "invalid_json",
+        },
+      };
     }
-    const parsed = parseWorkspace((body as { workspace?: unknown } | null)?.workspace);
-    if (!parsed.ok) return { status: 400, body: { error: parsed.error, code: "invalid_workspace" } };
+    const parsed = parseWorkspace(
+      (body as { workspace?: unknown } | null)?.workspace,
+    );
+    if (!parsed.ok)
+      return {
+        status: 400,
+        body: { error: parsed.error, code: "invalid_workspace" },
+      };
     const auth = await this.requireSession(cookies, "save");
     if ("status" in auth) return auth;
     const { session } = auth;
     const workspace: Workspace = parsed.value;
-    const result = await this.call("/rest/v1/copy_center_workspaces?on_conflict=user_id", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + session.accessToken, Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify({ user_id: session.user.id, payload: workspace, updated_at: now.toISOString() }),
-    });
+    const expected = (body as Record<string, unknown>).expectedUpdatedAt;
+    if (
+      expected !== null &&
+      (typeof expected !== "string" ||
+        expected.length > 64 ||
+        !/^\d{4}-\d{2}-\d{2}T/.test(expected) ||
+        !Number.isFinite(Date.parse(expected)))
+    ) {
+      return {
+        status: expected === undefined ? 428 : 400,
+        body: {
+          error:
+            "Read the latest cloud workspace before saving. Refresh this page if needed.",
+          code:
+            expected === undefined
+              ? "workspace_version_required"
+              : "invalid_workspace_version",
+        },
+        cookies: auth.cookies,
+      };
+    }
+    const nextTime = Math.max(
+      now.getTime(),
+      expected === null ? 0 : Date.parse(expected) + 1,
+    );
+    const updatedAt = new Date(nextTime).toISOString();
+    const query = new URLSearchParams({ user_id: "eq." + session.user.id });
+    if (expected !== null) query.set("updated_at", "eq." + expected);
+    const result = await this.call(
+      "/rest/v1/copy_center_workspaces" +
+        (expected === null ? "" : "?" + query),
+      {
+        method: expected === null ? "POST" : "PATCH",
+        headers: {
+          Authorization: "Bearer " + session.accessToken,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(
+          expected === null
+            ? {
+                user_id: session.user.id,
+                payload: workspace,
+                updated_at: updatedAt,
+              }
+            : { payload: workspace, updated_at: updatedAt },
+        ),
+      },
+    );
+    const conflict =
+      result.status === 409 ||
+      (result.ok && Array.isArray(result.data) && result.data.length === 0);
+    if (conflict)
+      return {
+        status: 409,
+        body: {
+          error:
+            "Cloud records changed in another session. Your local records were kept. Restore and compare before saving again.",
+          code: "workspace_conflict",
+        },
+        cookies: auth.cookies,
+      };
     if (!result.ok) {
       const denied = result.status === 401 || result.status === 403;
       return {
         status: result.status === 0 ? 503 : denied ? 403 : 502,
-        body: { error: denied ? "The database refused this workspace write for your account." : "The cloud workspace could not be saved. Try again later.", code: denied ? "workspace_forbidden" : "workspace_write_failed" },
+        body: {
+          error: denied
+            ? "The database refused this workspace write for your account."
+            : "The cloud workspace could not be saved. Try again later.",
+          code: denied ? "workspace_forbidden" : "workspace_write_failed",
+        },
         cookies: auth.cookies,
       };
     }
-    const updatedAt = Array.isArray(result.data) && typeof result.data[0]?.updated_at === "string" ? result.data[0].updated_at : now.toISOString();
-    return { status: 200, body: { ok: true, updatedAt }, cookies: auth.cookies };
+    if (
+      !Array.isArray(result.data) ||
+      result.data.length !== 1 ||
+      typeof result.data[0]?.updated_at !== "string"
+    )
+      return {
+        status: 502,
+        body: {
+          error:
+            "The cloud save could not be verified. Restore before retrying.",
+          code: "workspace_write_unverified",
+        },
+        cookies: auth.cookies,
+      };
+    return {
+      status: 200,
+      body: { ok: true, updatedAt: result.data[0].updated_at },
+      cookies: auth.cookies,
+    };
   }
 }
 

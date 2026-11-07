@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -149,7 +151,7 @@ class CdpBrowser {
   }
 }
 
-export async function GET() {
+async function ownerGET() {
   return html(`
     <h1>BTCC Sentinel cloud login</h1>
     <p>This creates a temporary Browserbase session with a persistent Context, opens the official BTCC login page, and then gives you a Live View link.</p>
@@ -160,7 +162,7 @@ export async function GET() {
   `);
 }
 
-export async function POST() {
+async function ownerPOST() {
   const apiKey = process.env.BROWSERBASE_API_KEY;
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
 
@@ -262,4 +264,12 @@ export async function POST() {
       <p>No BTCC credentials were collected. Go back and try once more, or send a screenshot of this error.</p>
     `, 502);
   }
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET());
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(), { mutation: true, requireJson: false });
 }

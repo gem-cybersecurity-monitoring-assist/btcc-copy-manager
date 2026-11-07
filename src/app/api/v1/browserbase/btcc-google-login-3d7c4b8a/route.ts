@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -99,7 +101,7 @@ async function releaseSession(apiKey: string, projectId: string, sessionId: stri
   }).catch(() => undefined);
 }
 
-export async function GET(request: Request) {
+async function ownerGET(request: Request) {
   const url = new URL(request.url);
   const supplied = (url.searchParams.get("email") || "").trim();
   const fallback = (process.env.BTCC_USERNAME || "").trim();
@@ -108,7 +110,7 @@ export async function GET(request: Request) {
   return page(`<h1>One-tap BTCC Google login</h1><p class="muted">No cloud-browser clicking or keyboard is required. This will open BTCC, press Google sign-in, enter the Google email identifier, and try to select a phone/passkey approval method. Passwords and verification codes are never requested by this page.</p>${email ? `<p class="ok">Google email is ready.</p>` : `<p class="warn">No Google email was supplied. Open the prepared link from ChatGPT again.</p>`}<form method="post">${hidden}<button type="submit" ${email ? "" : "disabled"}>Start Google phone approval</button></form><p class="warn">After tapping Start, watch your phone for a Google approval prompt. Keep this page open while it works.</p>`);
 }
 
-export async function POST(request: Request) {
+async function ownerPOST(request: Request) {
   const apiKey = process.env.BROWSERBASE_API_KEY;
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
   if (!apiKey || !projectId) return page(`<h1>Browserbase not configured</h1>`, 503);
@@ -240,4 +242,12 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Unknown login bootstrap failure.";
     return page(`<h1>One-tap login could not finish</h1><p class="err">${esc(message)}</p><p class="muted">No password, 2FA code, cookie, or session connection URL was collected.</p>`, 502);
   }
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET(request));
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, requireJson: false });
 }

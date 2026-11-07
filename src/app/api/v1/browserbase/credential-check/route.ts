@@ -1,9 +1,11 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function ownerGET() {
   const apiKey = process.env.BROWSERBASE_API_KEY;
   const projectId = process.env.BROWSERBASE_PROJECT_ID;
 
@@ -41,4 +43,8 @@ export async function GET() {
     configured: true,
     projectMatched: payload?.id === projectId,
   });
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET());
 }

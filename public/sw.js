@@ -1,11 +1,10 @@
-const CACHE = "btcc-live-manager-v2";
-self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["/"]))));
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+// Financial and owner data must never be served from an offline response cache.
+self.addEventListener("install", (event) => event.waitUntil(self.skipWaiting()));
+self.addEventListener("activate", (event) => event.waitUntil((async () => {
+  for (const name of await caches.keys())
+    if (name.startsWith("btcc-live-manager-")) await caches.delete(name);
+  await self.clients.claim();
+})()));
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(fetch(event.request).then((response) => {
-    const copy = response.clone();
-    caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-    return response;
-  }).catch(() => caches.match(event.request)));
+  event.respondWith(fetch(event.request, { cache: "no-store" }));
 });

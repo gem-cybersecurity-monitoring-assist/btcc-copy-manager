@@ -1,7 +1,9 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { getPurchaseConfigurationStatus, verifyFinitePurchaseToken, verifyPurchaseControlSecret } from "@/lib/finite-purchase";
 import { executeFinitePurchasePlan } from "@/lib/switchere-purchase";
 
-export async function POST(request: Request) {
+async function ownerPOST(request: Request) {
   try {
     const controlSecret = request.headers.get("x-purchase-control-secret") || "";
     if (!verifyPurchaseControlSecret(controlSecret)) {
@@ -27,4 +29,8 @@ export async function POST(request: Request) {
       { status: 422, headers: { "Cache-Control": "no-store" } }
     );
   }
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, financialExecution: true });
 }

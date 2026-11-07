@@ -1,10 +1,12 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { NextResponse } from "next/server";
 
 import { runBtccDiagnostics } from "@/lib/btcc-diagnostics";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function ownerGET() {
   const diagnostics = await runBtccDiagnostics();
   const status = diagnostics.category === "ok" ? 200 : 503;
 
@@ -14,4 +16,8 @@ export async function GET() {
       "cache-control": "no-store"
     }
   });
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET());
 }

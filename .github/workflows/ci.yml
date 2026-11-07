@@ -19,6 +19,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      - run: node scripts/test-owner-boundaries.mjs
 
   sentinel-tests:
     runs-on: ubuntu-latest

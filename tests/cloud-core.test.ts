@@ -163,7 +163,7 @@ test("logout revokes the session upstream and clears cookies even if revocation 
 test("workspace endpoints reject unauthenticated requests without calling the database", async () => {
   const { service, calls } = mockSupabase({});
   assert.equal((await service.getWorkspace({})).status, 401);
-  assert.equal((await service.putWorkspace({}, JSON.stringify({ workspace }))).status, 401);
+  assert.equal((await service.putWorkspace({}, JSON.stringify({ workspace, expectedUpdatedAt: null }))).status, 401);
   assert.equal(calls.length, 0);
 });
 
@@ -187,7 +187,7 @@ test("workspace write takes the owner id from the session, not the request body"
     "/auth/v1/user": { status: 200, body: USER_A },
     "/rest/v1/copy_center_workspaces": (call) => { written = JSON.parse(String(call.init.body)); return { status: 201, body: [{ updated_at: "2026-10-24T01:00:00Z" }] }; },
   });
-  const spoofed = JSON.stringify({ user_id: "22222222-2222-2222-2222-222222222222", workspace: { ...workspace, user_id: "evil" } });
+  const spoofed = JSON.stringify({ expectedUpdatedAt: null, user_id: "22222222-2222-2222-2222-222222222222", workspace: { ...workspace, user_id: "evil" } });
   const result = await service.putWorkspace({ access: "user-a-jwt" }, spoofed);
   assert.equal(result.status, 200);
   assert.equal(written.user_id, USER_A.id);
@@ -205,7 +205,7 @@ test("workspace write validates the payload before touching auth or the database
 
 test("RLS denial and database outages produce safe errors", async () => {
   const denied = mockSupabase({ "/auth/v1/user": { status: 200, body: USER_A }, "/rest/v1/": { status: 403, body: { message: "new row violates row-level security policy for table copy_center_workspaces" } } });
-  const result = await denied.service.putWorkspace({ access: "at" }, JSON.stringify({ workspace }));
+  const result = await denied.service.putWorkspace({ access: "at" }, JSON.stringify({ workspace, expectedUpdatedAt: null }));
   assert.equal(result.status, 403);
   assert.equal(JSON.stringify(result.body).includes("row-level"), false);
 

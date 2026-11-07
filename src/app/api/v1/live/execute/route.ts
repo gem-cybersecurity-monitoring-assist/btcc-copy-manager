@@ -1,7 +1,9 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { runBtccDiagnostics } from "@/lib/btcc-diagnostics";
 import { executeLiveOrder, verifyConfirmationToken } from "@/lib/btcc-live";
 
-export async function POST(request: Request) {
+async function ownerPOST(request: Request) {
   if (request.headers.get("cookie")?.includes("btcc-live-paused=1")) {
     return Response.json(
       { error: "Live submissions are paused by the emergency stop." },
@@ -45,4 +47,8 @@ export async function POST(request: Request) {
       { status: 422, headers: { "Cache-Control": "no-store" } }
     );
   }
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, financialExecution: true });
 }

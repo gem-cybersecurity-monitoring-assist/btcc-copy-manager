@@ -265,11 +265,11 @@ test("workspace API stores engine data only for the verified owner and rejects m
   };
   const service = new CloudService({ url: "https://proj.supabase.co", key: "anon" }, fetchImpl);
   const engine = { ...defaultEngineState(), strategies: [strategy("a")] };
-  const ok = await service.putWorkspace({ access: "jwt" }, JSON.stringify({ workspace: { traders: [], savedReviews: [], portfolioSnapshots: [], engine } }));
+  const ok = await service.putWorkspace({ access: "jwt" }, JSON.stringify({ expectedUpdatedAt: null, workspace: { traders: [], savedReviews: [], portfolioSnapshots: [], engine } }));
   assert.equal(ok.status, 200);
   assert.equal(written.user_id, "owner-1");
   assert.equal(written.payload.engine.strategies[0].id, "a");
-  const bad = await service.putWorkspace({ access: "jwt" }, JSON.stringify({ workspace: { traders: [], savedReviews: [], portfolioSnapshots: [], engine: { ...engine, policy: { maxLeverage: "lots" } } } }));
+  const bad = await service.putWorkspace({ access: "jwt" }, JSON.stringify({ expectedUpdatedAt: null, workspace: { traders: [], savedReviews: [], portfolioSnapshots: [], engine: { ...engine, policy: { maxLeverage: "lots" } } } }));
   assert.equal(bad.status, 400);
   assert.equal((await new CloudService({ url: "https://proj.supabase.co", key: "anon" }, fetchImpl).getWorkspace({})).status, 401);
 });

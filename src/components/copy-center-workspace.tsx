@@ -145,8 +145,11 @@ function WorkspaceIcon({ name }: { name: string }) {
   );
 }
 
-export function CopyCenterWorkspace() {
-  const [view, setView] = useState<View>("overview");
+export function CopyCenterWorkspace({
+  accountOnly = false,
+  initialAuthMode = "signin",
+}: { accountOnly?: boolean; initialAuthMode?: "signin" | "signup" } = {}) {
+  const [view, setView] = useState<View>(accountOnly ? "settings" : "overview");
   const [providers, setProviders] = useState<Provider[]>(starterProviders);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [budget, setBudget] = useState("10");
@@ -164,8 +167,35 @@ export function CopyCenterWorkspace() {
   const [cloudMessage, setCloudMessage] = useState("");
   const [cloudEmail, setCloudEmail] = useState("");
   const [cloudPassword, setCloudPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">(
+    initialAuthMode,
+  );
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!accountOnly || !cloudSession.authenticated) return;
+    let active = true;
+    void fetch("/api/auth/owner", { cache: "no-store" })
+      .then(async (response) => {
+        if (!active) return;
+        if (response.ok) window.location.replace("/copy-center");
+        else
+          setCloudMessage(
+            response.status === 403
+              ? "This signed-in account does not have owner workspace access. Sign out to use your owner account."
+              : "Owner access could not be verified. Try again shortly.",
+          );
+      })
+      .catch(() => {
+        if (active)
+          setCloudMessage(
+            "Owner access could not be reached. Try again shortly.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [accountOnly, cloudSession.authenticated]);
+
   const [bgKey, setBgKey] = useState("");
   const [bgSecret, setBgSecret] = useState("");
   const [bgPhrase, setBgPhrase] = useState("");
@@ -174,9 +204,11 @@ export function CopyCenterWorkspace() {
   const [bgBusy, setBgBusy] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const requested = params.get("view");
-    if (requested && nav.some(item => item.id === requested)) setView(requested as View);
-    if (requested === "settings" && params.get("auth") === "signup") setAuthMode("signup");
+    const requested = accountOnly ? "settings" : params.get("view");
+    if (requested && nav.some((item) => item.id === requested))
+      setView(requested as View);
+    if (requested === "settings" && params.get("auth") === "signup")
+      setAuthMode("signup");
   }, []);
   useEffect(() => {
     window.scrollTo({ top: 0 });
@@ -541,11 +573,13 @@ export function CopyCenterWorkspace() {
             : "The account request did not complete.",
         );
       if (action === "logout") {
+        setCloudUpdatedAt(null);
         setCloudPassword("");
         setCloudSession({ configured: true, authenticated: false, user: null });
         setCloudMessage(
           "Signed out. Cloud data remains saved in your account.",
         );
+        window.location.assign("/sign-in");
       } else if (action === "signup" && data.needsEmailConfirmation) {
         setCloudMessage(
           typeof data.message === "string"
@@ -560,6 +594,7 @@ export function CopyCenterWorkspace() {
         );
       } else {
         await refreshCloudSession();
+        setCloudUpdatedAt(null);
         setCloudPassword("");
         setCloudMessage(
           action === "signup"
@@ -656,6 +691,18 @@ export function CopyCenterWorkspace() {
           "Cloud preferences restored. Wallet sessions must be re-verified in this browser.",
         );
       } else {
+        if (cloudUpdatedAt !== null && current.updatedAt !== cloudUpdatedAt)
+          throw new Error(
+            "Cloud records changed in another session. Your local records were kept. Restore and compare before saving.",
+          );
+        if (
+          cloudUpdatedAt === null &&
+          current.workspace &&
+          !window.confirm(
+            "A saved workspace already exists. Replace its Copy Center preferences with this browser's preferences? Trader research records will be preserved.",
+          )
+        )
+          return;
         const base =
           current.workspace && typeof current.workspace === "object"
             ? current.workspace
@@ -666,6 +713,7 @@ export function CopyCenterWorkspace() {
           cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            expectedUpdatedAt: cloudUpdatedAt ?? current.updatedAt ?? null,
             workspace: {
               ...base,
               copyCenter: {
@@ -896,7 +944,9 @@ export function CopyCenterWorkspace() {
   }
 
   const mainNav = nav.filter((item) =>
-    ["overview", "providers", "portfolio", "performance", "risk"].includes(item.id),
+    ["overview", "providers", "portfolio", "performance", "risk"].includes(
+      item.id,
+    ),
   );
   const renderProvider = (provider: Provider) => (
     <article className="cc-provider-card" key={provider.id}>
@@ -942,83 +992,120 @@ export function CopyCenterWorkspace() {
       <a className="cc-skip" href="#cc-content">
         Skip to content
       </a>
-      <aside className="cc-sidebar" aria-label="Main navigation">
-        <a className="cc-brand" href="/copy-center">
-          <span className="cc-mark">G</span>
-          <span>
-            <strong>GEM</strong>
-            <small>Copy Center</small>
-          </span>
-        </a>
-        <nav>
-          {mainNav.map((item) => (
+      {!accountOnly && (
+        <aside className="cc-sidebar" aria-label="Main navigation">
+          <a className="cc-brand" href="/copy-center">
+            <span className="cc-mark">G</span>
+            <span>
+              <strong>GEM</strong>
+              <small>Copy Center</small>
+            </span>
+          </a>
+          <nav>
+            {mainNav.map((item) => (
+              <button
+                key={item.id}
+                aria-current={view === item.id ? "page" : undefined}
+                className={view === item.id ? "active" : ""}
+                onClick={() => setView(item.id)}
+              >
+                <WorkspaceIcon name={item.id} />
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          <div className="cc-sidebar-bottom">
             <button
-              key={item.id}
-              aria-current={view === item.id ? "page" : undefined}
-              className={view === item.id ? "active" : ""}
-              onClick={() => setView(item.id)}
+              className={
+                "cc-nav-setting " + (view === "settings" ? "active" : "")
+              }
+              onClick={() => setView("settings")}
             >
-              <WorkspaceIcon name={item.id} />
-              {item.label}
+              <WorkspaceIcon name="settings" />
+              Settings
             </button>
-          ))}
-        </nav>
-        <div className="cc-sidebar-bottom">
-          <button
-            className={
-              "cc-nav-setting " + (view === "settings" ? "active" : "")
-            }
-            onClick={() => setView("settings")}
-          >
-            <WorkspaceIcon name="settings" />
-            Settings
-          </button>
-          <div className="cc-side-note">
-            <span className="cc-status-dot" />
-            <span>Trading status<small>Verify account permissions before live actions</small></span>
+            <div className="cc-side-note">
+              <span className="cc-status-dot" />
+              <span>
+                Trading status
+                <small>Verify account permissions before live actions</small>
+              </span>
+            </div>
+            <div className="cc-cross-links" aria-label="Related dashboards">
+              <a href="/copy-trading">Trader intelligence</a>
+              <a href="/opportunities">Opportunities</a>
+              <a href="/automation">Automation center</a>
+              <a href="/steel">Browser controls</a>
+            </div>
           </div>
-          <div className="cc-cross-links" aria-label="Related dashboards">
-            <a href="/copy-trading">Trader intelligence</a>
-            <a href="/opportunities">Opportunities</a>
-            <a href="/automation">Automation center</a>
-            <a href="/steel">Browser controls</a>
-          </div>
-        </div>
-      </aside>
-      <main className="cc-main" id="cc-content" tabIndex={-1}>
+        </aside>
+      )}
+      <main
+        className="cc-main"
+        style={
+          accountOnly
+            ? {
+                marginLeft: 0,
+                maxWidth: 780,
+                marginRight: "auto",
+                marginInline: "auto",
+              }
+            : undefined
+        }
+        id="cc-content"
+        tabIndex={-1}
+      >
         <header className="cc-topbar">
           <div>
-            <p className="cc-eyebrow">YOUR WORKSPACE</p>
-            <h1>{nav.find((item) => item.id === view)?.label}</h1>
+            <p className="cc-eyebrow">
+              {accountOnly ? "PRIVATE WORKSPACE" : "YOUR WORKSPACE"}
+            </p>
+            <h1>
+              {accountOnly
+                ? authMode === "signup"
+                  ? "Create account"
+                  : "Sign in"
+                : nav.find((item) => item.id === view)?.label}
+            </h1>
           </div>
-          <button
-            className="cc-account-button"
-            onClick={() => setView("settings")}
-          >
-            <WorkspaceIcon name="account" />
-            <span>
-              {cloudSession.authenticated ? "My account" : "Sign in / Join"}
-            </span>
-          </button>
-        </header>
-        <div className="cc-mode-bar">
-          <span className="cc-status-dot" />
-          <strong>Connection status</strong>
-          <span>{exchangeCount ? "Exchange access checked; trading permissions not enabled" : "No active exchange trading session"}</span>
-        </div>
-        <nav className="cc-mobile-nav" aria-label="Mobile navigation">
-          {mainNav.map((item) => (
+          {!accountOnly && (
             <button
-              key={item.id}
-              aria-current={view === item.id ? "page" : undefined}
-              className={view === item.id ? "active" : ""}
-              onClick={() => setView(item.id)}
+              className="cc-account-button"
+              onClick={() => setView("settings")}
             >
-              <WorkspaceIcon name={item.id} />
-              <span>{item.label}</span>
+              <WorkspaceIcon name="account" />
+              <span>
+                {cloudSession.authenticated ? "My account" : "Sign in / Join"}
+              </span>
             </button>
-          ))}
-        </nav>
+          )}
+        </header>
+        {!accountOnly && (
+          <div className="cc-mode-bar">
+            <span className="cc-status-dot" />
+            <strong>Connection status</strong>
+            <span>
+              {exchangeCount
+                ? "Exchange access checked; trading permissions not enabled"
+                : "No active exchange trading session"}
+            </span>
+          </div>
+        )}
+        {!accountOnly && (
+          <nav className="cc-mobile-nav" aria-label="Mobile navigation">
+            {mainNav.map((item) => (
+              <button
+                key={item.id}
+                aria-current={view === item.id ? "page" : undefined}
+                className={view === item.id ? "active" : ""}
+                onClick={() => setView(item.id)}
+              >
+                <WorkspaceIcon name={item.id} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
         {toast && (
           <div className="cc-toast" role="status">
             <span>{toast}</span>
@@ -1027,11 +1114,13 @@ export function CopyCenterWorkspace() {
             </button>
           </div>
         )}
-        {view === "overview" && (
+        {!accountOnly && view === "overview" && (
           <div className="cc-page">
             <section className="cc-welcome">
               <div>
-                <span className="cc-hero-label">YOUR TRADING CONTROL CENTER</span>
+                <span className="cc-hero-label">
+                  YOUR TRADING CONTROL CENTER
+                </span>
                 <h2>
                   Your accounts.
                   <br />
@@ -1126,13 +1215,17 @@ export function CopyCenterWorkspace() {
               <a href="/automation">
                 <WorkspaceIcon name="performance" />
                 <strong>Automation center</strong>
-                <p>Review running checks, risk alerts, and service connectivity.</p>
+                <p>
+                  Review running checks, risk alerts, and service connectivity.
+                </p>
                 <span className="cc-step-link">Open automation →</span>
               </a>
               <a href="/opportunities">
                 <WorkspaceIcon name="traders" />
                 <strong>Opportunities</strong>
-                <p>Monitor candidates backed by verified market and trader data.</p>
+                <p>
+                  Monitor candidates backed by verified market and trader data.
+                </p>
                 <span className="cc-step-link">View opportunities →</span>
               </a>
               <a href="/copy-trading">
@@ -1167,7 +1260,7 @@ export function CopyCenterWorkspace() {
             )}
           </div>
         )}
-        {view === "providers" && (
+        {!accountOnly && view === "providers" && (
           <div className="cc-page">
             <section className="cc-section-head">
               <div>
@@ -1183,8 +1276,9 @@ export function CopyCenterWorkspace() {
                 .map(renderProvider)}
             </div>
             <p className="cc-footnote">
-              Provider access is shown only when verified. BTCC native copy operations
-              are not connected; Bitget currently supports a one-time account check.
+              Provider access is shown only when verified. BTCC native copy
+              operations are not connected; Bitget currently supports a one-time
+              account check.
             </p>
             <details className="cc-disclosure">
               <summary>
@@ -1202,13 +1296,13 @@ export function CopyCenterWorkspace() {
             </details>
           </div>
         )}
-        {view === "performance" && (
+        {!accountOnly && view === "performance" && (
           <div className="cc-page">
             <PerformancePanel />
             <MarketOverview />
           </div>
         )}
-        {view === "portfolio" && (
+        {!accountOnly && view === "portfolio" && (
           <div className="cc-page">
             <section className="cc-section-head">
               <div>
@@ -1224,7 +1318,9 @@ export function CopyCenterWorkspace() {
                 <WorkspaceIcon name="portfolio" />
               </span>
               <div>
-                <span className="cc-pill cc-pill-muted">No live positions synced</span>
+                <span className="cc-pill cc-pill-muted">
+                  No live positions synced
+                </span>
                 <h2>Positions and approvals</h2>
                 <p>
                   View existing locally recorded positions and owner approvals.
@@ -1258,7 +1354,7 @@ export function CopyCenterWorkspace() {
           </div>
         )}
 
-        {view === "risk" && (
+        {!accountOnly && view === "risk" && (
           <div className="cc-page">
             <section className="cc-section-head">
               <div>
@@ -1339,7 +1435,7 @@ export function CopyCenterWorkspace() {
           </div>
         )}
 
-        {view === "activity" && (
+        {!accountOnly && view === "activity" && (
           <div className="cc-page">
             <section className="cc-section-head">
               <div>
@@ -1371,8 +1467,8 @@ export function CopyCenterWorkspace() {
                 <div className="cc-empty-icon">≡</div>
                 <h3>No activity recorded yet</h3>
                 <p>
-                  Account verification and workspace actions appear here.
-                  This history does not substitute for exchange trade records.
+                  Account verification and workspace actions appear here. This
+                  history does not substitute for exchange trade records.
                 </p>
                 <button
                   className="cc-button"
@@ -1387,16 +1483,18 @@ export function CopyCenterWorkspace() {
 
         {view === "settings" && (
           <div className="cc-page">
-            <section className="cc-section-head">
-              <div>
-                <p className="cc-eyebrow">WORKSPACE SETTINGS</p>
-                <h2>Your account &amp; preferences</h2>
-                <p className="cc-lead">
-                  Manage your sign-in and sync only the planning data you
-                  choose.
-                </p>
-              </div>
-            </section>
+            {!accountOnly && (
+              <section className="cc-section-head">
+                <div>
+                  <p className="cc-eyebrow">WORKSPACE SETTINGS</p>
+                  <h2>Your account &amp; preferences</h2>
+                  <p className="cc-lead">
+                    Manage your sign-in and sync only the planning data you
+                    choose.
+                  </p>
+                </div>
+              </section>
+            )}
             <section className="cc-settings-card cc-cloud-card">
               <span className="cc-setting-icon">☁</span>
               <h3>Your GEM account</h3>
@@ -1486,20 +1584,24 @@ export function CopyCenterWorkspace() {
               )}
               {cloudSession.authenticated && (
                 <div className="cc-cloud-actions">
-                  <button
-                    className="cc-button"
-                    disabled={cloudBusy}
-                    onClick={() => void syncCloud("save")}
-                  >
-                    {cloudBusy ? "Working…" : "Save to cloud"}
-                  </button>
-                  <button
-                    className="cc-button cc-button-secondary"
-                    disabled={cloudBusy}
-                    onClick={() => void syncCloud("restore")}
-                  >
-                    Restore cloud data
-                  </button>
+                  {!accountOnly && (
+                    <>
+                      <button
+                        className="cc-button"
+                        disabled={cloudBusy}
+                        onClick={() => void syncCloud("save")}
+                      >
+                        {cloudBusy ? "Working…" : "Save to cloud"}
+                      </button>
+                      <button
+                        className="cc-button cc-button-secondary"
+                        disabled={cloudBusy}
+                        onClick={() => void syncCloud("restore")}
+                      >
+                        Restore cloud data
+                      </button>
+                    </>
+                  )}
                   <button
                     className="cc-text-button"
                     disabled={cloudBusy}
@@ -1537,92 +1639,98 @@ export function CopyCenterWorkspace() {
                 never uploaded.
               </p>
             </section>
-            <div className="cc-settings-grid">
-              <article className="cc-settings-card">
-                <h3>Workspace activity</h3>
-                <p>
-                  Review your recent setup and planning history on this browser.
-                </p>
-                <button
-                  className="cc-card-button"
-                  onClick={() => setView("activity")}
-                >
-                  View activity →
-                </button>
-              </article>
-              <article className="cc-settings-card">
-                <h3>Local workspace</h3>
-                <p>
-                  Reset planning amounts and local history. Cloud data is not
-                  deleted.
-                </p>
-                <button
-                  className="cc-card-button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Reset this browser's GEM Copy Center planning data? This cannot be undone.",
-                      )
-                    ) {
-                      setProviders(starterProviders);
-                      setActivity([]);
-                      setBudget("10");
-                      setMaxLoss("2");
-                      setToast("Local planning workspace reset.");
-                    }
-                  }}
-                >
-                  Reset local data
-                </button>
-              </article>
-            </div>
-            <details className="cc-disclosure">
-              <summary>
-                Advanced tools <span>Research &amp; technical controls</span>
-              </summary>
-              <div className="cc-settings-grid">
-                <article className="cc-settings-card">
-                  <h3>Research engine</h3>
-                  <p>
-                    Detailed trader profiles, allocation proposals, and risk
-                    reports.
-                  </p>
-                  <a className="cc-card-button" href="/copy-trading">
-                    Open research →
-                  </a>
-                  <a className="cc-card-button" href="/opportunities">
-                    Opportunity monitor →
-                  </a>
-                </article>
-                <article className="cc-settings-card">
-                  <h3>BTCC control room</h3>
-                  <p>
-                    Existing technical controls remain separate. Live financial
-                    actions require your explicit authorization.
-                  </p>
-                  <a className="cc-card-button" href="/steel">
-                    Open BTCC browser controls →
-                  </a>
-                </article>
-                <article className="cc-settings-card">
-                  <h3>Other services</h3>
-                  <p>
-                    Farcaster and MetaTrader 5 adapters are not implemented.
-                  </p>
-                  {providers
-                    .filter((p) => ["farcaster", "mt5"].includes(p.id))
-                    .map((p) => (
-                      <button
-                        key={p.id}
-                        className="cc-card-button"
-                        onClick={() => requestConnection(p)}
-                      >
-                        View {p.name} status →
-                      </button>
-                    ))}
-                </article>
-              </div>
-            </details>
+            {!accountOnly && (
+              <>
+                <div className="cc-settings-grid">
+                  <article className="cc-settings-card">
+                    <h3>Workspace activity</h3>
+                    <p>
+                      Review your recent setup and planning history on this
+                      browser.
+                    </p>
+                    <button
+                      className="cc-card-button"
+                      onClick={() => setView("activity")}
+                    >
+                      View activity →
+                    </button>
+                  </article>
+                  <article className="cc-settings-card">
+                    <h3>Local workspace</h3>
+                    <p>
+                      Reset planning amounts and local history. Cloud data is
+                      not deleted.
+                    </p>
+                    <button
+                      className="cc-card-button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Reset this browser's GEM Copy Center planning data? This cannot be undone.",
+                          )
+                        ) {
+                          setProviders(starterProviders);
+                          setActivity([]);
+                          setBudget("10");
+                          setMaxLoss("2");
+                          setToast("Local planning workspace reset.");
+                        }
+                      }}
+                    >
+                      Reset local data
+                    </button>
+                  </article>
+                </div>
+                <details className="cc-disclosure">
+                  <summary>
+                    Advanced tools{" "}
+                    <span>Research &amp; technical controls</span>
+                  </summary>
+                  <div className="cc-settings-grid">
+                    <article className="cc-settings-card">
+                      <h3>Research engine</h3>
+                      <p>
+                        Detailed trader profiles, allocation proposals, and risk
+                        reports.
+                      </p>
+                      <a className="cc-card-button" href="/copy-trading">
+                        Open research →
+                      </a>
+                      <a className="cc-card-button" href="/opportunities">
+                        Opportunity monitor →
+                      </a>
+                    </article>
+                    <article className="cc-settings-card">
+                      <h3>BTCC control room</h3>
+                      <p>
+                        Existing technical controls remain separate. Live
+                        financial actions require your explicit authorization.
+                      </p>
+                      <a className="cc-card-button" href="/steel">
+                        Open BTCC browser controls →
+                      </a>
+                    </article>
+                    <article className="cc-settings-card">
+                      <h3>Other services</h3>
+                      <p>
+                        Farcaster and MetaTrader 5 adapters are not implemented.
+                      </p>
+                      {providers
+                        .filter((p) => ["farcaster", "mt5"].includes(p.id))
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            className="cc-card-button"
+                            onClick={() => requestConnection(p)}
+                          >
+                            View {p.name} status →
+                          </button>
+                        ))}
+                    </article>
+                  </div>
+                </details>
+              </>
+            )}
           </div>
         )}
       </main>
