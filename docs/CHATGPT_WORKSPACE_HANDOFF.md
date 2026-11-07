@@ -20,14 +20,27 @@
 6. Added `connect-chatgpt.sh` (commit `deb7461b7`) to invoke `npx --yes @wonderwhy-er/desktop-commander@latest remote` in a user-controlled Codespace terminal.
 7. Added Copilot agent prompt `.github/prompts/connect-chatgpt.prompt.md` (commit `9657b99c2`) so Copilot Agent can run the connection sequence without the owner pasting terminal commands. Both CI and smoke checks on that commit passed.
 
-## Important current access boundary
-- The Codespace URL was supplied by the owner, but no terminal access has been established from this ChatGPT session.
-- Desktop Commander currently lists **only GEM-ASSIST, offline**, last seen approximately 60 hours before inspection.
-- The user has difficulty pasting into the Codespace terminal on an iPhone. Use the Copilot Agent prompt above, with Copilot executing shell commands and the owner only verifying/approving pairing. **Do not say the pairing succeeded until the new remote device is online in Desktop Commander and a harmless command has been executed there.**
-- GitHub repository access and Vercel API access do not confer a Codespace shell, nor permit bypassing pairing.
+## Current authenticated access — verified November 7, 2026
+- Existing orange-waddle Codespace is paired as codespaces-c39052, device ID
+  2a742b71-6dff-4373-bd15-c6185fb43f24. Its Online status and harmless remote
+  pwd/git-status/node commands were verified through Desktop Commander.
+- Direct integrated-terminal commands also worked; execution no longer depends
+  on Copilot Agent. Node v24.22.2 is installed.
+- The original checkout remains at 0a01597 with the owner's README edit and
+  untracked next-env.d.ts/package-lock.json preserved. connect-chatgpt.sh was
+  retrieved locally for pairing. No owner file was reset or overwritten.
+- Work continues on codex/copy-center-readiness in the separate git worktree
+  /workspaces/btcc-copy-manager-acceptance inside the SAME Codespace.
+- A controlled remote-agent restart reused the saved authentication and accepted
+  a new remote command without another approval. Full Codespace stop/start and
+  rebuild recovery are not verified. See docs/CODESPACE_REMOTE_ACCESS.md.
+- Remote authentication stays in its private user-home config, outside Git.
+- The owner reports no GEM cloud account yet. The production signup form is
+  open; account creation, email confirmation, owner session, cloud round trip
+  and tenant-isolation acceptance remain pending. No live credentials were used.
 
 ## Remaining acceptance work, prioritized
-1. **Codespace access:** In the existing Codespace, have Copilot Agent follow `.github/prompts/connect-chatgpt.prompt.md`. Preserve any uncommitted files; safely fetch main before running `bash connect-chatgpt.sh`. Owner must approve pairing and verify code. Check the connected device and then run harmless shell checks (`pwd`, `git status`, `node -v`).
+1. **Codespace access:** Initial pairing and direct shell verification are complete; saved-session agent restart passed. Validate full Codespace resume when convenient. For recovery, have Copilot Agent follow `.github/prompts/connect-chatgpt.prompt.md`. Preserve any uncommitted files; safely fetch main before running `bash connect-chatgpt.sh`. Owner must approve pairing and verify code. Check the connected device and then run harmless shell checks (`pwd`, `git status`, `node -v`).
 2. **iPhone owner authentication:** Open the real production dashboard, sign in, verify email/session persistence, verify logout and authorization on protected endpoints. Do not fabricate completion from build logs.
 3. **Cloud save and restore:** In authenticated owner session, create non-sensitive sample workspace settings, explicitly save, sign out/reload as appropriate, restore and compare, check tenant isolation and absence of credentials in persisted payloads. Existing issue #43 noted cloud row count zero and owner save/restore unproven.
 4. **Sentinel:** Configure a secure reachable persistent endpoint only after verifying service compatibility and authentication; inspect configuration without exposing control tokens. Historically `SENTINEL_URL` and `SENTINEL_CONTROL_TOKEN` were not configured in the deployed project, and no remote Sentinel was proven. Running a service inside a Codespace does not imply it will be online 24/7.
