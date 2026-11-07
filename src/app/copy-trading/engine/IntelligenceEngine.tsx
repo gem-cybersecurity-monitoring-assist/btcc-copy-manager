@@ -32,6 +32,10 @@ const STATUS_TONE: Partial<Record<ProviderStatus, "good" | "warn" | "bad">> = { 
 
 export default function IntelligenceEngine({ engine, onChange, manualTraders }: { engine: EngineState; onChange: EngineChange; manualTraders: Trader[] }) {
   const [tab, setTab] = useState<TabId>("providers");
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("engine");
+    if (requested && TABS.some(([id]) => id === requested)) setTab(requested as TabId);
+  }, []);
   // The allocation tab remounts on every visit; only the guide's practice button opens it with simulated data.
   const [allocationView, setAllocationView] = useState({ key: 0, simulated: false });
   const [now, setNow] = useState(() => new Date());
@@ -61,7 +65,11 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
 
   return (
     <section id="engine" className="section-block engine" aria-label="Copy trading intelligence engine">
-      <StartGuide engine={engine} onChange={onChange} go={go} showSimulatedPlan={() => go("allocation", undefined, true)} />
+      <div className="engine-actions" style={{ marginBottom: 14 }}>
+        <a href="/automation" className="secondary-btn">Automation overview</a>
+        <a href="/copy-center?view=providers" className="secondary-btn">Accounts</a>
+        <a href="/copy-center?view=performance" className="secondary-btn">Performance</a>
+      </div>
       <div className="section-heading"><div><p className="eyebrow">INTELLIGENCE ENGINE</p><h2>Multi-provider research, allocation &amp; risk</h2></div>
         <span className="section-note">{engine.strategies.length} strategies · {engine.providers.length} tracked providers · {openAlerts} open alert{openAlerts === 1 ? "" : "s"}</span></div>
       <Notice tone="info"><strong>What this engine does:</strong> scores the strategies you record, proposes small allocations within your limits, monitors risk across platforms, and keeps an audit trail. <strong>What it does not do:</strong> it does not move money, enroll you in copy trading, pause a trader, or read exchange accounts. Every platform action happens on the platform itself, and statuses you record are your confirmations, not GEM verifications. Scores and simulations are not predictions or guarantees.</Notice>

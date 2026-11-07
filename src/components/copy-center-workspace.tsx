@@ -978,6 +978,7 @@ export function CopyCenterWorkspace() {
           <div className="cc-cross-links" aria-label="Related dashboards">
             <a href="/copy-trading">Trader intelligence</a>
             <a href="/opportunities">Opportunities</a>
+            <a href="/automation">Automation center</a>
             <a href="/advanced-btcc">Advanced controls</a>
           </div>
         </div>
@@ -1120,6 +1121,12 @@ export function CopyCenterWorkspace() {
                 <p>Inspect recorded account equity and return evidence.</p>
                 <span className="cc-step-link">Open performance →</span>
               </button>
+              <a href="/automation">
+                <WorkspaceIcon name="performance" />
+                <strong>Automation center</strong>
+                <p>Review running checks, risk alerts, and service connectivity.</p>
+                <span className="cc-step-link">Open automation →</span>
+              </a>
               <a href="/opportunities">
                 <WorkspaceIcon name="traders" />
                 <strong>Opportunities</strong>
