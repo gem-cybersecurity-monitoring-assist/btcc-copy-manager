@@ -14,6 +14,18 @@ Verified 7 November 2026. This file is the entry point for a new ChatGPT chat. I
 
 Read this complete file, the connection prompt, and the repository status before changing files. Use the existing Codespace; do not create another or depend on the owner's PC.
 
+## Final UI release — verified
+
+PR #47 merged: https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/pull/47
+Production source commit: `364ab9ed9fd17387678b5a4e15bd90eebdbe8702`.
+Vercel deployment `dpl_s7iDQzMLqbc7nqfppvUwjN3sW2Mf` is **READY**, target production, built in approximately 34 seconds and assigned `btcc-copy-manager.vercel.app`.
+
+Post-release smoke checks passed for /, /copy-center, /copy-center/positions, /copy-trading and /opportunities (HTTP 200); anonymous /api/auth/session reported configured and signed out; /api/workspace correctly denied access (HTTP 401). Root redirects to /copy-center and contains the new headline. /advanced-btcc responds HTTP 200. The live Connect account button was manually checked in the shared browser. CI and smoke checks passed on the merged source commit. The scoped post-release error/fatal log scan returned no groups; this brief observation is not continuous monitoring.
+
+Automatic Vercel Git checks still fail because the project uses a private organization repository on Hobby. The authenticated Vercel API successfully deployed the reviewed commit. No plan/billing upgrade, new project, or new infrastructure was created. Future releases must inspect this limitation rather than assume that a Git push deployed successfully.
+
+The UI redesign is complete and released. Continue with owner authentication and the remaining acceptance list below, not another redesign or repeated pairing. Later documentation-only commits may be newer than the deployed source without changing the released UI. If PR #46 is later merged, preserve this newer handoff when resolving its documentation conflict.
+
 ## Owner's current requests
 
 Finish a clearer, easier phone interface and leave a durable continuation report for another ChatGPT chat. Keep existing infrastructure, free/existing services, paper mode, and approval safeguards. Avoid repeated setup and unnecessary credit use. The owner said they do not yet have a GEM cloud account; signup/login and cloud acceptance remain pending.
