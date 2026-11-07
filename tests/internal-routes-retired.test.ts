@@ -15,6 +15,8 @@ test("no publicly routable internal diagnostic handlers exist", async () => {
       else if (/^(route|page)\.(ts|tsx|js|jsx)$/.test(name)) paths.push(file);
     }
   }
-  await visit(root);
+  await visit(root).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+  });
   assert.deepEqual(paths, [], "no internal diagnostic route may be publicly routable");
 });
