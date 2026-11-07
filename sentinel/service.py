@@ -136,6 +136,24 @@ class SentinelService:
             ids.append(self.store.save_action(action))
         return ids
 
+    def review_latest(self) -> dict:
+        """Evaluate stored observations only: no exchange/AI requests or writes."""
+        batch = self.store.latest_batch()
+        if not batch:
+            return {"status": "no_data", "ranked": [], "autonomy_plan": None,
+                    "maintenance_plan": None, "read_only": True}
+        return {
+            "status": "ok",
+            "captured_at": batch.captured_at.isoformat(),
+            "ranked": self.monitor.rank(batch.traders, batch.account),
+            "autonomy_plan": build_copy_plan(batch.traders, batch.account),
+            "maintenance_plan": build_maintenance_plan(batch.traders, batch.account),
+            "ai_review": {"enabled": False, "status": "not_requested"},
+            "execution": {"enabled": False, "status": "read_only"},
+            "prepared_action_ids": [],
+            "read_only": True,
+        }
+
     def scan_latest(self) -> dict:
         batch = self.store.latest_batch()
         if not batch:
