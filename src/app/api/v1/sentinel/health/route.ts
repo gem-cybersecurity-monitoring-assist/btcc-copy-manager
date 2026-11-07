@@ -1,20 +1,14 @@
-import { NextResponse } from "next/server";
-import { getSentinelHealth, sentinelBaseUrl } from "@/lib/sentinel-client";
-
+import type { NextRequest } from "next/server";
+import { getSentinelHealth } from "@/lib/sentinel-client";
+import { withSentinelOwner } from "@/lib/sentinel-owner";
 export const dynamic = "force-dynamic";
-
-export async function GET() {
-  try {
-    const health = await getSentinelHealth();
-    return NextResponse.json({ connected: true, sentinelUrl: sentinelBaseUrl(), health });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        connected: false,
-        sentinelUrl: sentinelBaseUrl(),
-        error: error instanceof Error ? error.message : "Unknown Sentinel connection error",
-      },
-      { status: 503 },
-    );
-  }
+export async function GET(request: NextRequest) {
+  return withSentinelOwner(request, async () => {
+    try {
+      const health = await getSentinelHealth();
+      return { status: 200, body: { connected: health.ok === true, health } };
+    } catch {
+      return { status: 503, body: { connected: false, code: "sentinel_unavailable", error: "Sentinel is unavailable. Verify its endpoint and authentication." } };
+    }
+  });
 }

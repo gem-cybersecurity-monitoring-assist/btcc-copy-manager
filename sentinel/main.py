@@ -57,7 +57,7 @@ async def require_sentinel_auth(request, call_next):
     if request.url.path == "/health":
         return await call_next(request)
     expected = os.getenv("SENTINEL_CONTROL_TOKEN", "").strip()
-    required = os.getenv("SENTINEL_REQUIRE_AUTH", "false").lower() == "true"
+    required = True  # Non-health access always requires server authentication.
     if not expected:
         if required:
             return JSONResponse({"detail": "Sentinel control authentication is not configured."}, status_code=503)
@@ -234,6 +234,11 @@ def state_latest():
 @app.get("/alerts")
 def alerts(limit: int = 50):
     return store.recent_alerts(max(1, min(limit, 200)))
+
+
+@app.get("/review/latest")
+def review_latest():
+    return service.review_latest()
 
 
 @app.post("/scan")
