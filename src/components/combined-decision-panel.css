@@ -1,0 +1,23 @@
+.gem-decision {--gd-ink:#173b39;--gd-muted:#55706a;--gd-line:#d6e4de;border:1px solid var(--gd-line);border-radius:16px;background:#fff;padding:clamp(18px,3vw,24px);margin-bottom:18px;color:var(--gd-ink);font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+.gem-decision *{box-sizing:border-box}
+.gem-decision h2,.gem-decision p{margin:0}
+.gem-decision-head{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}
+.gem-decision-overline{color:#167f60;font-size:10px;font-weight:800;letter-spacing:.12em}
+.gem-decision-head h2{font-size:22px;letter-spacing:-.02em;margin:5px 0}
+.gem-decision-head p:not(.gem-decision-overline){color:var(--gd-muted);max-width:650px}
+.gem-decision-head button{border:0;background:#126d52;color:#fff;border-radius:10px;padding:12px 15px;min-height:44px;font-weight:700;cursor:pointer;white-space:nowrap}
+.gem-decision-head button:disabled{opacity:.55}
+.gem-decision-head button:focus-visible{outline:3px solid #24a77f;outline-offset:2px}
+.gem-decision-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 15px;border:1px solid #e5e9e6;border-radius:10px;background:#f4f7f5;margin-bottom:15px}
+.gem-decision-summary span{color:#82542c;font-size:12px;font-weight:650}
+.gem-decision-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gem-decision-checks article{min-width:0;border:1px solid var(--gd-line);border-radius:11px;padding:16px}
+.gem-decision-check-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:7px}
+.gem-decision-check-head strong{font-size:14px}
+.gem-decision-check-head span{border-radius:20px;font-size:10px;padding:5px 9px;font-weight:800}
+.gem-decision-check-head .observed{background:#e5f4eb;color:#276549}
+.gem-decision-check-head .review{background:#fff3df;color:#835c22}
+.gem-decision-check-head .blocked{background:#fbe8e5;color:#984c3c}
+.gem-decision-checks article p,.gem-decision-foot{font-size:12px;line-height:1.55;color:var(--gd-muted)}
+.gem-decision-foot{margin-top:13px!important}
+@media(max-width:680px){.gem-decision-head{flex-direction:column;align-items:stretch}.gem-decision-head button{align-self:flex-start}.gem-decision-checks{grid-template-columns:1fr}}
