@@ -268,6 +268,61 @@ export class CloudService {
     return { status: 200, body: { ok: true, workspace: parsed.value, updatedAt: row.updated_at ?? null }, cookies: auth.cookies };
   }
 
+  /**
+   * Read only official/manual account snapshot records under Supabase RLS.
+   * The owner filter comes exclusively from the verified session; callers
+   * cannot select another owner or request the full unfiltered table.
+   * This path uses the public app key plus the user's JWT, never service_role.
+   */
+  async getLedgerSnapshots(cookies: SessionCookies): Promise<Result> {
+    const auth = await this.requireSession(cookies, "read");
+    if ("status" in auth) return auth;
+    const { session } = auth;
+    const fields = "id,connection_id,captured_at,recorded_at,source_kind,equity_quote,available_quote,realized_pnl_quote,unrealized_pnl_quote,quote_currency,native_snapshot_id";
+    const query = new URLSearchParams({
+      select: fields,
+      user_id: "eq." + session.user.id,
+      order: "captured_at.desc",
+      limit: "25",
+    });
+    const result = await this.call("/rest/v1/gem_copy_account_snapshots?" + query, {
+      headers: { Authorization: "Bearer " + session.accessToken },
+    });
+    if (!result.ok) {
+      const absent = result.status === 404 || ["PGRST205", "42P01"].includes(String(result.data?.code ?? ""));
+      return {
+        status: absent ? 503 : result.status === 0 ? 503 : result.status === 401 || result.status === 403 ? 403 : 502,
+        body: { ok: false, code: absent ? "ledger_not_ready" : result.status === 0 ? "ledger_unreachable" : result.status === 401 || result.status === 403 ? "ledger_forbidden" : "ledger_read_failed",
+          error: absent ? "The GEM Copy Manager owner ledger has not been activated for this database." : "Verified account snapshots could not be read." },
+        cookies: auth.cookies,
+      };
+    }
+    if (!Array.isArray(result.data))
+      return { status: 502, body: { ok: false, code: "ledger_invalid", error: "The ledger returned an unexpected result." }, cookies: auth.cookies };
+    const rows: Record<string, unknown>[] = [];
+    const validNumber = (v: unknown) => v === null || (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && /^-?\d+(?:\.\d+)?$/.test(v));
+    for (const row of result.data) {
+      if (!row || typeof row !== "object" || Array.isArray(row) ||
+          typeof row.id !== "string" || typeof row.connection_id !== "string" ||
+          typeof row.captured_at !== "string" || !Number.isFinite(Date.parse(row.captured_at)) ||
+          typeof row.recorded_at !== "string" || !Number.isFinite(Date.parse(row.recorded_at)) ||
+          !["official_api", "manual_attestation"].includes(row.source_kind) ||
+          !["USDT", "USD", "USDC", "EUR"].includes(row.quote_currency) ||
+          !["equity_quote", "available_quote", "realized_pnl_quote", "unrealized_pnl_quote"].every((field) => validNumber(row[field])) ||
+          !(row.native_snapshot_id === null || typeof row.native_snapshot_id === "string")) {
+        return { status: 502, body: { ok: false, code: "ledger_invalid", error: "The ledger returned invalid snapshot evidence." }, cookies: auth.cookies };
+      }
+      rows.push({
+        id: row.id, connectionId: row.connection_id, capturedAt: row.captured_at,
+        recordedAt: row.recorded_at, sourceKind: row.source_kind,
+        equityQuote: row.equity_quote, availableQuote: row.available_quote,
+        realizedPnlQuote: row.realized_pnl_quote, unrealizedPnlQuote: row.unrealized_pnl_quote,
+        quoteCurrency: row.quote_currency, nativeSnapshotId: row.native_snapshot_id,
+      });
+    }
+    return { status: 200, body: { ok: true, snapshots: rows, source: "owner_scoped_ledger", limit: 25 }, cookies: auth.cookies };
+  }
+
   async putWorkspace(cookies: SessionCookies, rawBody: string, now = new Date()): Promise<Result> {
     if (new TextEncoder().encode(rawBody).byteLength > LIMITS.maxBytes) {
       return { status: 413, body: { error: "Workspace backup is too large (maximum 750 KB).", code: "payload_too_large" } };
