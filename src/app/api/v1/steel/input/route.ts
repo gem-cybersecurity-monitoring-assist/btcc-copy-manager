@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { NextRequest, NextResponse } from "next/server";
 import { BTCC_ASSETS_URL, prepareSteelSession, steelConfigStatus, withSteelCdp } from "@/lib/steel-browser";
 import { jsonError, protectedRoute, readSteelState, setSteelState } from "@/lib/steel-route";
@@ -13,7 +15,7 @@ type InputBody = {
   value?: unknown;
 };
 
-export async function POST(request: NextRequest) {
+async function ownerPOST(request: NextRequest) {
   const denied = protectedRoute(request);
   if (denied) return denied;
   if (!steelConfigStatus().ready) return jsonError("Steel environment is not fully configured.", 503);
@@ -71,4 +73,8 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Steel browser input failed.";
     return jsonError(message, 502);
   }
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
 }

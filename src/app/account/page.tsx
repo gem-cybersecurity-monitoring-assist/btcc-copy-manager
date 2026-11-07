@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
-
-/** Stable owner-facing registration link; never hosts a second auth implementation. */
+import { CopyCenterWorkspace } from "@/components/copy-center-workspace";
+import "../copy-center/copy-center.css";
 export default function AccountPage() {
-  redirect("/copy-center?view=settings&auth=signup");
+  return <CopyCenterWorkspace accountOnly initialAuthMode="signup" />;
 }

@@ -11,7 +11,7 @@ import { runLocalRiskReview } from "@/lib/browser-automation";
 export function DashboardReviewRunner() {
   const pathname = usePathname();
   useEffect(() => {
-    if (pathname === "/copy-trading") return;
+    if (!pathname || ["/copy-trading", "/account", "/sign-in", "/"].includes(pathname)) return;
     const run = () => { if (document.visibilityState === "visible") runLocalRiskReview(false); };
     run();
     const id = window.setInterval(run, 60_000);

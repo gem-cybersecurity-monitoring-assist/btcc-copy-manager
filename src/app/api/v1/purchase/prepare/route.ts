@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { prepareFinitePurchase, type FinitePurchaseIntent } from "@/lib/finite-purchase";
 
 function clientIp(request: Request) {
@@ -5,7 +7,7 @@ function clientIp(request: Request) {
   return forwarded || request.headers.get("x-real-ip")?.trim() || "";
 }
 
-export async function POST(request: Request) {
+async function ownerPOST(request: Request) {
   try {
     const body = await request.json() as Partial<FinitePurchaseIntent> & { remoteCountry?: string };
     const observedCountry = request.headers.get("x-vercel-ip-country")?.trim().toUpperCase();
@@ -27,4 +29,8 @@ export async function POST(request: Request) {
       { status: 422, headers: { "Cache-Control": "no-store" } }
     );
   }
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
 }

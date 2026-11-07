@@ -1,9 +1,11 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { runBtccDiagnostics } from "@/lib/btcc-diagnostics";
 import { getLiveConfigurationStatus } from "@/lib/btcc-live";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+async function ownerGET() {
   const configuration = getLiveConfigurationStatus();
   const observedAt = new Date().toISOString();
 
@@ -37,4 +39,8 @@ export async function GET() {
     },
     { headers: { "Cache-Control": "no-store" } }
   );
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET());
 }

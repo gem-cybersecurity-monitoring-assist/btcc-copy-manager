@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { NextRequest, NextResponse } from "next/server";
 import {
   BTCC_ASSETS_URL,
@@ -43,7 +45,7 @@ function publicState(state: SteelBrowserState, live: boolean) {
   };
 }
 
-export async function GET(request: NextRequest) {
+async function ownerGET(request: NextRequest) {
   const denied = protectedRoute(request);
   if (denied) return denied;
   const config = steelConfigStatus();
@@ -63,7 +65,7 @@ export async function GET(request: NextRequest) {
   }, { headers: { "cache-control": "no-store, max-age=0" } });
 }
 
-export async function POST(request: NextRequest) {
+async function ownerPOST(request: NextRequest) {
   const denied = protectedRoute(request);
   if (denied) return denied;
   const config = steelConfigStatus();
@@ -148,4 +150,12 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Steel session operation failed.";
     return jsonError(message, 502);
   }
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET(request));
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
 }

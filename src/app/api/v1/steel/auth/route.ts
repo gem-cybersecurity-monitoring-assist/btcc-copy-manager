@@ -1,3 +1,5 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { steelConfigStatus, verifyControlSecret } from "@/lib/steel-browser";
@@ -14,7 +16,7 @@ function verifyLegacyControlSecret(candidate: string) {
   return expected.length === supplied.length && timingSafeEqual(expected, supplied);
 }
 
-export async function GET(request: NextRequest) {
+async function ownerGET(request: NextRequest) {
   const config = steelConfigStatus();
   return NextResponse.json({
     ok: true,
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
   }, { headers: { "cache-control": "no-store, max-age=0" } });
 }
 
-export async function POST(request: NextRequest) {
+async function ownerPOST(request: NextRequest) {
   if (!sameOrigin(request)) return jsonError("Cross-origin request blocked.", 403);
   const config = steelConfigStatus();
   if (!config.ready) return jsonError("Steel controller environment is not fully configured.", 503);
@@ -52,11 +54,23 @@ export async function POST(request: NextRequest) {
   return response;
 }
 
-export async function DELETE(request: NextRequest) {
+async function ownerDELETE(request: NextRequest) {
   if (!sameOrigin(request)) return jsonError("Cross-origin request blocked.", 403);
   const response = NextResponse.json({ ok: true, authorized: false }, {
     headers: { "cache-control": "no-store, max-age=0" },
   });
   clearSteelAuth(response);
   return response;
+}
+
+export async function GET(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerGET(request));
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
+}
+
+export async function DELETE(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerDELETE(request), { mutation: true, requireJson: false });
 }

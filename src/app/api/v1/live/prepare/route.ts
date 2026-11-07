@@ -1,8 +1,10 @@
+import type { NextRequest as OwnerRequest } from "next/server";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { runBtccDiagnostics } from "@/lib/btcc-diagnostics";
 import { prepareLiveOrder } from "@/lib/btcc-live";
 import type { LiveOrderIntent } from "@/lib/live-types";
 
-export async function POST(request: Request) {
+async function ownerPOST(request: Request) {
   try {
     const diagnostics = await runBtccDiagnostics();
     if (diagnostics.category !== "ok" || diagnostics.accountRead !== "ok") {
@@ -27,4 +29,8 @@ export async function POST(request: Request) {
       { status: 422, headers: { "Cache-Control": "no-store" } }
     );
   }
+}
+
+export async function POST(request: OwnerRequest) {
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
 }
