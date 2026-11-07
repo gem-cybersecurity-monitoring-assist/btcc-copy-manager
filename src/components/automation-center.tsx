@@ -118,7 +118,7 @@ export function AutomationCenter() {
         <a href="/copy-trading?engine=opportunities"><strong>Trader evaluation</strong><small>Research and compare recorded strategies</small></a>
         <a href="/copy-trading?engine=allocation"><strong>Allocation engine</strong><small>Compute capital proposals under risk limits</small></a>
         <a href="/copy-center?view=performance"><strong>Performance</strong><small>Observe equity history and live market context</small></a>
-        <a href="/advanced-btcc"><strong>Execution controls</strong><small>Check native BTCC readiness and approval safeguards</small></a>
+        <a href="/steel"><strong>BTCC browser controls</strong><small>Authenticated browser-session operations</small></a>
         <a href="/copy-trading?engine=monitoring"><strong>Monitoring history</strong><small>Review alerts, evidence and audit events</small></a>
       </div>
     </section>
