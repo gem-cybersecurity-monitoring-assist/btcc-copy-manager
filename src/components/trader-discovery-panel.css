@@ -21,3 +21,5 @@
 .gem-discovery-meta,.gem-discovery-footnote{font-size:11px;color:var(--td-muted);margin-top:12px!important;line-height:1.55}
 .gem-discovery-empty{padding:15px;background:#f4f8f6;border-radius:10px;color:var(--td-muted)}
 @media(max-width:550px){.gem-discovery-head{flex-direction:column;align-items:stretch}.gem-discovery button{align-self:flex-start}}
+
+.gem-discovery button.gem-discovery-save {font-size:11px;padding:7px 9px;min-height:36px;background:#e4f3ed;color:#175d48;white-space:nowrap}
