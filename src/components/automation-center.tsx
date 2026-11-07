@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AUTOMATION_EVENT, inspectLocalAutomation, runLocalRiskReview } from "@/lib/browser-automation";
+import { LiquidityPanel } from "@/components/liquidity-panel";
 import "./automation-center.css";
 
 type BrowserState = ReturnType<typeof inspectLocalAutomation>;
@@ -105,6 +106,7 @@ export function AutomationCenter() {
       </div>
     </section>
 
+    <div className="gem-auto-liquidity"><LiquidityPanel /></div>
     <section className="gem-auto-panel">
       <div className="gem-auto-heading"><div><span className="gem-auto-eyebrow">WORKFLOW ACCESS</span><h2>Trading intelligence and controls</h2></div></div>
       <div className="gem-auto-links">
