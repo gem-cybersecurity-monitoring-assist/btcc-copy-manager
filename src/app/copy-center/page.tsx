@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function CopyCenterPage() {
-  return <CopyCenterWorkspace />;
+  return <><div style={{ padding: "12px 20px", background: "#e9f7f0", borderBottom: "1px solid #c4e5d3", fontFamily: "system-ui, sans-serif", fontSize: 13 }}><strong>Paper mode:</strong> <a href="/copy-center/positions" style={{ color: "#116448", fontWeight: 700 }}>Open positions &amp; approval queue →</a> <span style={{ color: "#536d61" }}>· No live transactions</span></div><CopyCenterWorkspace /></>;
 }
