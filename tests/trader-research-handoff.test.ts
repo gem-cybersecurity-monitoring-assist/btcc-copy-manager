@@ -31,5 +31,5 @@ test("duplicate IDs and malformed source never overwrite engine",()=>{
  assert.equal(saved.ok,true);
  if(!saved.ok)return;
  assert.equal(addCandidateResearch(saved.state,candidate,at).ok,false);
- assert.equal(addCandidateResearch(defaultEngineState(),{...candidate,executable:true} as TraderCandidate,at).ok,false);
+ assert.equal(addCandidateResearch(defaultEngineState(),{...candidate,executable:true} as unknown as TraderCandidate,at).ok,false);
 });
