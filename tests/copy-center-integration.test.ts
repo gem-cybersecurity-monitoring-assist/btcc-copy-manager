@@ -54,7 +54,8 @@ test("desktop and phone navigation expose both Copy Center and research", () => 
 
 test("Copy Center advanced tools link routes to the existing protected browser controller", () => {
   const dashboard = read("src/components/copy-center-workspace.tsx");
-  assert.ok(dashboard.includes('href="/steel"'));\n  assert.ok(!dashboard.includes('href="/advanced-btcc"'));
+  assert.ok(dashboard.includes('href="/steel"'));
+  assert.ok(!dashboard.includes('href="/advanced-btcc"'));
   assert.ok(dashboard.includes('href="/copy-center/positions"'));
 });
 
