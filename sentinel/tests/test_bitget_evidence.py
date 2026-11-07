@@ -209,3 +209,47 @@ def test_http_envelope_clock_is_retained_separately(monkeypatch):
     payload = adapter._request("GET", "/api/v3/account/assets")
     assert payload == {"available": "1"}
     assert payload.request_time_ms == 1794050000123
+
+
+@pytest.mark.parametrize("status", [401, 429, 500, 503])
+def test_http_failures_do_not_read_or_reflect_provider_body(monkeypatch, status):
+    import bitget_copy
+    from io import BytesIO
+    from urllib.error import HTTPError
+    class Body(BytesIO):
+        reads = 0
+        def read(self, *args):
+            self.reads += 1
+            return super().read(*args)
+    body = Body(b'{"msg":"test-api-secret test-passphrase user-account-123"}')
+    def fail(*_args, **_kwargs):
+        raise HTTPError("https://api.bitget.com/private?secret=reflected", status,
+                        "test-api-secret", {}, body)
+    monkeypatch.setattr(bitget_copy, "urlopen", fail)
+    with pytest.raises(BitgetError) as caught:
+        BitgetCopyAdapter(CONFIG)._request("GET", "/api/v3/account/assets")
+    assert str(caught.value) == f"Bitget HTTP {status}"
+    assert body.reads == 0
+    assert body.closed
+
+
+@pytest.mark.parametrize("code,expected", [("40009", "40009"), ("test-api-secret", "unknown")])
+def test_api_rejection_never_reflects_message_or_unrecognized_code(monkeypatch, code, expected):
+    import bitget_copy
+    class Reply:
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def read(self):
+            return json.dumps({"code": code, "msg": "test-api-secret test-passphrase"}).encode()
+    monkeypatch.setattr(bitget_copy, "urlopen", lambda *_args, **_kwargs: Reply())
+    with pytest.raises(BitgetError) as caught:
+        BitgetCopyAdapter(CONFIG)._request("GET", "/api/v3/account/assets")
+    assert str(caught.value) == f"Bitget rejected request (code {expected})."
+
+
+def test_status_reports_evidence_instead_of_unavailable_execution_snapshot():
+    result = BitgetCopyAdapter(CONFIG).status()
+    assert "account_evidence" in result["supported"]
+    assert "account_snapshot" not in result["supported"]
+    assert result["execution_risk_snapshot_available"] is False
+    assert "account_snapshot" in result["unavailable"]

@@ -158,7 +158,9 @@ class BitgetCopyAdapter:
             "allowlisted_project_count": len(self.config.allowed_project_ids),
             "minimum_subscription_usdt": self.MIN_SUBSCRIPTION_USDT,
             "required_account_mode": "Unified Account",
-            "supported": ["account_snapshot", "current_copy", "copy_settings", "current_positions", "profit_details", "follow", "modify", "unfollow", "close_all"],
+            "supported": ["account_evidence", "current_copy", "copy_settings", "current_positions", "profit_details", "follow", "modify", "unfollow", "close_all"],
+            "execution_risk_snapshot_available": False,
+            "unavailable": ["account_snapshot"],
             "unsupported_by_design": ["withdraw", "address_management", "fund_transfer"],
         }
 
@@ -173,12 +175,19 @@ class BitgetCopyAdapter:
             with urlopen(request, timeout=15) as response:
                 payload = json.loads(response.read().decode("utf-8") or "{}")
         except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:500]
-            raise BitgetError(f"Bitget HTTP {exc.code}: {detail}") from None
+            status = exc.code if isinstance(exc.code, int) and 100 <= exc.code <= 599 else "unknown"
+            exc.close()
+            raise BitgetError(f"Bitget HTTP {status}") from None
         except (URLError, TimeoutError) as exc:
             raise BitgetError(f"Bitget API unavailable: {type(exc).__name__}") from None
+        except (json.JSONDecodeError, UnicodeError):
+            raise BitgetError("Bitget returned an invalid response.") from None
+        if not isinstance(payload, dict):
+            raise BitgetError("Bitget returned an invalid response.")
         if payload.get("code") != "00000":
-            raise BitgetError(f"Bitget rejected request: {payload.get('code')} {payload.get('msg')}")
+            code = payload.get("code")
+            safe_code = code if isinstance(code, str) and re.fullmatch(r"[0-9]{5}", code) else "unknown"
+            raise BitgetError(f"Bitget rejected request (code {safe_code}).")
         data = payload.get("data", {})
         if isinstance(data, dict):
             stamp = payload.get("requestTime")
