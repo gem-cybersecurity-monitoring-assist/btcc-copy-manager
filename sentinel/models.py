@@ -47,6 +47,7 @@ class TraderSnapshot(BaseModel):
     pnl_30d_pct: float | None = None
     aum_usdt: float | None = None
     win_rate_pct: float | None = None
+    max_drawdown_pct: float | None = None
     copiers: int | None = None
     copier_capacity: int | None = None
     recent_trades: list[TradeRecord] = Field(default_factory=list)

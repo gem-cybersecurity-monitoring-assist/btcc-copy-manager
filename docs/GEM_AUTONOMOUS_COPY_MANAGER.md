@@ -97,3 +97,14 @@ Use a dedicated key with the minimum read/write scopes required by the enabled f
 
 
 A strict /collector/bitget-batch endpoint is provided for the eventual leaderboard collector. It rejects batches that do not contain a Bitget account snapshot and a verified native projectId for every trader. The collector itself remains a separate data-source task because no supported public leaderboard endpoint was verified.
+
+
+## Bitget public trader discovery (Kopyon)
+
+A read-only discovery adapter is included at `sentinel/kopyon_discovery.py`. It reads Bitget leaderboards, period performance and closed-position history through Kopyon's documented API. It is triggered manually through the authenticated `POST /discovery/bitget/kopyon` endpoint so request usage is bounded and does not silently consume the free monthly quota. The adapter requests at most eight leaders per run; each leader requires a performance and position-history request in addition to the leaderboard request.
+
+Configure `KOPYON_API_KEY` in the Sentinel host secret store. Kopyon documents a free tier of 10,000 requests per month. The adapter is read-only and never sends exchange orders.
+
+**Important identity boundary:** Kopyon's `traderId` is described as a Bitget trader UID or portfolio ID. Bitget's follower API requires a native `projectId`. They are not assumed interchangeable. The adapter leaves `exchange_project_id` empty unless the owner explicitly supplies a verified mapping in `BITGET_COPY_PROJECT_ID_MAP` (JSON object mapping Kopyon traderId to the exact Bitget follower projectId). Missing mappings are rejected by the autonomous planner; no name-based or ID-format guessing is permitted. The user must verify each mapping against Bitget's own copy-trader profile before adding it.
+
+Kopyon performance values are public-source evidence and are treated as untrusted observations. Missing trade history, insufficient trades, excessive leverage, stale data or missing project mapping continue to fail closed. Kopyon data is not an execution authorization.

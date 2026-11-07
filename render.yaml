@@ -46,3 +46,7 @@ services:
         sync: false
       - key: OPENAI_MODEL
         sync: false
+      - key: KOPYON_API_KEY
+        sync: false
+      - key: BITGET_COPY_PROJECT_ID_MAP
+        sync: false

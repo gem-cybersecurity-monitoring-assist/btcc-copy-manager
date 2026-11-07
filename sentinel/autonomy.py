@@ -21,6 +21,7 @@ class AutonomyPolicy:
     min_trades: int = 10
     min_score: int = 82
     max_trader_leverage: float = 10.0
+    max_trader_drawdown_pct: float = 35.0
     execution_leverage: int = 3
     max_daily_loss_ratio: float = 0.03
     min_allocation_usdt: float = 50.0
@@ -80,6 +81,10 @@ def build_copy_plan(
             reasons.append("Trader snapshot is stale or future-dated.")
         if trader.provenance and trader.provenance.confidence < policy.min_provenance_confidence:
             reasons.append("Trader data provenance confidence is below policy.")
+        if trader.exchange == "bitget" and trader.max_drawdown_pct is None:
+            reasons.append("Bitget public discovery is missing maximum drawdown evidence.")
+        elif trader.max_drawdown_pct is not None and trader.max_drawdown_pct > policy.max_trader_drawdown_pct:
+            reasons.append(f"Maximum drawdown exceeds {policy.max_trader_drawdown_pct:g}% autonomous limit.")
         if max((t.leverage for t in trader.recent_trades), default=0) > policy.max_trader_leverage:
             reasons.append(f"Observed leverage exceeds {policy.max_trader_leverage:g}x autonomous limit.")
         if trader.executable_min_margin_usdt is None:
