@@ -114,7 +114,7 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
   return (
     <div className="engine-stack agent">
       <Notice tone="info"><strong>Your GEM agent</strong> can review your workspace, add traders you tell it about, build your plan, check risk, and run reviews. Every change it wants to make is shown to you first and saved only when you click <strong>Approve</strong>. It cannot move money, trade, or touch your exchange accounts.</Notice>
-      {status.checked && status.configured === false && <Notice tone="warn"><strong>The agent isn&apos;t switched on yet.</strong> The site owner needs to add an <code>ANTHROPIC_API_KEY</code> in Vercel → Settings → Environment Variables and redeploy (see AGENT_SETUP.md).</Notice>}
+      {status.checked && status.configured === false && <Notice tone="warn"><strong>The agent isn&apos;t switched on yet.</strong> The in-app assistant is not available in this session. You can still use the built-in risk, trader, allocation, and monitoring controls.</Notice>}
       {status.checked && status.configured && !status.signedIn && <Notice tone="warn"><strong>Sign in to use the agent.</strong> Use the Cloud account box on this page. Signing in keeps the agent private to you.</Notice>}
 
       <div className="agent-chat" aria-live="polite">

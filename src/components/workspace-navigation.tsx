@@ -14,6 +14,7 @@ const sections = [
   { href: "/opportunities", label: "Opportunities", path: "/opportunities" },
   { href: "/copy-center?view=performance", label: "Performance", path: "/copy-center" },
   { href: "/copy-center?view=portfolio", label: "Positions", path: "/copy-center" },
+  { href: "/automation", label: "Automation", path: "/automation" },
 ] as const;
 
 const tools = [
