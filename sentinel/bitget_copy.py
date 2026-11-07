@@ -5,8 +5,10 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Any, Callable
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -51,6 +53,70 @@ class BitgetConfig:
     def configured(self) -> bool:
         return bool(self.api_key and self.secret_key and self.passphrase)
 
+
+
+@dataclass(frozen=True)
+class BitgetAccountEvidence:
+    """Read-only observations, never execution-grade capital or reconciled ROI."""
+    exchange_user_id: str
+    equity_usdt: str
+    available_usdt: str | None
+    aggregate_metrics_usd: dict[str, str | None]
+    positions: list[dict[str, Any]]
+    position_categories: list[str]
+    positions_complete: bool
+    active_positions: int | None
+    fills: list[dict[str, Any]]
+    fill_history_complete: bool
+    fill_history_status: str
+    fill_history_category: str
+    fill_window_start_ms: int
+    fill_window_end_ms: int
+    fill_pnl_usdt: str | None
+    fill_fees_by_coin: dict[str, str]
+    net_pnl_today_usdt: None
+    net_pnl_status: str
+    received_started_at: str
+    received_completed_at: str
+    provider_request_times_ms: dict[str, int | None]
+    read_only: bool = True
+    execution_eligible: bool = False
+
+
+class _ResponseData(dict):
+    """Keep the exchange envelope clock without changing existing data mapping."""
+    def __init__(self, data: dict, request_time_ms: int | None):
+        super().__init__(data)
+        self.request_time_ms = request_time_ms
+
+
+def _decimal_text(value: Any, name: str, *, nonnegative: bool = False) -> str:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        raise BitgetError(f"Bitget {name} is unavailable or invalid.")
+    if len(str(value)) > 128 or (isinstance(value, str) and not re.fullmatch(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?", value)):
+        raise BitgetError(f"Bitget {name} is unavailable or invalid.")
+    try:
+        number = Decimal(str(value))
+    except InvalidOperation:
+        raise BitgetError(f"Bitget {name} is unavailable or invalid.") from None
+    if not number.is_finite() or len(number.as_tuple().digits) > 38 or (number != 0 and not -28 <= number.adjusted() <= 28) or (nonnegative and number < 0):
+        raise BitgetError(f"Bitget {name} is unavailable or invalid.")
+    return format(number, "f")
+
+
+def _optional_decimal(value: Any, name: str, *, nonnegative: bool = False) -> str | None:
+    return None if value is None else _decimal_text(value, name, nonnegative=nonnegative)
+
+
+def _add_amount(left: Decimal, right: Decimal) -> Decimal:
+    with localcontext() as context:
+        context.prec = 64
+        return left + right
+
+
+def _provider_time(payload: dict) -> int | None:
+    value = getattr(payload, "request_time_ms", None)
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
 
 def _canonical_query(params: dict[str, Any] | None) -> str:
     if not params:
@@ -113,7 +179,12 @@ class BitgetCopyAdapter:
             raise BitgetError(f"Bitget API unavailable: {type(exc).__name__}") from None
         if payload.get("code") != "00000":
             raise BitgetError(f"Bitget rejected request: {payload.get('code')} {payload.get('msg')}")
-        return payload.get("data", {})
+        data = payload.get("data", {})
+        if isinstance(data, dict):
+            stamp = payload.get("requestTime")
+            stamp = stamp if isinstance(stamp, int) and not isinstance(stamp, bool) and stamp > 0 else None
+            return _ResponseData(data, stamp)
+        return data
 
     def _request(self, method: str, path: str, params: dict[str, Any] | None = None, body_obj: dict | None = None):
         if not self.config.configured:
@@ -146,66 +217,174 @@ class BitgetCopyAdapter:
             raise BitgetError("Live copy actions are disabled. Set BITGET_COPY_LIVE_ENABLED=true only after validation.")
 
 
-    def account_snapshot(self, timezone_name: str | None = None) -> AccountState:
-        """Read UTA equity and today's realized futures PnL for a venue-tagged snapshot."""
-        now = datetime.now(timezone.utc)
+    def account_evidence(
+        self, timezone_name: str | None = None, *, max_fill_pages: int = 2,
+    ) -> BitgetAccountEvidence:
+        """Bounded GET-only collection with explicit scope and completeness.
+
+        No USD aggregate is converted to USDT, and fills are not presented as
+        reconciled net account profit. Read-only uta_mgt alone remains useful
+        for asset evidence; positions/fills additionally require uta_trade.
+        """
+        if isinstance(max_fill_pages, bool) or not isinstance(max_fill_pages, int) or not 1 <= max_fill_pages <= 10:
+            raise BitgetError("max_fill_pages must be an integer between 1 and 10.")
+        started = datetime.now(timezone.utc)
         try:
             tz = ZoneInfo(timezone_name or os.getenv("SENTINEL_TIMEZONE", "Africa/Lagos"))
         except Exception:
             raise BitgetError("SENTINEL_TIMEZONE is not a valid IANA timezone.") from None
+        midnight = started.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        start_ms = int(midnight.astimezone(timezone.utc).timestamp() * 1000)
+        end_ms = int(started.timestamp() * 1000)
+        info = self._request("GET", "/api/v3/account/info")
+        permissions = info.get("permissions") if isinstance(info, dict) else None
+        if (
+            not isinstance(info, dict) or info.get("permType") != "read-only"
+            or not isinstance(permissions, list) or not permissions
+            or any(not isinstance(scope, str) for scope in permissions)
+            or len(permissions) != len(set(permissions))
+            or "uta_mgt" not in permissions
+            or not set(permissions).issubset({"uta_mgt", "uta_trade"})
+        ):
+            raise BitgetError("Bitget evidence requires a read-only key with only UTA management and optionally UTA trade read scopes.")
+        user_id = info.get("userId")
+        if not isinstance(user_id, str) or not user_id.isdigit() or len(user_id) > 64:
+            raise BitgetError("Bitget account identity is unavailable.")
         assets = self._request("GET", "/api/v3/account/assets")
-        if not isinstance(assets, dict) or not assets.get("usdtEquity"):
-            raise BitgetError("Bitget account-assets response did not include USDT equity.")
-        local_midnight = now.astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-        start_ms = int(local_midnight.astimezone(timezone.utc).timestamp() * 1000)
-        end_ms = int(now.timestamp() * 1000)
-        cursor = None
-        realized = 0.0
-        complete = True
-        for page in range(10):
+        if not isinstance(assets, dict) or not isinstance(assets.get("assets"), list):
+            raise BitgetError("Bitget account-assets response is invalid.")
+        equity = _decimal_text(assets.get("usdtEquity"), "USDT equity", nonnegative=True)
+        usdt_rows = [row for row in assets["assets"] if isinstance(row, dict) and row.get("coin") == "USDT"]
+        if len(usdt_rows) > 1:
+            raise BitgetError("Bitget account-assets response has duplicate USDT rows.")
+        available = _optional_decimal(usdt_rows[0].get("available"), "USDT availability", nonnegative=True) if usdt_rows else None
+        usd = {
+            name: _optional_decimal(assets.get(name), name, nonnegative=name != "unrealisedPnl")
+            for name in ("accountEquity", "effEquity", "imr", "positionValue", "unrealisedPnl")
+        }
+        clocks = {"account_info": _provider_time(info), "account_assets": _provider_time(assets)}
+        positions: list[dict[str, Any]] = []
+        completed: list[str] = []
+        fills: list[dict[str, Any]] = []
+        fill_status = "permission_missing"
+        fill_complete = False
+        fill_pnl: str | None = None
+        fees: dict[str, Decimal] = {}
+        if "uta_trade" in permissions:
+            for category in ("USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES"):
+                try:
+                    payload = self._request("GET", "/api/v3/position/current-position", {"category": category})
+                    if not isinstance(payload, dict) or not isinstance(payload.get("list"), list) or len(payload["list"]) > 1000:
+                        raise BitgetError("Invalid positions response.")
+                    category_rows = []
+                    seen_positions = set()
+                    for row in payload["list"]:
+                        if not isinstance(row, dict) or row.get("category") != category:
+                            raise BitgetError("Invalid position category.")
+                        identity = (row.get("symbol"), row.get("posSide"))
+                        if (not isinstance(identity[0], str) or not identity[0]
+                            or identity[1] not in {"long", "short"} or identity in seen_positions
+                            or not isinstance(row.get("marginCoin"), str) or not row["marginCoin"]):
+                            raise BitgetError("Invalid position identity.")
+                        seen_positions.add(identity)
+                        total = _decimal_text(row.get("total"), "position quantity", nonnegative=True)
+                        if Decimal(total) == 0:
+                            continue
+                        projected = {"category": category, "symbol": row["symbol"], "posSide": row["posSide"], "marginCoin": row["marginCoin"], "total": total}
+                        for name in ("positionBalance", "leverage", "unrealisedPnl", "curRealisedPnl", "totalFunding", "openFeeTotal", "closeFeeTotal"):
+                            projected[name] = _optional_decimal(row.get(name), name, nonnegative=name in {"positionBalance", "leverage"})
+                        for name in ("createdTime", "updatedTime"):
+                            stamp = row.get(name)
+                            if stamp is not None and (not isinstance(stamp, str) or not stamp.isdigit()):
+                                raise BitgetError("Invalid position timestamp.")
+                            projected[name] = stamp
+                        category_rows.append(projected)
+                    positions.extend(category_rows)
+                    completed.append(category)
+                    clocks["positions_" + category] = _provider_time(payload)
+                except BitgetError:
+                    # Partial category evidence is displayed as partial, never zero.
+                    clocks["positions_" + category] = None
             params: dict[str, Any] = {
-                "category": "USDT-FUTURES",
-                "startTime": start_ms,
-                "endTime": end_ms,
-                "limit": 100,
+                "category": "USDT-FUTURES", "startTime": start_ms,
+                "endTime": end_ms, "limit": 100,
             }
-            if cursor:
-                params["cursor"] = cursor
-            fills = self._request("GET", "/api/v3/trade/fills", params)
-            rows = (fills.get("list") or []) if isinstance(fills, dict) else []
-            for fill in rows:
-                pnl = float(fill.get("execPnl") or 0)
-                fees = sum(
-                    float(fee.get("fee") or 0)
-                    for fee in (fill.get("feeDetail") or [])
-                    if fee.get("feeCoin") == "USDT"
-                )
-                realized += pnl - fees
-            cursor = fills.get("cursor") if isinstance(fills, dict) else None
-            if not cursor:
-                break
-        else:
-            complete = False
+            seen_ids: dict[str, dict] = {}
+            seen_cursors: set[str] = set()
+            fill_status = "page_limit"
+            try:
+                for page in range(max_fill_pages):
+                    payload = self._request("GET", "/api/v3/trade/fills", params)
+                    if not isinstance(payload, dict) or not isinstance(payload.get("list"), list):
+                        raise BitgetError("Invalid fill response.")
+                    clocks["fills_page_" + str(page + 1)] = _provider_time(payload)
+                    if len(payload["list"]) > 100:
+                        raise BitgetError("Invalid fill page size.")
+                    for row in payload["list"]:
+                        if not isinstance(row, dict) or row.get("category") != "USDT-FUTURES":
+                            raise BitgetError("Invalid fill category.")
+                        exec_id = row.get("execId")
+                        if not isinstance(exec_id, str) or not exec_id or len(exec_id) > 160:
+                            raise BitgetError("Invalid fill identity.")
+                        stamp = row.get("createdTime")
+                        if not isinstance(stamp, str) or not stamp.isdigit() or not params["startTime"] <= int(stamp) <= params["endTime"]:
+                            raise BitgetError("Fill is outside the requested time range.")
+                        pnl = _decimal_text(row.get("execPnl"), "fill PnL")
+                        detail = row.get("feeDetail")
+                        if not isinstance(detail, list):
+                            raise BitgetError("Fill fee evidence is unavailable.")
+                        fee_rows = []
+                        for fee in detail:
+                            if not isinstance(fee, dict) or not isinstance(fee.get("feeCoin"), str) or not fee["feeCoin"]:
+                                raise BitgetError("Invalid fill fee currency.")
+                            fee_rows.append({"coin": fee["feeCoin"], "amount": _decimal_text(fee.get("fee"), "fill fee")})
+                        projected = {"execId": exec_id, "createdTime": stamp, "execPnl": pnl, "fees": fee_rows}
+                        if exec_id in seen_ids and seen_ids[exec_id] != projected:
+                            raise BitgetError("Conflicting duplicate fill evidence.")
+                        seen_ids[exec_id] = projected
+                    cursor = payload.get("cursor")
+                    if cursor is None or cursor == "":
+                        fill_complete, fill_status = True, "complete"
+                        break
+                    if not isinstance(cursor, str) or len(cursor) > 160 or cursor in seen_cursors:
+                        raise BitgetError("Invalid or repeated fill cursor.")
+                    seen_cursors.add(cursor)
+                    params["cursor"] = cursor
+            except BitgetError:
+                fill_status = "unavailable_or_invalid"
+                fill_complete = False
+            fills = list(seen_ids.values())
+            if fill_complete:
+                total_pnl = Decimal(0)
+                for row in fills:
+                    total_pnl = _add_amount(total_pnl, Decimal(row["execPnl"]))
+                fill_pnl = format(total_pnl, "f")
+            for row in fills:
+                for fee in row["fees"]:
+                    fees[fee["coin"]] = _add_amount(fees.get(fee["coin"], Decimal(0)), Decimal(fee["amount"]))
+        return BitgetAccountEvidence(
+            exchange_user_id=user_id, equity_usdt=equity, available_usdt=available,
+            aggregate_metrics_usd=usd, positions=positions, position_categories=completed,
+            positions_complete=len(completed) == 3,
+            active_positions=len(positions) if len(completed) == 3 else None,
+            fills=fills, fill_history_complete=fill_complete, fill_history_status=fill_status,
+            fill_history_category="USDT-FUTURES", fill_window_start_ms=start_ms, fill_window_end_ms=end_ms,
+            fill_pnl_usdt=fill_pnl, fill_fees_by_coin={coin: format(value, "f") for coin, value in fees.items()},
+            net_pnl_today_usdt=None, net_pnl_status="unreconciled_funding_cashflows_and_fee_currencies",
+            received_started_at=started.isoformat(), received_completed_at=datetime.now(timezone.utc).isoformat(),
+            provider_request_times_ms=clocks,
+        )
 
-        usdt_asset = next((row for row in (assets.get("assets") or []) if row.get("coin") == "USDT"), {})
-        confidence = 0.99 if complete else 0.80
-        usdt_available = max(0.0, float(usdt_asset.get("available") or 0))
-        effective_equity = max(0.0, float(assets.get("effEquity") or 0))
-        conservative_free = min(usdt_available, effective_equity)
-        return AccountState(
-            exchange="bitget",
-            total_usdt=max(0.0, float(assets.get("usdtEquity") or 0)),
-            futures_free_usdt=conservative_free,
-            wallet_usdt=usdt_available,
-            open_margin_usdt=max(0.0, float(assets.get("imr") or 0)),
-            realized_pnl_today_usdt=realized,
-            active_positions=1 if float(assets.get("positionValue") or 0) > 0 else 0,
-            source_timestamp=now,
-            provenance=Provenance(
-                source="xhr",
-                confidence=confidence,
-                captured_at=now,
-            ),
+    def account_snapshot(self, timezone_name: str | None = None) -> AccountState:
+        """Legacy execution-risk shape cannot represent incomplete evidence safely."""
+        if timezone_name:
+            try:
+                ZoneInfo(timezone_name)
+            except Exception:
+                raise BitgetError("SENTINEL_TIMEZONE is not a valid IANA timezone.") from None
+        raise BitgetError(
+            "Execution-grade Bitget snapshot is unavailable: USDT margin capacity and reconciled daily PnL "
+            "have not been verified. Use account_evidence() for read-only observations; no execution is authorized."
         )
 
     def current_copy(self, project_id: str):
