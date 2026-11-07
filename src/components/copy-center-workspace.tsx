@@ -928,7 +928,7 @@ export function CopyCenterWorkspace() {
         {provider.id === "bitget"
           ? "Check read-only access"
           : provider.id === "btcc"
-            ? "View BTCC guide"
+            ? "Review BTCC connection"
             : "Connect wallet"}
         <span aria-hidden="true">→</span>
       </button>
@@ -979,7 +979,7 @@ export function CopyCenterWorkspace() {
             <a href="/copy-trading">Trader intelligence</a>
             <a href="/opportunities">Opportunities</a>
             <a href="/automation">Automation center</a>
-            <a href="/advanced-btcc">Advanced controls</a>
+            <a href="/steel">Browser controls</a>
           </div>
         </div>
       </aside>
@@ -1598,8 +1598,8 @@ export function CopyCenterWorkspace() {
                     Existing technical controls remain separate. Live financial
                     actions require your explicit authorization.
                   </p>
-                  <a className="cc-card-button" href="/advanced-btcc">
-                    Open advanced tools →
+                  <a className="cc-card-button" href="/steel">
+                    Open BTCC browser controls →
                   </a>
                 </article>
                 <article className="cc-settings-card">

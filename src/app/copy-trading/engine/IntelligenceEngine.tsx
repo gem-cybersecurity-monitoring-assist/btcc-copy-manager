@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { allProviders, allowedTransitions, createCustomProvider, effectiveStatus, newProviderAccount, STATUS_EVIDENCE_PROMPT, STATUS_LABELS, statusProvenance, transitionStatus } from "../../../../lib/engine/providers.ts";
 import { parseSeriesCsv, SOURCE_LABELS } from "../../../../lib/engine/quality.ts";
 import { isMonitorDue, runMonitoring } from "../../../../lib/engine/monitoring.ts";
-import { SAMPLE_PREFIX, simulatedStrategies } from "../../../../lib/engine/sample-data.ts";
+import { SAMPLE_PREFIX } from "../../../../lib/engine/sample-data.ts";
 import { rankStrategies, type StrategyEvaluation } from "../../../../lib/engine/scoring.ts";
 import { ENGINE_LIMITS, newId } from "../../../../lib/engine/state.ts";
 import type { DataSource, EngineState, ProviderAccount, ProviderDefinition, ProviderStatus, Strategy } from "../../../../lib/engine/types.ts";
@@ -36,7 +36,7 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
     const requested = new URLSearchParams(window.location.search).get("engine");
     if (requested && TABS.some(([id]) => id === requested)) setTab(requested as TabId);
   }, []);
-  // The allocation tab remounts on every visit; only the guide's practice button opens it with simulated data.
+  // Allocation calculations remount on each visit with current settings.
   const [allocationView, setAllocationView] = useState({ key: 0, simulated: false });
   const [now, setNow] = useState(() => new Date());
   const ranAuto = useRef(false);
@@ -88,48 +88,6 @@ export default function IntelligenceEngine({ engine, onChange, manualTraders }: 
         {tab === "wallets" && <WalletsTab />}
       </div>
     </section>
-  );
-}
-
-// ---- Start here guide --------------------------------------------------------
-
-const GUIDE_KEY = "gem-copy-center-guide-hidden";
-
-function StartGuide({ engine, onChange, go, showSimulatedPlan }: { engine: EngineState; onChange: EngineChange; go: (tab: TabId, targetId?: string) => void; showSimulatedPlan: () => void }) {
-  const [hidden, setHidden] = useState(false);
-  useEffect(() => { try { setHidden(localStorage.getItem(GUIDE_KEY) === "1"); } catch { /* storage unavailable */ } }, []);
-  const setHiddenPersist = (value: boolean) => { setHidden(value); try { if (value) localStorage.setItem(GUIDE_KEY, "1"); else localStorage.removeItem(GUIDE_KEY); } catch { /* ignore */ } };
-
-  const hasSample = engine.strategies.some((s) => s.id.startsWith(SAMPLE_PREFIX));
-  const realStrategies = engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX));
-  const realWithHistory = realStrategies.filter((s) => s.series).length;
-  const tracked = engine.providers.length;
-
-  function tryPractice() {
-    if (!hasSample) {
-      const sample = simulatedStrategies(new Date());
-      onChange({ ...engine, strategies: [...engine.strategies, ...sample] }, { action: "sample_loaded", detail: `Loaded ${sample.length} SIMULATED strategies from the start guide.` });
-    }
-    showSimulatedPlan();
-  }
-  function clearPractice() {
-    onChange({ ...engine, strategies: engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX)), providers: engine.providers.map((a) => (a.selectedStrategyId?.startsWith(SAMPLE_PREFIX) ? { ...a, selectedStrategyId: null } : a)) }, { action: "sample_removed", detail: "Removed simulated strategies from the start guide." });
-  }
-
-  if (hidden) return <button type="button" className="link-btn guide-show" onClick={() => setHiddenPersist(false)}>Show the “Start here” guide</button>;
-
-  const steps = [
-    { done: hasSample, title: "See how it works with practice traders", text: "Loads 6 made-up traders (marked SIMULATED) and shows the plan the engine would make for $30. Nothing real happens.", action: <><button type="button" className="primary-btn" onClick={tryPractice}>{hasSample ? "Show the practice plan" : "Load practice traders"}</button>{hasSample && <button type="button" className="secondary-btn" onClick={clearPractice}>Remove practice traders</button>}</> },
-    { done: realWithHistory > 0, title: "Add a real trader you are considering", text: realStrategies.length && !realWithHistory ? "Add the trader's return history (CSV) so the engine can judge it." : "Copy the trader's figures from their profile on BTCC, Bitget, or MT5. Return history (CSV) is what lets the engine recommend them.", action: <button type="button" className="primary-btn" onClick={() => go("opportunities", "strategy-form")}>Add a trader</button> },
-    { done: false, title: "Get your plan", text: "Enter how much you want to use (for example $30). The engine says how much to put with each trader, and what to keep back, with reasons.", action: <button type="button" className="primary-btn" onClick={() => go("allocation")}>Open my plan</button> },
-    { done: tracked > 0, title: "Copy on the exchange, then record it here", text: "Start copying on the exchange's own website using the planned amount, then mark the steps and the amount in Providers so GEM can watch the risk.", action: <button type="button" className="primary-btn" onClick={() => go("providers")}>Record on Providers</button> },
-  ];
-  return (
-    <div className="start-guide" aria-label="Start here guide">
-      <div className="start-guide-head"><div><p className="eyebrow">START HERE</p><h3>Four steps to use GEM Copy Center</h3><p className="muted">No account needed: everything saves in this browser. GEM never moves money; you copy traders on the exchange itself. Prefer to just ask? <button type="button" className="link-btn" onClick={() => go("agent")}>Open the ★ Agent</button> and describe what you want.</p></div>
-        <button type="button" className="link-btn" onClick={() => setHiddenPersist(true)}>Hide guide</button></div>
-      <ol className="start-steps">{steps.map((s, i) => <li key={s.title} className={s.done ? "done" : ""}><span className="step-num" aria-hidden="true">{s.done ? "✓" : i + 1}</span><div><strong>{s.title}</strong>{s.done && <span className="sr-only"> (done)</span>}<p>{s.text}</p><div className="engine-actions">{s.action}</div></div></li>)}</ol>
-    </div>
   );
 }
 
@@ -333,11 +291,6 @@ function OpportunitiesTab({ engine, onChange, evaluations, manualTraders, now }:
     onChange({ ...engine, strategies: engine.strategies.filter((x) => x.id !== s.id), providers: engine.providers.map((a) => (a.selectedStrategyId === s.id ? { ...a, selectedStrategyId: null } : a)) }, { action: "strategy_removed", detail: s.name });
   }
 
-  function loadSample() {
-    const sample = simulatedStrategies(new Date());
-    onChange({ ...engine, strategies: [...engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX)), ...sample] }, { action: "sample_loaded", detail: `Loaded ${sample.length} SIMULATED strategies for testing.` });
-    setMessage("Loaded 6 simulated strategies. They are labelled SIM, are excluded from real allocations, and can be used in the Simulation lab.");
-  }
   function removeSample() {
     onChange({ ...engine, strategies: engine.strategies.filter((s) => !s.id.startsWith(SAMPLE_PREFIX)), providers: engine.providers.map((a) => (a.selectedStrategyId?.startsWith(SAMPLE_PREFIX) ? { ...a, selectedStrategyId: null } : a)) }, { action: "sample_removed", detail: "Removed simulated strategies." });
   }
@@ -358,15 +311,15 @@ function OpportunitiesTab({ engine, onChange, evaluations, manualTraders, now }:
 
   return (
     <div className="engine-stack">
-      <Notice tone="info"><strong>Research sources.</strong> Live: none — no provider exposes a verified data feed to GEM yet. Available now: figures you transcribe from official trader profiles, return/equity history you import as CSV, and clearly labelled simulated data for testing. Social posts or tips are leads only; record them here after checking the trader on the official platform.</Notice>
+      <Notice tone="info"><strong>Research sources.</strong> Public Bitget and Gate third-party rankings are available under Opportunities. These rankings do not verify exchange accounts or trading history. The engine uses recorded observations and imported return series; native copying requires separate authentication and approval.</Notice>
       <div className="engine-actions">
         <button type="button" className="secondary-btn" onClick={importTraders} disabled={!manualTraders.length}>Import from trader comparison ({manualTraders.length})</button>
-        {hasSample ? <button type="button" className="secondary-btn" onClick={removeSample}>Remove simulated sample</button> : <button type="button" className="secondary-btn" onClick={loadSample}>Load simulated sample (testing)</button>}
+        {hasSample && <button type="button" className="secondary-btn" onClick={removeSample}>Clear old sample records</button>}
       </div>
       <div className="table-wrap"><table>
         <thead><tr><th>Rank</th><th>Strategy</th><th>Score</th><th>Net ann.</th><th>Max DD</th><th>Sortino</th><th>Data</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
-          {!evaluations.length && <tr><td colSpan={9} className="empty-cell">No strategies yet. Add a trader you reviewed on BTCC, Bitget, or MT5 below, or load the simulated sample to see how the engine works.</td></tr>}
+          {!evaluations.length && <tr><td colSpan={9} className="empty-cell">No recorded strategies yet. Research traders from Opportunities or add a verified history below.</td></tr>}
           {evaluations.map((e, i) => {
             const s = byId.get(e.strategyId)!;
             const prov = providers.find((p) => p.id === s.providerId);
