@@ -1,0 +1,12 @@
+{
+  "name": "GEM Copy Center",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "postStartCommand": "bash -lc 'bash scripts/ensure-codespace-remote.sh'",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
