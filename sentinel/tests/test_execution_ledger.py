@@ -50,3 +50,27 @@ def test_active_subscription_registry_persists_and_marks_inactive(tmp_path):
     assert store.list_active_subscriptions()[0]["project_id"] == "project-1"
     store.mark_subscription_inactive("project-1")
     assert store.get_active_subscription("project-1") is None
+
+
+def test_exchange_action_ledger_rejects_cross_account_or_operation_reuse(tmp_path):
+    import pytest
+
+    store = EventStore(tmp_path / "ledger.db")
+    key = "follow-project-1-002"
+    original = {"amount": 50}
+    assert store.begin_exchange_action(key, "bitget", "FOLLOW", "project-1", original)[0]
+
+    # Same serialized payload is not sufficient: all parts of the action
+    # identity must be stable for a retry to be considered idempotent.
+    for venue, action, project in [
+        ("btcc", "FOLLOW", "project-1"),
+        ("bitget", "UNFOLLOW", "project-1"),
+        ("bitget", "FOLLOW", "project-2"),
+    ]:
+        with pytest.raises(ValueError, match="action identity"):
+            store.begin_exchange_action(key, venue, action, project, original)
+
+    unchanged, row = store.begin_exchange_action(key, "bitget", "FOLLOW", "project-1", original)
+    assert unchanged is False
+    assert (row["venue"], row["action_type"], row["project_id"]) == ("bitget", "FOLLOW", "project-1")
+    assert row["status"] == "PENDING"

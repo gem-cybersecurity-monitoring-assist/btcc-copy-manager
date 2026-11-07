@@ -193,8 +193,13 @@ class EventStore:
                 (idempotency_key,),
             ).fetchone()
         result = dict(row)
-        if result["request_hash"] != digest:
-            raise ValueError("Idempotency key was already used for a different request payload.")
+        # A retry is identical only if its operation identity AND request
+        # payload match. Reusing a key for another account, venue or action
+        # must fail closed, even if the serialized payload happens to match.
+        if (result["request_hash"] != digest or result["venue"] != venue
+                or result["action_type"] != action_type
+                or result["project_id"] != project_id):
+            raise ValueError("Idempotency key was already used for a different request payload or action identity.")
         return cur.rowcount == 1, result
 
     def finish_exchange_action(self, idempotency_key: str, status: str, response: dict | None = None, error: str | None = None) -> bool:
