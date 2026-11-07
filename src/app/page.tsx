@@ -1,5 +1,5 @@
-import { ManagerShell } from "@/components/manager-shell";
+import { redirect } from "next/navigation";
 
 export default function HomePage() {
-  return <ManagerShell />;
+  redirect("/copy-center");
 }
