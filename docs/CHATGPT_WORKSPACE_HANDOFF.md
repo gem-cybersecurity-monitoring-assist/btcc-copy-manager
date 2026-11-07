@@ -44,7 +44,7 @@ Branch `codex/copy-center-readiness`, commit `cfc5253f0adfe3c04ee5369bfca221a7b0
 
 - Original: /workspaces/btcc-copy-manager. Existing owner changes to README.md and untracked package-lock.json / next-env.d.ts were preserved.
 - Remote-access worktree: /workspaces/btcc-copy-manager-acceptance.
-- UI worktree: /workspaces/btcc-copy-manager-ui, branch `codex/copy-center-simple-ui`.
+- UI worktree: /workspaces/btcc-copy-manager-ui. UI branch: `codex/copy-center-simple-ui`; current checkout: `codex/copy-center-release-evidence` for the documentation-only release record.
 - These are git worktrees in the same Codespace, not new Codespaces.
 - Generated next-env.d.ts is untracked; do not accidentally stage unrelated files.
 - Node v24.22.2; pnpm 10.28.0; Python3 and authenticated gh are available. rg is not installed; use grep/find/Python as needed.
