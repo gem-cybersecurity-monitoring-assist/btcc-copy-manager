@@ -3,6 +3,7 @@
 // calls against this workspace. Reads run immediately; every change waits for the user's approval.
 import { useEffect, useRef, useState } from "react";
 import { executeAgentTool, WRITE_TOOLS } from "../../../../lib/agent/tools.ts";
+import { localEngineReply } from "../../../../lib/agent/local-assistant.ts";
 import type { EngineState } from "../../../../lib/engine/types.ts";
 import { Notice, type EngineChange } from "./ui.tsx";
 
@@ -27,8 +28,8 @@ const TOOL_LABELS: Record<string, string> = {
 const EXAMPLES = [
   "I have $30. What should I do?",
   "Explain my current risk in simple words.",
-  "Help me add a trader I found on Bitget.",
-  "Which of my traders are not eligible, and why?",
+  "Which of my traders are eligible, and why?",
+  "Show automation monitoring status.",
 ];
 
 export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: EngineChange }) {
@@ -73,6 +74,13 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
     let transcript: Turn[] = [...turns, { role: "user", content: message }];
     setTurns(transcript);
     let working = engineRef.current;
+    const onlineAssistantAvailable = status.checked && status.configured === true && status.signedIn === true;
+    if (!onlineAssistantAvailable) {
+      const reply = localEngineReply(message, working, new Date());
+      setTurns([...transcript, { role: "assistant", content: [{ type: "text", text: reply }] }]);
+      setBusy(false);
+      return;
+    }
     try {
       for (let round = 0; round < MAX_ROUNDS; round++) {
         const reply = await callAgent(transcript);
@@ -110,12 +118,13 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
     }
   }
 
-  const ready = status.checked && status.configured && status.signedIn;
+  const remote = status.checked && status.configured && status.signedIn;
+  const ready = true;
   return (
     <div className="engine-stack agent">
-      <Notice tone="info"><strong>Your GEM agent</strong> can review your workspace, add traders you tell it about, build your plan, check risk, and run reviews. Every change it wants to make is shown to you first and saved only when you click <strong>Approve</strong>. It cannot move money, trade, or touch your exchange accounts.</Notice>
-      {status.checked && status.configured === false && <Notice tone="warn"><strong>The agent isn&apos;t switched on yet.</strong> The in-app assistant is not available in this session. You can still use the built-in risk, trader, allocation, and monitoring controls.</Notice>}
-      {status.checked && status.configured && !status.signedIn && <Notice tone="warn"><strong>Sign in to use the agent.</strong> Use the Cloud account box on this page. Signing in keeps the agent private to you.</Notice>}
+      <Notice tone="info"><strong>{remote ? "Connected GEM assistant" : "Free GEM intelligence assistant"}</strong> — {remote ? "The connected model can use the engine's tools and proposes changes only after your approval." : "Instant, deterministic answers from your saved strategy scores, risk limits, allocation calculations, and monitoring records. No paid model, login or API key is needed for these local research answers."} Neither mode executes exchange trades or moves funds.</Notice>
+      {status.checked && status.configured === false && <Notice tone="info">Online generative AI is not connected; the local deterministic engine is active. Ask about risk, strategies, allocations, simulations and monitoring.</Notice>}
+      {status.checked && status.configured && !status.signedIn && <Notice tone="info">Sign in for the optional online assistant. Local intelligence remains available without a login.</Notice>}
 
       <div className="agent-chat" aria-live="polite">
         {!turns.length && <div className="agent-empty"><p>Ask in your own words. For example:</p><div className="agent-examples">{EXAMPLES.map((e) => <button key={e} type="button" className="secondary-btn" disabled={!ready || busy} onClick={() => void send(e)}>{e}</button>)}</div></div>}
@@ -133,10 +142,10 @@ export function AgentTab({ engine, onChange }: { engine: EngineState; onChange: 
       {error && <p className="form-message error" role="alert">{error}</p>}
       <form className="agent-input" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
         <label className="sr-only" htmlFor="agent-message">Message the agent</label>
-        <textarea id="agent-message" rows={2} maxLength={4000} value={input} disabled={!ready || busy} placeholder={ready ? "Type a message…" : "The agent is unavailable until it is switched on and you are signed in."} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} />
+        <textarea id="agent-message" rows={2} maxLength={4000} value={input} disabled={!ready || busy} placeholder={remote ? "Ask the connected assistant…" : "Ask about risk, top traders, capital allocation or monitoring…"} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(input); } }} />
         <div className="engine-actions"><button type="submit" className="primary-btn" disabled={!ready || busy || !input.trim()}>Send</button>{turns.length > 0 && <button type="button" className="secondary-btn" disabled={busy} onClick={() => { setTurns([]); setError(""); }}>New conversation</button>}</div>
       </form>
-      <p className="footnote">Messages, and the workspace details the agent looks up, are sent to Anthropic&apos;s API to produce replies. Don&apos;t share exchange passwords, API keys, or recovery phrases.</p>
+      <p className="footnote">{remote ? "Messages and workspace details are sent to the connected model provider to produce responses." : "Local mode processes your questions using deterministic calculations in this browser; no model provider receives them."} Never share exchange passwords, API keys or recovery phrases. The assistant cannot guarantee returns.</p>
     </div>
   );
 }
