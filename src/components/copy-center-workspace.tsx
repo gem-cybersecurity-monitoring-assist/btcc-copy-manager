@@ -173,8 +173,10 @@ export function CopyCenterWorkspace() {
   const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
   useEffect(() => {
-    const requested = new URLSearchParams(window.location.search).get("view");
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get("view");
     if (requested && nav.some(item => item.id === requested)) setView(requested as View);
+    if (requested === "settings" && params.get("auth") === "signup") setAuthMode("signup");
   }, []);
   useEffect(() => {
     window.scrollTo({ top: 0 });
