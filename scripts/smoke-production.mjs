@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 
 const base = (process.env.COPY_MANAGER_SMOKE_URL || "https://btcc-copy-manager.vercel.app").replace(/\/$/, "");
-const targetPaths = ["/", "/copy-center", "/copy-trading", "/opportunities"];
+const targetPaths = ["/", "/copy-center", "/copy-center/positions", "/copy-trading", "/opportunities"];
 let failures = 0;
 
 async function check(path, verify) {
