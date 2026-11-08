@@ -42,6 +42,23 @@ for (const group of ["live", "purchase", "browserbase", "steel"])
       gates.push(method + " " + path);
     }
   }
+// Verify the mounted credential route rejects nonowners before parsing credentials.
+for (const [cookie, expected] of [["", 401], [other, 403]]) {
+  const r = await fetch(base + "/api/connections/bitget/verify", {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(r.status, expected, "Bitget owner boundary");
+  assert.match(r.headers.get("cache-control"), /no-store/);
+}
+const refreshedVerifier = await fetch(base + "/api/connections/bitget/verify", {
+  method: "POST",
+  headers: { Cookie: "gem_cc_access=expired-jwt; gem_cc_refresh=fixture-refresh", Origin: base, "Content-Type": "application/json" },
+  body: "{}",
+});
+assert.equal(refreshedVerifier.status, 400);
+assert.equal(refreshedVerifier.headers.getSetCookie().length, 2);
 for (const path of [
   "/copy-center",
   "/copy-center?view=settings",

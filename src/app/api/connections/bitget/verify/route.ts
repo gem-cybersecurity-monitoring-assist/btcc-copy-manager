@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { cloudService, guardMutation, sessionCookiesFrom } from "@/lib/cloud-auth-bridge.ts";
+import { withOwnerRequest } from "@/lib/owner-request";
 import { isReadOnlyUtaPermissions } from "@/lib/bitget-readonly.ts";
 
 export const runtime = "nodejs";
@@ -17,17 +17,7 @@ function safeText(value: unknown, max = 256): value is string {
  * Credentials are held only in request memory, never logged or persisted.
  * This route cannot place orders, change account settings, or withdraw funds.
  */
-export async function POST(request: NextRequest) {
-  const blocked = guardMutation(request, "auth");
-  if (blocked) return blocked;
-
-  const service = cloudService();
-  if (!service) return NextResponse.json({ ok: false, error: "Cloud account service is not configured." }, { status: 503, headers: noStore });
-  const session = await service.sessionStatus(sessionCookiesFrom(request));
-  if (session.status !== 200 || session.body.authenticated !== true) {
-    return NextResponse.json({ ok: false, error: "Sign in to GEM Copy Center before verifying an exchange connection." }, { status: 401, headers: noStore });
-  }
-
+async function verify(request: NextRequest) {
   const input = await request.json().catch(() => null) as Record<string, unknown> | null;
   const apiKey = input?.apiKey;
   const secret = input?.secret;
@@ -44,6 +34,7 @@ export async function POST(request: NextRequest) {
       method: "GET",
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
+      redirect: "error",
       headers: {
         "ACCESS-KEY": apiKey.trim(),
         "ACCESS-SIGN": permissionSignature,
@@ -71,6 +62,7 @@ export async function POST(request: NextRequest) {
       method: "GET",
       cache: "no-store",
       signal: AbortSignal.timeout(10_000),
+      redirect: "error",
       headers: {
         "ACCESS-KEY": apiKey.trim(),
         "ACCESS-SIGN": signature,
@@ -93,6 +85,7 @@ export async function POST(request: NextRequest) {
     }
     const numberOrNull = (value: unknown) => {
       if (typeof value !== "string" && typeof value !== "number") return null;
+      if (typeof value === "string" && !value.trim()) return null;
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : null;
     };
@@ -111,4 +104,8 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: "Bitget could not be reached safely. No credentials were stored; try again later." }, { status: 502, headers: noStore });
   }
+}
+
+export async function POST(request: NextRequest) {
+  return withOwnerRequest(request, () => verify(request), { mutation: true });
 }
