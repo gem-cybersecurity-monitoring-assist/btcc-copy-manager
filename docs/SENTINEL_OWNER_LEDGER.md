@@ -1,6 +1,6 @@
 # GEM Copy Center durable Sentinel ledger (isolated backend)
 
-This repository contains the **unapplied** migration `supabase/migrations/20261107_gem_copy_sentinel_ledger.sql`. It has not been run against any connected Supabase organization or project. Do not run it against `crypto-signal-bot`, GEM Enterprise, or a project whose existing data ownership is not verified.
+The reviewed migration `supabase/migrations/20261107_gem_copy_sentinel_ledger.sql` was applied on 7 November 2026 to the dedicated `gem-copy-center` project (`najhqvsxwbpvadoueced`) after owner approval. It was not applied to `crypto-signal-bot` or GEM Enterprise. Production database cutover and real owner acceptance remain pending. See `docs/OWNER_ACCEPTANCE_AND_DATABASE_CUTOVER.md` and the latest shared handoff.
 
 ## Intended architecture
 
@@ -31,4 +31,9 @@ The original PR #67 SQL contained an unterminated Vault-reference constraint and
 
 Run `bash scripts/test-sentinel-ledger.sh` from this repository. It starts a digest-pinned official PostgreSQL 16 container with no network and no published ports, creates synthetic Supabase-style roles and an auth.uid() stub, applies the migration twice, tests its constraints, and removes the disposable container on exit. No hosted database URL, credential or project is used. The same check runs in the path-scoped Sentinel ledger PostgreSQL validation workflow.
 
-Actual local results: migration and reapplication passed; two synthetic owners saw only their own rows across all six tables; anonymous reads and authenticated insert/update/delete were denied; service audit update/delete/truncate were denied; cross-owner connection references, duplicate snapshots/run/action keys, non-Vault credentials, unapproved EXECUTED rows and NaN balances were rejected. The original SQL failed with a syntax error in the same harness. This is isolated database testing, not proof of a real owner's authenticated Supabase session or application persistence. The migration remains unapplied to all connected Supabase projects.
+Actual local results: migration and reapplication passed; two synthetic owners saw only their own rows across all six tables; anonymous reads and authenticated insert/update/delete were denied; service audit update/delete/truncate were denied; cross-owner connection references, duplicate snapshots/run/action keys, non-Vault credentials, unapproved EXECUTED rows and NaN balances were rejected. The original SQL failed with a syntax error in the same harness. This is isolated database testing, not proof of a real owner's authenticated Supabase session or application persistence. At that isolated test checkpoint the migration was still unapplied; the later owner-approved dedicated-project staging is recorded above.
+
+
+## Narrow observation repository — 8 November 2026
+
+`sentinel/observation_repository.py` now provides server-side owner-verified, freshness-checked, idempotent snapshot persistence for the existing schema. It is inactive until explicitly configured and integrated; the existing SQLite store, approval machinery and executor are unchanged. See `docs/SENTINEL_OBSERVATION_PERSISTENCE.md` for the security boundary, actual tests and remaining hosted acceptance. This is not a complete durable worker or approval ledger adapter.

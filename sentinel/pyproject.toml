@@ -19,7 +19,7 @@ ai = ["openai-agents>=0.2.0"]
 dev = ["pytest>=8.0"]
 
 [tool.setuptools]
-py-modules = ["models", "risk", "monitor", "autonomy", "maintenance", "agent_review", "bitget_copy", "execution", "workflow", "storage", "service", "main"]
+py-modules = ["models", "risk", "monitor", "autonomy", "maintenance", "agent_review", "bitget_copy", "execution", "workflow", "storage", "observation_repository", "service", "main"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

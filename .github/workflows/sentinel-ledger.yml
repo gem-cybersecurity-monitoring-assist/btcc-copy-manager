@@ -4,6 +4,8 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
+      - "sentinel/observation_repository.py"
+      - "sentinel/tests/test_observation_repository.py"
       - "scripts/test-sentinel-ledger.sh"
       - ".github/workflows/sentinel-ledger.yml"
   push:
@@ -11,6 +13,8 @@ on:
     paths:
       - "supabase/migrations/**"
       - "supabase/tests/**"
+      - "sentinel/observation_repository.py"
+      - "sentinel/tests/test_observation_repository.py"
       - "scripts/test-sentinel-ledger.sh"
       - ".github/workflows/sentinel-ledger.yml"
 permissions:
