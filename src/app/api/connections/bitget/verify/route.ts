@@ -1,12 +1,27 @@
 import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { withOwnerRequest } from "@/lib/owner-request";
-import { isReadOnlyUtaPermissions } from "@/lib/bitget-readonly.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const noStore = { "Cache-Control": "no-store" };
+
+// Bitget's live /api/v3/account/info returns permType "readonly" (no hyphen),
+// while its docs write "read-only". Normalize before comparing so both are
+// accepted. Permissions are checked by membership: "uta_mgt" must be present
+// and none of the trading, withdrawal or copy-trading permissions may be.
+// Read-and-write keys stay rejected.
+const FORBIDDEN_UTA_PERMISSIONS = ["uta_trade", "withdraw", "copy_futures_position", "copy_futures_order"];
+
+function isReadOnlyUtaPermissions(permissions: unknown, permissionType: unknown): boolean {
+  const normalizedPermissionType =
+    typeof permissionType === "string" ? permissionType.replace(/-/g, "").toLowerCase() : "";
+  if (normalizedPermissionType !== "readonly") return false;
+  if (!Array.isArray(permissions)) return false;
+  if (!permissions.includes("uta_mgt")) return false;
+  return !FORBIDDEN_UTA_PERMISSIONS.some((permission) => permissions.includes(permission));
+}
 
 function safeText(value: unknown, max = 256): value is string {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
@@ -48,10 +63,16 @@ async function verify(request: NextRequest) {
       code?: string;
       data?: { permissions?: unknown; permType?: unknown };
     };
-    if (!permissionResponse.ok || permissionPayload.code !== "00000" || !isReadOnlyUtaPermissions(permissionPayload.data?.permissions, permissionPayload.data?.permType)) {
+    if (!permissionResponse.ok || permissionPayload.code !== "00000") {
       return NextResponse.json({
         ok: false,
-        error: "This key is not strictly read-only. Create a Bitget API key with permission type read-only and UTA management as its only permission; remove trading, copy-trading, withdrawal, and all other permissions."
+        error: "Bitget rejected the credentials. Check the API key, secret and passphrase."
+      }, { status: 403, headers: noStore });
+    }
+    if (!isReadOnlyUtaPermissions(permissionPayload.data?.permissions, permissionPayload.data?.permType)) {
+      return NextResponse.json({
+        ok: false,
+        error: `This key is not strictly read-only. Create a Bitget API key with permission type read-only and UTA management as its only permission; remove trading, copy-trading, withdrawal, and all other permissions. Bitget reported permType ${JSON.stringify(permissionPayload.data?.permType ?? null)} with permissions ${JSON.stringify(permissionPayload.data?.permissions ?? null)}.`
       }, { status: 403, headers: noStore });
     }
 
