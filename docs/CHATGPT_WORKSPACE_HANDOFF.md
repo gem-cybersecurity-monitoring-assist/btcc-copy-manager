@@ -273,3 +273,12 @@ The preview browser reaches Vercel Authentication. The owner selected Passkey in
 ## Handoff recovery — 8 November 2026
 
 The full continuation history above was restored from Git commit `0004da193a9be85cb820d4444e9a8534342f08e1`, preserving the newer Auth-configuration notes. A prior documentation-only update had accidentally replaced the earlier body with a missing in-session value. No application, environment or database changes are part of this repair. Verify source content before concatenation in future updates; never rely on in-session storage surviving a new user turn.
+
+
+## Resumed Codespace and observation persistence implementation — 8 November 2026
+
+The owner resumed the existing Codespace. Desktop Commander codespaces-c39052 reported Online and direct pwd/node/git commands succeeded. Original main README and untracked files, all existing worktrees and the old UI changes were preserved. No new Codespace, pairing or PC was used. Work is isolated on feat/sentinel-observation-persistence in /workspaces/btcc-copy-manager-ledger-fix from main dd6f66e. The old synthetic QA process 106192 was absent after resume; no unrelated process was stopped.
+
+Added a narrow server-side snapshot repository, not an execution/approval adapter or replacement for SQLite. It validates the owner session with Auth on every write, checks a matching existing connection through owner JWT/RLS, preserves exact decimals and provider timestamps, rejects stale/invalid evidence, writes only explicit snapshot fields, and verifies inserted/duplicate records. Explicit dedicated-ledger configuration is required; no legacy database fallback, new endpoint, hosted write, worker, exchange call or credential retrieval was enabled. Bitget fill PnL and aggregate USD metrics are not relabeled as reconciled USDT performance. See docs/SENTINEL_OBSERVATION_PERSISTENCE.md.
+
+Validation: 57 focused repository tests and 143 full Sentinel tests passed; disposable PostgreSQL migration/reapplication, two-owner isolation, client-write denial, audit immutability, deduplication, numeric/approval constraints passed. Hosted authenticated owner and service-writer acceptance still require the dedicated-project owner registration and approved secret provisioning. No production website redeploy is needed for this inactive Python/docs-only change. Production migration approval remains recorded; do not request it again or skip preview acceptance.
