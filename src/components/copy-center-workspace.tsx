@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
+import { AccountEvidencePanel } from "./account-evidence-panel";
 import { PerformancePanel } from "./performance-panel";
 import { MarketOverview } from "./market-overview";
 
@@ -1298,6 +1299,7 @@ export function CopyCenterWorkspace({
         )}
         {!accountOnly && view === "performance" && (
           <div className="cc-page">
+            <AccountEvidencePanel />
             <PerformancePanel />
             <MarketOverview />
           </div>
@@ -1313,6 +1315,7 @@ export function CopyCenterWorkspace({
                 </p>
               </div>
             </section>
+            <AccountEvidencePanel />
             <section className="cc-position-card">
               <span className="cc-position-icon">
                 <WorkspaceIcon name="portfolio" />
@@ -1340,7 +1343,8 @@ export function CopyCenterWorkspace({
               <div>
                 <strong>Live portfolio</strong>
                 <p>
-                  No live balances or positions are loaded. An account check
+                  Live positions are not synchronized. Saved balance observations
+                  are shown separately above when available. An account check
                   does not enable trading.
                 </p>
                 <button

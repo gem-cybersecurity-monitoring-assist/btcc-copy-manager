@@ -8,5 +8,5 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const service = cloudService();
   if (!service) return notConfigured();
-  return toResponse(await service.getLedgerSnapshots(sessionCookiesFrom(request)));
+  return toResponse(await service.getLedgerSnapshots(sessionCookiesFrom(request), process.env.COPY_CENTER_OWNER_USER_ID));
 }

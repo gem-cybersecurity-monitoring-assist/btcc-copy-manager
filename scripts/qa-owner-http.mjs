@@ -63,6 +63,9 @@ for (const [cookie, expected] of [["", 401], [other, 403], [owner, 200]]) {
     assert.equal(result.capabilities.futuresExecution.state, "BLOCKED");
   }
 }
+const ordinarySnapshots = await fetch(base + "/api/v1/ledger/snapshots", { headers: { Cookie: other } });
+assert.equal(ordinarySnapshots.status, 403);
+assert.equal((await ordinarySnapshots.json()).code, "owner_required");
 const refreshedVerifier = await fetch(base + "/api/connections/bitget/verify", {
   method: "POST",
   headers: { Cookie: "gem_cc_access=expired-jwt; gem_cc_refresh=fixture-refresh", Origin: base, "Content-Type": "application/json" },
