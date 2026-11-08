@@ -96,16 +96,20 @@ async function verify(request: NextRequest) {
     const payload = await upstream.json().catch(() => ({})) as {
       code?: string;
       msg?: string;
-      data?: {
-        accountEquity?: unknown;
-        usdtEquity?: unknown;
-        btcEquity?: unknown;
-      };
+      data?: { accountEquity?: string | number; usdtEquity?: string | number; btcEquity?: string | number };
     };
-    if (!upstream.ok || payload.code !== "00000") {
-      return NextResponse.json({ ok: false, error: "Bitget did not verify these credentials. Check the API key, secret, and passphrase." }, { status: 401, headers: noStore });
+    if (!upstream.ok || payload.code !== "00000" || !payload.data) {
+      return NextResponse.json({
+        ok: false,
+        error: "Bitget did not verify these credentials. Check the key, secret, passphrase, IP allow-list, and UTA management/read permission."
+      }, { status: 401, headers: noStore });
     }
-    const numberOrNull = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : null;
+    const numberOrNull = (value: unknown) => {
+      if (typeof value !== "string" && typeof value !== "number") return null;
+      if (typeof value === "string" && !value.trim()) return null;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
     return NextResponse.json({
       ok: true,
       provider: "Bitget",
