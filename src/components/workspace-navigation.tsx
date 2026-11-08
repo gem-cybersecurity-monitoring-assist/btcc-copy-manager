@@ -26,7 +26,7 @@ const tools = [
 export function WorkspaceNavigation() {
   const path = usePathname();
   if (!path || path === "/copy-center") return null;
-  if (path === "/account" || path === "/sign-in") return (
+  if (["/account", "/sign-in", "/forgot-password", "/reset-password"].includes(path)) return (
     <header className="gem-route-header">
       <div className="gem-route-header-inner">
         <a className="gem-route-brand" href="/sign-in" aria-label="GEM Copy Center sign in">

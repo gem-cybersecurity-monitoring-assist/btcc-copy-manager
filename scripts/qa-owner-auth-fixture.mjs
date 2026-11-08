@@ -1,4 +1,6 @@
 import https from "node:https";
+import { createHash } from "node:crypto";
+let recoveryChallenge, recoveryUsed = false;
 import fs from "node:fs";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
@@ -36,7 +38,13 @@ https
         body = JSON.parse(text || "{}");
       } catch {}
       const auth = req.headers.authorization;
+      if (url.pathname === "/auth/v1/recover") {
+        recoveryChallenge = body.code_challenge; recoveryUsed = false;
+        return send(200);
+      }
       if (url.pathname === "/auth/v1/user") {
+        if (auth === "Bearer recovery-jwt")
+          return send(200, { id: OWNER, email_confirmed_at: "2026-11-08T00:00:00Z", is_anonymous: false });
         if (auth === "Bearer outage-jwt") return send(503);
         if (auth === "Bearer owner-jwt")
           return send(200, { id: OWNER, email: "owner@example.test" });
@@ -53,6 +61,13 @@ https
           confirmation_sent_at: new Date().toISOString(),
         });
       if (url.pathname === "/auth/v1/token") {
+        if (url.searchParams.get("grant_type") === "pkce") {
+          if (recoveryUsed || body.auth_code !== "12345678-1234-1234-1234-123456789012" ||
+              createHash("sha256").update(body.code_verifier || "").digest("base64url") !== recoveryChallenge)
+            return send(400);
+          recoveryUsed = true;
+          return send(200, { access_token: "recovery-jwt", refresh_token: "recovery-refresh", expires_in: 3600, user: {id:OWNER} });
+        }
         if (
           url.searchParams.get("grant_type") === "refresh_token" &&
           body.refresh_token !== "fixture-refresh"
