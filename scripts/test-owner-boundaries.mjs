@@ -34,6 +34,8 @@ const qaEnv = {
   PATH: process.env.PATH,
   HOME: process.env.HOME,
   NODE_ENV: "production",
+  // Enabled only for an isolated synthetic Auth fixture; never forwarded from hosted secrets.
+  COPY_CENTER_PASSWORD_RECOVERY_ENABLED: process.env.GEM_QA_RECOVERY_TEST === "1" ? "true" : undefined,
   LD_LIBRARY_PATH: process.env.GEM_QA_BROWSER_LIBS,
   GEM_QA_PLAYWRIGHT_MODULE: process.env.GEM_QA_PLAYWRIGHT_MODULE,
   NEXT_TELEMETRY_DISABLED: "1",

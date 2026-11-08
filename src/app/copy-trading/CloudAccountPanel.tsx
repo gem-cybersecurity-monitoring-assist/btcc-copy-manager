@@ -396,6 +396,7 @@ export default function CloudAccountPanel({
                 ? "I already have an account"
                 : "Create an account"}
             </button>
+            <a href="/forgot-password" className="secondary-btn">Forgot password?</a>
             {offerResend && (
               <button
                 type="button"

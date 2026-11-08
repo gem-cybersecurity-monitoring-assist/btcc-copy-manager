@@ -10,6 +10,10 @@
 
 import { LIMITS, parseWorkspace, type Workspace } from "./workspace.ts";
 
+export const RECOVERY_VERIFIER_COOKIE = "gem_cc_recovery_verifier";
+export const RECOVERY_COOKIE = "gem_cc_recovery";
+export const RECOVERY_MAX_AGE = 600;
+
 export const ACCESS_COOKIE = "gem_cc_access";
 export const REFRESH_COOKIE = "gem_cc_refresh";
 export const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
@@ -63,7 +67,7 @@ export type AuthFailure = { status: number; code?: string; message?: string };
  * Converts a Supabase Auth failure into a safe, actionable message. Raw upstream text is only
  * passed through for known-safe validation errors; everything else gets a fixed message.
  */
-export function describeAuthFailure(context: "signup" | "login" | "resend" | "session", failure: AuthFailure): Result {
+export function describeAuthFailure(context: "signup" | "login" | "resend" | "session" | "recovery", failure: AuthFailure): Result {
   const code = failure.code ?? "";
   const text = (failure.message ?? "").toLowerCase();
   if (failure.status === 0) return { status: 503, body: { error: "The authentication service could not be reached. Check your connection and try again.", code: "auth_unreachable" } };
@@ -249,6 +253,72 @@ export class CloudService {
       return failure;
     }
     return { status: 200, body: { ok: true, message: "If this address has an unconfirmed account, a new confirmation email has been requested. Delivery is not confirmed by this dashboard; check your inbox and spam folder." } };
+  }
+
+
+  async requestRecovery(body: unknown, challenge: string, redirectTo: string): Promise<Result> {
+    const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const email = typeof record.email === "string" ? record.email.trim().toLowerCase() : "";
+    if (!EMAIL_PATTERN.test(email) || email.length > 254)
+      return { status: 400, body: { error: "Enter a valid email address.", code: "invalid_email" } };
+    const result = await this.call("/auth/v1/recover?redirect_to=" + encodeURIComponent(redirectTo), {
+      method: "POST", body: JSON.stringify({ email, code_challenge: challenge, code_challenge_method: "s256" }),
+    });
+    if (!result.ok) {
+      const failure = describeAuthFailure("recovery", CloudService.failure(result.status, result.data));
+      // Match the provider's anti-enumeration behavior. Surface only delivery/rate/service failures.
+      if (failure.status !== 400 && failure.status !== 409 && failure.status !== 403) return failure;
+    }
+    return { status: 200, body: { ok: true, message: "If this address has an account, a recovery email has been requested. Delivery is not confirmed. Open the newest link in this same browser within 10 minutes. A new request replaces the previous recovery attempt." } };
+  }
+
+  async exchangeRecovery(body: unknown, verifier: string | undefined): Promise<Result> {
+    const code = body && typeof body === "object" ? (body as Record<string, unknown>).code : undefined;
+    const cleared = [{ name: RECOVERY_VERIFIER_COOKIE, value: "", maxAge: 0 }];
+    const invalid: Result = { status: 400, body: { error: "This recovery link expired, was already used, or was opened in a different browser. Request a new link here.", code: "invalid_recovery" }, cookies: [...cleared, { name: RECOVERY_COOKIE, value: "", maxAge: 0 }] };
+    if (typeof code !== "string" || !/^[0-9a-f-]{36}$/i.test(code) || !verifier || !/^[A-Za-z0-9_-]{43}$/.test(verifier)) return invalid;
+    const result = await this.call("/auth/v1/token?grant_type=pkce", {
+      method: "POST", body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
+    });
+    if (!result.ok) return result.status === 0 || result.status >= 500
+      ? { status: 503, body: { error: "Recovery could not be checked. Request a new link and try again.", code: "auth_unreachable" }, cookies: invalid.cookies } : invalid;
+    const tokens = result.data as Tokens;
+    if (!tokens.access_token || !tokens.refresh_token || typeof tokens.user?.id !== "string") return invalid;
+    // Never create normal application cookies or expose either token to JavaScript.
+    return { status: 200, body: { ok: true }, cookies: [...cleared, { name: RECOVERY_COOKIE, value: tokens.access_token, maxAge: Math.min(RECOVERY_MAX_AGE, tokens.expires_in ?? RECOVERY_MAX_AGE) }] };
+  }
+
+  async recoveryStatus(access: string | undefined): Promise<Result> {
+    if (!access) return { status: 401, body: { ready: false, code: "recovery_required" } };
+    const result = await this.call("/auth/v1/user", { headers: { Authorization: "Bearer " + access } });
+    if (result.status === 0 || result.status >= 500)
+      return { status: 503, body: { ready: false, error: "The account service is unavailable. Try again shortly." } };
+    if (!result.ok || typeof result.data?.id !== "string" || !result.data.email_confirmed_at || result.data.is_anonymous === true)
+      return { status: 401, body: { ready: false, code: "recovery_required" }, cookies: [{ name: RECOVERY_COOKIE, value: "", maxAge: 0 }] };
+    return { status: 200, body: { ready: true } };
+  }
+
+  async resetPassword(body: unknown, access: string | undefined): Promise<Result> {
+    const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const password = record.password;
+    if (typeof password !== "string" || password.length < PASSWORD_MIN || password.length > PASSWORD_MAX || password !== record.confirmPassword)
+      return { status: 400, body: { error: "Use matching passwords between 12 and 256 characters.", code: "invalid_password" } };
+    const valid = await this.recoveryStatus(access);
+    if (valid.status !== 200) return valid;
+    const result = await this.call("/auth/v1/user", {
+      method: "PUT", headers: { Authorization: "Bearer " + access }, body: JSON.stringify({ password }),
+    });
+    if (!result.ok) return describeAuthFailure("recovery", CloudService.failure(result.status, result.data));
+    if (typeof result.data?.id !== "string")
+      return { status: 502, body: { error: "The password update could not be confirmed. Try signing in or request a new recovery link.", code: "password_update_unverified" } };
+    const revoked = await this.call("/auth/v1/logout?scope=global", { method: "POST", headers: { Authorization: "Bearer " + access } });
+    return {
+      status: 200,
+      body: { ok: true, message: revoked.ok
+        ? "Password changed. Sign in with your new password. Other refresh sessions were revoked; existing access tokens can remain valid until expiry."
+        : "Password changed. Sign in with your new password. Other sessions could not be confirmed signed out; existing access tokens can remain valid until expiry." },
+      cookies: [...clearedCookies(), { name: RECOVERY_COOKIE, value: "", maxAge: 0 }, { name: RECOVERY_VERIFIER_COOKIE, value: "", maxAge: 0 }],
+    };
   }
 
   async logout(cookies: SessionCookies): Promise<Result> {
