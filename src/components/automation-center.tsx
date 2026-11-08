@@ -10,6 +10,10 @@ import "./automation-center.css";
 
 type BrowserState = ReturnType<typeof inspectLocalAutomation>;
 type Service = { status: "checking" | "connected" | "unavailable"; message: string };
+type OwnerConnections = { status: "checking" | "signed_out" | "unavailable" | "ready"; records: Array<{
+  id: string; venue: string; status: string; lastVerifiedAt: string | null;
+}>; limited: boolean };
+
 const idle: BrowserState = { available: false, configured: false, strategyCount: 0, trackedProviders: 0,
   openAlerts: 0, intervalHours: 24, lastRunAt: null, summary: null, error: null };
 
@@ -21,6 +25,7 @@ function displayTime(value: string | null) {
 
 export function AutomationCenter() {
   const [browser, setBrowser] = useState<BrowserState>(idle);
+  const [ownerConnections, setOwnerConnections] = useState<OwnerConnections>({ status: "checking", records: [], limited: false });
   const [sentinel, setSentinel] = useState<Service>({ status: "checking", message: "Checking…" });
   const [agent, setAgent] = useState<Service>({ status: "checking", message: "Checking…" });
   const [market, setMarket] = useState<Service>({ status: "checking", message: "Checking…" });
@@ -34,13 +39,29 @@ export function AutomationCenter() {
       fetch("/api/v1/sentinel/health", { cache: "no-store" }),
       fetch("/api/agent", { cache: "no-store" }),
       fetch("/api/v1/market/overview", { cache: "no-store" }),
+      fetch("/api/v1/ledger/connections", { cache: "no-store", credentials: "same-origin", signal: AbortSignal.timeout(12_000) }),
     ]);
     const read = async (result: PromiseSettledResult<Response>): Promise<{ ok: boolean; body: Record<string, unknown> }> => {
       if (result.status !== "fulfilled") return { ok: false, body: {} };
       try { return { ok: result.value.ok, body: await result.value.json() as Record<string, unknown> }; }
       catch { return { ok: false, body: {} }; }
     };
-    const [s, a, m] = await Promise.all(checks.map(read));
+    const [s, a, m, c] = await Promise.all(checks.map(read));
+    const connectionCheck = checks[3];
+    if (connectionCheck.status === "fulfilled" && connectionCheck.value.status === 401) {
+      setOwnerConnections({ status: "signed_out", records: [], limited: false });
+    } else if (connectionCheck.status === "fulfilled" && connectionCheck.value.ok) {
+      try {
+        const payload = c.body as {connections?: unknown; limited?: boolean};
+        const records = Array.isArray(payload.connections) ? payload.connections.filter((x): x is OwnerConnections["records"][number] =>
+          x && typeof x.id === "string" && typeof x.venue === "string" &&
+          ["DISCONNECTED", "READ_ONLY", "VERIFIED", "PAUSED", "ERROR"].includes(x.status) &&
+          (x.lastVerifiedAt === null || typeof x.lastVerifiedAt === "string")) : null;
+        setOwnerConnections(records ? { status: "ready", records, limited: payload.limited === true } : { status: "unavailable", records: [], limited: false });
+      } catch { setOwnerConnections({ status: "unavailable", records: [], limited: false }); }
+    } else {
+      setOwnerConnections({ status: "unavailable", records: [], limited: false });
+    }
     setSentinel({ status: s.ok && s.body.connected === true ? "connected" : "unavailable",
       message: s.ok && s.body.connected === true ? "Service health verified" : "Persistent execution service not confirmed" });
     setAgent({ status: a.ok && a.body.configured === true && a.body.signedIn === true ? "connected" : "unavailable",
@@ -98,6 +119,24 @@ export function AutomationCenter() {
         <a href="/copy-trading?engine=monitoring">Alerts and audit</a>
         <a href="/copy-trading?engine=risk">Risk controls</a>
       </div>
+    </section>
+
+    <section className="gem-auto-panel" aria-label="Verified owner connection records">
+      <div className="gem-auto-heading"><div><span className="gem-auto-eyebrow">SAVED ACCOUNT EVIDENCE</span><h2>Provider connection records</h2></div>
+        <span className={ownerConnections.status === "ready" ? "gem-auto-status good" : "gem-auto-status"}>{ownerConnections.status === "ready" ? "Owner ledger read" : "Not verified"}</span>
+      </div>
+      <p>{ownerConnections.status === "checking" ? "Checking owner-scoped connection records…" :
+        ownerConnections.status === "signed_out" ? "Sign in to see saved owner connection records. Browser-local provider counters are not proof of a verified account." :
+        ownerConnections.status === "unavailable" ? "Owner connection records cannot be verified. Check your account session and dedicated ledger configuration." :
+        ownerConnections.records.length ? "Saved statuses are not proof that an exchange session is currently active." :
+        "No persisted provider connections are recorded for this owner. No balances, positions or monitoring can be inferred from browser settings."}</p>
+      {ownerConnections.records.map(record => <p key={record.id} className="gem-auto-summary">
+        <strong>{record.venue.toUpperCase()}</strong> — {record.status.replaceAll("_", " ")}.
+        {record.lastVerifiedAt ? " Last checked: " + new Date(record.lastVerifiedAt).toLocaleString() + ". This may be stale." : " No verified check time recorded."}
+      </p>)}
+      {ownerConnections.limited && <p className="gem-auto-warning">Only the latest 25 connection records are shown.</p>}
+      <div className="gem-auto-actions"><a href={ownerConnections.status === "signed_out" ? "/sign-in" : "/copy-center?view=providers"}>
+        {ownerConnections.status === "signed_out" ? "Sign in" : "Review account connections"}</a></div>
     </section>
 
     <section className="gem-auto-panel">
