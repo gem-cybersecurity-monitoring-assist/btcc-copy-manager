@@ -129,9 +129,27 @@ export class CloudService {
       const response = await this.fetchImpl(this.config.url + path, {
         ...init,
         cache: "no-store",
+        redirect: "error",
+        signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000),
         headers: { apikey: this.config.key, "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) },
       });
-      const data = await response.json().catch(() => ({}));
+      // The largest supported workspace is 750 KiB. Bound all Auth/REST bodies
+      // above that limit without trusting Content-Length or reading secrets into logs.
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let bytes = 0, text = "";
+      try {
+        if (reader) while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          bytes += chunk.value.byteLength;
+          if (bytes > 1_048_576) { await reader.cancel(); throw Error("Response limit"); }
+          text += decoder.decode(chunk.value, { stream: true });
+        }
+      } finally { reader?.releaseLock(); }
+      text += decoder.decode();
+      let data: any = {};
+      try { data = JSON.parse(text); } catch { /* normal sanitized validation handles invalid JSON */ }
       return { ok: response.ok, status: response.status, data };
     } catch {
       return { ok: false, status: 0, data: {} };
