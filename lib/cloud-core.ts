@@ -274,10 +274,15 @@ export class CloudService {
    * cannot select another owner or request the full unfiltered table.
    * This path uses the public app key plus the user's JWT, never service_role.
    */
-  async getLedgerSnapshots(cookies: SessionCookies): Promise<Result> {
+  async getLedgerSnapshots(cookies: SessionCookies, ownerUserId: string | undefined): Promise<Result> {
     const auth = await this.requireSession(cookies, "read");
     if ("status" in auth) return auth;
     const { session } = auth;
+    const owner = ownerUserId?.trim().toLowerCase();
+    if (!owner || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(owner))
+      return { status: 503, body: { ok: false, code: "owner_not_configured", error: "Workspace owner access has not been configured." }, cookies: auth.cookies };
+    if (session.user.id.toLowerCase() !== owner)
+      return { status: 403, body: { ok: false, code: "owner_required", error: "Account evidence is restricted to the workspace owner." }, cookies: auth.cookies };
     const fields = "id,connection_id,captured_at,recorded_at,source_kind,equity_quote,available_quote,realized_pnl_quote,unrealized_pnl_quote,quote_currency,native_snapshot_id";
     const query = new URLSearchParams({
       select: fields,

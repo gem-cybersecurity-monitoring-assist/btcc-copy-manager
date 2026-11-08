@@ -118,6 +118,29 @@ for (const width of [320, 390, 1440]) {
     await page.locator("body").waitFor();
     await fit(path);
   }
+  // Synthetic observation payload: never a real provider account.
+  let evidenceMode = "records";
+  await page.route("**/api/v1/ledger/snapshots", route => route.fulfill({
+    status: evidenceMode === "unavailable" ? 503 : 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true, source: "owner_scoped_ledger", snapshots: evidenceMode === "empty" ? [] : [{
+      id: "synthetic-snapshot", connectionId: "synthetic-account", capturedAt: "2020-01-01T00:00:00Z", recordedAt: "2020-01-01T00:00:01Z", sourceKind: "official_api", quoteCurrency: "USDT", equityQuote: "99999999999999999999.12345678", availableQuote: null, realizedPnlQuote: null, unrealizedPnlQuote: "-1.23"
+    }, { id: "synthetic-manual", connectionId: "synthetic-account", capturedAt: "2020-01-01T00:00:00Z", recordedAt: "2020-01-01T00:00:01Z", sourceKind: "manual_attestation", quoteCurrency: "USD", equityQuote: "50", availableQuote: null, realizedPnlQuote: null, unrealizedPnlQuote: null }] }),
+  }));
+  await page.goto(base + "/copy-center?view=portfolio");
+  const evidence = page.getByRole("region", { name: "Saved account evidence" });
+  await evidence.getByText("99999999999999999999.12345678 USDT", { exact: true }).waitFor();
+  await evidence.getByText("Manual record — not exchange verified", { exact: true }).waitFor();
+  assert.equal(await evidence.getByText(/Stale observation/).count(), 2);
+  assert.ok(await evidence.getByText("Unavailable", { exact: true }).count() >= 2);
+  await fit("Account evidence with exact decimals");
+  evidenceMode = "empty";
+  await evidence.getByRole("button", { name: "Refresh account evidence" }).click();
+  await evidence.getByText(/No saved account observations yet/).waitFor();
+  evidenceMode = "unavailable";
+  await evidence.getByRole("button", { name: "Refresh account evidence" }).click();
+  await evidence.getByText(/Account evidence is unavailable/).waitFor();
+  assert.equal(await evidence.getByText("99999999999999999999.12345678 USDT", { exact: true }).count(), 0);
   await page.goto(base + "/copy-center?view=providers");
   await page
     .getByRole("button", { name: "Check read-only access", exact: true })
