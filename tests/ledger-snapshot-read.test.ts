@@ -27,14 +27,14 @@ function setup(opts: { user?: string; snapshots?: unknown; restStatus?: number; 
 
 test("signed-out snapshots fail before database calls", async () => {
   const { service, calls } = setup();
-  const result = await service.getLedgerSnapshots({});
+  const result = await service.getLedgerSnapshots({}, owner);
   assert.equal(result.status, 401);
   assert.equal(calls.length, 0);
 });
 
 test("uses verified owner JWT and owner filter, with no secret exposure", async () => {
   const { service, calls } = setup();
-  const result = await service.getLedgerSnapshots({ access: "user-jwt" });
+  const result = await service.getLedgerSnapshots({ access: "user-jwt" }, owner);
   assert.equal(result.status, 200);
   assert.equal(calls.length, 2);
   const dbCall = calls[1];
@@ -49,17 +49,23 @@ test("uses verified owner JWT and owner filter, with no secret exposure", async 
   assert(!JSON.stringify(result.body).includes("user-jwt"));
 });
 
-test("changing authenticated identity changes owner scope", async () => {
+test("ordinary signed-in identity is rejected before database access", async () => {
   const { service, calls } = setup({ user: other, snapshots: [] });
-  const result = await service.getLedgerSnapshots({ access: "token" });
-  assert.equal(result.status, 200);
-  assert.deepEqual(result.body.snapshots, []);
-  assert.equal(new URL(calls[1].url).searchParams.get("user_id"), "eq." + other);
+  const result = await service.getLedgerSnapshots({ access: "token" }, owner);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, "owner_required");
+  assert.equal(calls.length, 1);
+});
+test("missing owner configuration fails closed before database access", async () => {
+  const { service, calls } = setup();
+  const result = await service.getLedgerSnapshots({ access: "token" }, undefined);
+  assert.equal(result.status, 503);
+  assert.equal(calls.length, 1);
 });
 
 test("unapplied schema is not misreported as empty account data", async () => {
   const { service } = setup({ restStatus: 404, restCode: "PGRST205" });
-  const result = await service.getLedgerSnapshots({ access: "token" });
+  const result = await service.getLedgerSnapshots({ access: "token" }, owner);
   assert.equal(result.status, 503);
   assert.equal(result.body.code, "ledger_not_ready");
   assert.equal(result.body.snapshots, undefined);
@@ -67,14 +73,14 @@ test("unapplied schema is not misreported as empty account data", async () => {
 
 test("network failure fails closed, without upstream secret in error", async () => {
   const { service } = setup({ errorOnFetch: true });
-  const result = await service.getLedgerSnapshots({ access: "token" });
+  const result = await service.getLedgerSnapshots({ access: "token" }, owner);
   assert.equal(result.status, 503);
   assert(!JSON.stringify(result).includes("secret"));
 });
 
 test("invalid upstream rows are not displayed as verified balances", async () => {
   const { service } = setup({ snapshots: [{ ...row, equity_quote: "NaN" }] });
-  const result = await service.getLedgerSnapshots({ access: "token" });
+  const result = await service.getLedgerSnapshots({ access: "token" }, owner);
   assert.equal(result.status, 502);
   assert.equal(result.body.code, "ledger_invalid");
 });

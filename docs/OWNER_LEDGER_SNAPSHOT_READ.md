@@ -42,3 +42,12 @@ persistence or proof of real signed-in account access.
 - `tests/ledger-snapshot-read.test.ts` tests session rejection, JWT and
   owner filtering, provenance redaction, missing schema, network errors,
   and invalid financial evidence using a mock Supabase API.
+
+
+## Dashboard integration — 8 November 2026
+
+The destination is now the approved dedicated gem-copy-center project; its schema and copied owner workspace exist. Earlier unapplied/unidentified statements above describe the original implementation checkpoint, not current staging. Production database cutover remains separate.
+
+Positions and Performance now consume the existing GET endpoint through AccountEvidencePanel. Requests use same-origin cookies, no-store, a 15-second timeout and unmount cancellation. No credentials or responses are persisted in browser storage. Failed refreshes clear prior financial values. The panel selects latest observations separately per connection, source and currency; decimal strings remain exact, null is unavailable, capture/record times and stale/future warnings are visible. A local age timer does not collect data or claim continuous monitoring.
+
+Manual entries are explicitly not exchange verified. Reported realized/unrealized PnL is not reconciled daily ROI. This integration does not synthesize positions, fills, funding, fees or cash flows and does not activate an observation worker. Empty records, unavailable services and missing schemas remain distinct from verified zero balances.
