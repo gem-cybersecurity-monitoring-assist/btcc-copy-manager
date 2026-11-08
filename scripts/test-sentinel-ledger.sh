@@ -9,7 +9,9 @@ container_id="$(docker run -d --rm --network none -e POSTGRES_HOST_AUTH_METHOD=t
 trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
 ready=false
 for attempt in {1..30}; do
-  if docker exec "$container_id" pg_isready -U postgres -q; then ready=true; break; fi
+  # The entrypoint temporarily serves a Unix socket during init, then stops it.
+  # Wait for the final TCP listener to avoid accepting that transient server.
+  if docker exec "$container_id" pg_isready -h 127.0.0.1 -U postgres -q; then ready=true; break; fi
   sleep 1
 done
 if [[ "$ready" != true ]]; then echo "Disposable PostgreSQL did not become ready." >&2; exit 1; fi

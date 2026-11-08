@@ -28,3 +28,5 @@ Before activation: finish the approved dedicated-project owner registration and 
 - Full Sentinel suite: 143 tests passed after the final change.
 - `bash scripts/test-sentinel-ledger.sh`: real disposable PostgreSQL schema application twice, two-owner RLS, anonymous/client-write denial, audit immutability, foreign keys, deduplication, approval and numeric constraints passed. This workflow now also runs for observation-repository changes.
 - Hosted owner JWTs, service-role writes, exchange access and 24/7 operations remain untested. Local fixtures and a disposable database do not establish production acceptance.
+
+The first GitHub PostgreSQL job exposed a pre-existing initialization race: the readiness probe accepted the temporary Unix-socket server while the official image was restarting into its final server. The harness now waits for the final container-local TCP listener. No network or port is exposed. Local rerun passed; inspect the latest GitHub job before merging.
