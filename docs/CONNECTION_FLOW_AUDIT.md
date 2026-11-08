@@ -30,3 +30,5 @@ The previously spoken Bitget passphrase must not be reused. Before any separatel
 ## Evidence and limits
 
 Local built-app synthetic HTTP checks cover nonowner credential-route rejection and refresh-cookie preservation without calling Bitget. Full web tests/build and Sentinel tests run separately. Browser viewport results are synthetic local sessions, not real hosted JWT, iPhone Safari or exchange acceptance. Official USD aggregate equity remains distinct from USDT. Funding/cash-flow reconciliation, durable observations, missing positions/fills and actual net returns remain unavailable where evidence is absent.
+
+The legacy capabilities API also claimed VERIFIED native copying without current acceptance. It now requires the owner and returns unverified provider capability and blocked execution regardless of configuration. Mounted HTTP tests assert these states.

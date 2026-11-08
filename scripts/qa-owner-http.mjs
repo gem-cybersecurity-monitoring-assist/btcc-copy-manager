@@ -52,6 +52,17 @@ for (const [cookie, expected] of [["", 401], [other, 403]]) {
   assert.equal(r.status, expected, "Bitget owner boundary");
   assert.match(r.headers.get("cache-control"), /no-store/);
 }
+for (const [cookie, expected] of [["", 401], [other, 403], [owner, 200]]) {
+  const r = await fetch(base + "/api/v1/capabilities", { headers: { Cookie: cookie } });
+  assert.equal(r.status, expected);
+  assert.match(r.headers.get("cache-control"), /no-store/);
+  if (expected === 200) {
+    const result = await r.json();
+    assert.equal(result.mode, "disabled");
+    assert.equal(result.capabilities.nativeCopyTrading.state, "UNVERIFIED");
+    assert.equal(result.capabilities.futuresExecution.state, "BLOCKED");
+  }
+}
 const refreshedVerifier = await fetch(base + "/api/connections/bitget/verify", {
   method: "POST",
   headers: { Cookie: "gem_cc_access=expired-jwt; gem_cc_refresh=fixture-refresh", Origin: base, "Content-Type": "application/json" },
