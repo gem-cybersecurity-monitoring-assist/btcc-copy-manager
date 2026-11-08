@@ -416,6 +416,45 @@ export class CloudService {
     return { status: 200, body: { ok: true, snapshots: rows, source: "owner_scoped_ledger", limit: 25 }, cookies: auth.cookies };
   }
 
+  /** Owner JWT + RLS; export only safe connection statuses, no Vault or API credentials. */
+  async getLedgerConnections(cookies: SessionCookies, ownerUserId: string | undefined): Promise<Result> {
+    const auth = await this.requireSession(cookies, "read");
+    if ("status" in auth) return auth;
+    const owner = ownerUserId?.trim().toLowerCase();
+    if (!owner || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(owner))
+      return { status: 503, body: { ok: false, code: "owner_not_configured" }, cookies: auth.cookies };
+    if (auth.session.user.id.toLowerCase() !== owner)
+      return { status: 403, body: { ok: false, code: "owner_required" }, cookies: auth.cookies };
+    const query = new URLSearchParams({
+      select: "id,venue,connection_status,last_verified_at,updated_at",
+      user_id: "eq." + auth.session.user.id, order: "updated_at.desc", limit: "25",
+    });
+    const response = await this.call("/rest/v1/gem_copy_connections?" + query, {
+      headers: { Authorization: "Bearer " + auth.session.accessToken },
+    });
+    if (!response.ok) {
+      const absent = response.status === 404 || ["PGRST205", "42P01"].includes(String(response.data?.code ?? ""));
+      return { status: absent || response.status === 0 ? 503 : response.status === 401 || response.status === 403 ? 403 : 502,
+        body: { ok: false, code: absent ? "ledger_not_ready" : "ledger_read_failed" }, cookies: auth.cookies };
+    }
+    if (!Array.isArray(response.data))
+      return { status: 502, body: { ok: false, code: "ledger_invalid" }, cookies: auth.cookies };
+    const connections: Record<string, string | null>[] = [];
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const record of response.data) {
+      if (!record || typeof record !== "object" || Array.isArray(record) ||
+          typeof record.id !== "string" || !uuid.test(record.id) ||
+          !["bitget", "btcc", "gate", "mt5", "other"].includes(record.venue) ||
+          !["DISCONNECTED", "READ_ONLY", "VERIFIED", "PAUSED", "ERROR"].includes(record.connection_status) ||
+          typeof record.updated_at !== "string" || !Number.isFinite(Date.parse(record.updated_at)) ||
+          !(record.last_verified_at === null || (typeof record.last_verified_at === "string" && Number.isFinite(Date.parse(record.last_verified_at)))))
+        return { status: 502, body: { ok: false, code: "ledger_invalid" }, cookies: auth.cookies };
+      connections.push({ id: record.id, venue: record.venue, status: record.connection_status,
+        lastVerifiedAt: record.last_verified_at, updatedAt: record.updated_at });
+    }
+    return { status: 200, body: { ok: true, source: "owner_scoped_ledger", connections, limited: connections.length === 25 }, cookies: auth.cookies };
+  }
+
   async putWorkspace(
     cookies: SessionCookies,
     rawBody: string,
