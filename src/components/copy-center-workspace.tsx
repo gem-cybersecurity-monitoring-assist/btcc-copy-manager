@@ -1576,6 +1576,7 @@ export function CopyCenterWorkspace({
                         : "Create account"}
                     </button>
                   </div>
+                  <a href="/forgot-password" className="secondary-btn">Forgot password?</a>
                   <button
                     type="button"
                     className="cc-text-button"
