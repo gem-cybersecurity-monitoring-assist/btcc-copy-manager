@@ -62,4 +62,3 @@ test("untrusted status and dates fail closed",async()=>{
     assert.equal(r.status,502);assert.equal(r.body.code,"ledger_invalid");
   }
 });
-
