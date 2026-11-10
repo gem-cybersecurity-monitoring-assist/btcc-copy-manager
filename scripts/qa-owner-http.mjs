@@ -52,6 +52,32 @@ for (const [cookie, expected] of [["", 401], [other, 403]]) {
   assert.equal(r.status, expected, "Bitget owner boundary");
   assert.match(r.headers.get("cache-control"), /no-store/);
 }
+// Persistent read-only connection routes: owner-only, same-origin writes, and
+// without server-only storage keys the owner gets an explicit unconfigured state.
+for (const [path, method] of [
+  ["/api/connections/bitget", "GET"],
+  ["/api/connections/bitget", "POST"],
+  ["/api/connections/bitget", "DELETE"],
+  ["/api/connections/bitget/refresh", "POST"],
+]) {
+  const body = method === "GET" ? {} : { body: "{}" };
+  for (const [cookie, expected] of [["", 401], [other, 403]]) {
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    assert.equal(r.status, expected, path + " " + method);
+    assert.match(r.headers.get("cache-control"), /no-store/);
+  }
+  if (method !== "GET") {
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    assert.equal(cross.status, 403, path + " cross-site");
+  }
+  const ownerResult = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" },
+    ...(method === "POST" && path.endsWith("/bitget") ? { body: JSON.stringify({ apiKey: "k", secret: "s", passphrase: "p" }) } : body) });
+  assert.equal(ownerResult.status, 503, path + " " + method + " unconfigured");
+  const result = await ownerResult.json();
+  assert.equal(result.code, "connection_storage_not_configured");
+  assert.ok(result.missing.includes("SUPABASE_SERVICE_ROLE_KEY") && result.missing.includes("CONNECTION_SECRETS_KEY"));
+  gates.push(method + " " + path);
+}
 for (const [cookie, expected] of [["", 401], [other, 403], [owner, 200]]) {
   const r = await fetch(base + "/api/v1/capabilities", { headers: { Cookie: cookie } });
   assert.equal(r.status, expected);

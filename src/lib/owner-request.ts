@@ -10,7 +10,7 @@ import { authorizeSentinelOwner } from "../../lib/sentinel-access.ts";
 /** Owner authorization precedes provider access, diagnostics, billing or execution. */
 export async function withOwnerRequest(
   request: NextRequest,
-  operation: () => Promise<Response>,
+  operation: (owner: { userId: string }) => Promise<Response>,
   options: {
     mutation?: boolean;
     requireJson?: boolean;
@@ -39,7 +39,7 @@ export async function withOwnerRequest(
       },
       cookies: access.result.cookies,
     });
-  const response = await operation();
+  const response = await operation({ userId: access.userId! });
   response.headers.set("Cache-Control", "no-store");
   for (const cookie of toResponse(access.result).headers.getSetCookie())
     response.headers.append("Set-Cookie", cookie);

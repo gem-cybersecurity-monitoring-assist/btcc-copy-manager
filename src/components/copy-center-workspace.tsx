@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
 import { AccountEvidencePanel } from "./account-evidence-panel";
 import { PerformancePanel } from "./performance-panel";
 import { MarketOverview } from "./market-overview";
+import {
+  BITGET_CONNECTION_EVENT,
+  BitgetConnectionPanel,
+  type BitgetConnectionView,
+} from "./bitget-connection-panel";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = {
@@ -51,9 +56,9 @@ const starterProviders: Provider[] = [
     id: "bitget",
     name: "Bitget",
     kind: "exchange",
-    description: "One-time read-only account-assets verification.",
+    description: "Live read-only balances and positions through the official API.",
     state: "not-connected",
-    note: "A one-time read-only account-assets check is available after sign-in; credentials are not stored.",
+    note: "Save a read-only Bitget API key after sign-in. It is encrypted on the GEM server and never stored in this browser.",
   },
   {
     id: "phantom",
@@ -203,6 +208,37 @@ export function CopyCenterWorkspace({
   const [bgMessage, setBgMessage] = useState("");
   const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
+  const onBitgetStatus = useCallback(
+    (connection: BitgetConnectionView | null) => {
+      setProviders((old) =>
+        old.map((p) => {
+          if (p.id !== "bitget") return p;
+          if (connection && connection.status === "READ_ONLY")
+            return {
+              ...p,
+              state: "connected",
+              note:
+                "Read-only connection saved" +
+                (connection.lastVerifiedAt
+                  ? "; last verified " +
+                    new Date(connection.lastVerifiedAt).toLocaleString()
+                  : "") +
+                ". Credentials are encrypted on the server.",
+            };
+          if (connection && connection.status === "ERROR")
+            return {
+              ...p,
+              state: "not-connected",
+              note: "The saved Bitget connection needs attention. Review it in Accounts.",
+            };
+          return p.state === "connected"
+            ? { ...p, state: "not-connected", note: starterProviders.find((x) => x.id === "bitget")!.note }
+            : p;
+        }),
+      );
+    },
+    [],
+  );
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = accountOnly ? "settings" : params.get("view");
@@ -280,6 +316,25 @@ export function CopyCenterWorkspace({
         : outcome.message,
     );
   }, []);
+
+  // Bitget connection state always comes from the server, never browser storage.
+  useEffect(() => {
+    if (!cloudSession.authenticated) return;
+    const controller = new AbortController();
+    void fetch("/api/connections/bitget", {
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data && data.ok === true) onBitgetStatus(data.connection ?? null);
+      })
+      .catch(() => {
+        /* Status stays "not connected"; nothing is inferred. */
+      });
+    return () => controller.abort();
+  }, [cloudSession.authenticated, onBitgetStatus]);
 
   useEffect(() => {
     try {
@@ -748,6 +803,53 @@ export function CopyCenterWorkspace({
       );
     } finally {
       setCloudBusy(false);
+    }
+  }
+
+  async function saveBitget() {
+    setBgBusy(true);
+    setBgMessage("");
+    setBgResult(null);
+    try {
+      if (!cloudSession.authenticated)
+        throw new Error("Sign in first to connect an exchange account.");
+      const response = await fetch("/api/connections/bitget", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: bgKey,
+          secret: bgSecret,
+          passphrase: bgPhrase,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true)
+        throw new Error(
+          typeof data.error === "string"
+            ? data.error
+            : "Bitget connection failed.",
+        );
+      onBitgetStatus(data.connection ?? null);
+      window.dispatchEvent(new Event(BITGET_CONNECTION_EVENT));
+      window.dispatchEvent(new Event("gem:account-evidence-changed"));
+      log(
+        "Bitget connected (read-only)",
+        "Read-only permissions verified; balances read. Credentials are encrypted on the server. No order or transfer endpoint exists.",
+      );
+      setBgMessage(
+        "Read-only connection saved. Balances and positions are shown in Accounts and Positions; use Re-verify & refresh any time.",
+      );
+    } catch (error) {
+      setBgMessage(
+        error instanceof Error ? error.message : "Connection failed.",
+      );
+    } finally {
+      setBgKey("");
+      setBgSecret("");
+      setBgPhrase("");
+      setBgBusy(false);
     }
   }
 
@@ -1271,15 +1373,19 @@ export function CopyCenterWorkspace({
                 </p>
               </div>
             </section>
+            {cloudSession.authenticated && (
+              <BitgetConnectionPanel mode="accounts" onStatus={onBitgetStatus} />
+            )}
             <div className="cc-provider-grid">
               {providers
                 .filter((p) => p.kind === "exchange")
                 .map(renderProvider)}
             </div>
             <p className="cc-footnote">
-              Provider access is shown only when verified. BTCC native copy
-              operations are not connected; Bitget currently supports a one-time
-              account check.
+              Provider access is shown only when verified. Bitget figures come
+              from the official API with a read-only key. BTCC native copy
+              operations are not connected. Nothing here can trade, transfer or
+              withdraw.
             </p>
             <details className="cc-disclosure">
               <summary>
@@ -1315,6 +1421,9 @@ export function CopyCenterWorkspace({
                 </p>
               </div>
             </section>
+            {cloudSession.authenticated && (
+              <BitgetConnectionPanel mode="positions" onStatus={onBitgetStatus} />
+            )}
             <AccountEvidencePanel />
             <section className="cc-position-card">
               <span className="cc-position-icon">
@@ -1322,7 +1431,7 @@ export function CopyCenterWorkspace({
               </span>
               <div>
                 <span className="cc-pill cc-pill-muted">
-                  No live positions synced
+                  Local records · not exchange data
                 </span>
                 <h2>Positions and approvals</h2>
                 <p>
@@ -1343,9 +1452,9 @@ export function CopyCenterWorkspace({
               <div>
                 <strong>Live portfolio</strong>
                 <p>
-                  Live positions are not synchronized. Saved balance observations
-                  are shown separately above when available. An account check
-                  does not enable trading.
+                  Live Bitget positions appear above once a read-only connection
+                  is saved; refresh them on demand. Saved balance observations are
+                  shown separately. A read-only connection cannot trade.
                 </p>
                 <button
                   className="cc-text-button"
@@ -1804,15 +1913,16 @@ export function CopyCenterWorkspace({
                 className="cc-credential-form"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void verifyBitget();
+                  void saveBitget();
                 }}
               >
                 <p className="cc-form-note">
-                  Read-only account-assets check only. Use a Bitget API key
-                  whose overall permission type is read-only and whose only
-                  permission is UTA management. Read-and-write keys are
-                  rejected. The key and secret are sent to the GEM server for
-                  this verification request and are not saved.
+                  Use a Bitget API key whose overall permission type is
+                  read-only and whose permission is UTA management. Keys with
+                  trading, copy-trading or withdrawal permissions are rejected.
+                  Saving encrypts the key on the GEM server (never in this
+                  browser) so balances can be refreshed on demand. Choose
+                  &ldquo;Verify once&rdquo; to check without saving.
                 </p>
                 <label className="cc-field">
                   API key
@@ -1847,12 +1957,22 @@ export function CopyCenterWorkspace({
                     required
                   />
                 </label>
-                <button
-                  className="cc-button"
-                  disabled={bgBusy || !cloudSession.authenticated}
-                >
-                  {bgBusy ? "Verifying…" : "Verify read-only access"}
-                </button>
+                <div className="cc-modal-actions">
+                  <button
+                    className="cc-button"
+                    disabled={bgBusy || !cloudSession.authenticated}
+                  >
+                    {bgBusy ? "Verifying…" : "Save read-only connection"}
+                  </button>
+                  <button
+                    type="button"
+                    className="cc-button cc-button-secondary"
+                    disabled={bgBusy || !cloudSession.authenticated}
+                    onClick={() => void verifyBitget()}
+                  >
+                    Verify once without saving
+                  </button>
+                </div>
                 {bgMessage && (
                   <p className="cc-form-note" role="status">
                     {bgMessage}

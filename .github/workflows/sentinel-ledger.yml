@@ -7,6 +7,7 @@ on:
       - "sentinel/observation_repository.py"
       - "sentinel/tests/test_observation_repository.py"
       - "scripts/test-sentinel-ledger.sh"
+      - "scripts/test-connection-secrets-migration.sh"
       - ".github/workflows/sentinel-ledger.yml"
   push:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - "sentinel/observation_repository.py"
       - "sentinel/tests/test_observation_repository.py"
       - "scripts/test-sentinel-ledger.sh"
+      - "scripts/test-connection-secrets-migration.sh"
       - ".github/workflows/sentinel-ledger.yml"
 permissions:
   contents: read
@@ -27,3 +29,5 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Apply twice and validate owner isolation in disposable PostgreSQL
         run: bash scripts/test-sentinel-ledger.sh
+      - name: Apply connection-secrets migration and validate server-only credential storage
+        run: bash scripts/test-connection-secrets-migration.sh

@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | GEM account | CopyCenterWorkspace auth → /api/auth/* → server Supabase Auth | GEM email/password for GEM sign-in, not exchange login. Signup does not grant owner access. |
 | Cloud restore/save | syncCloud → /api/workspace → owner session/JWT/RLS | Planning payload only; revision-conditional writes, no provider secrets. |
-| Bitget | verifyBitget → POST /api/connections/bitget/verify → signed GET /api/v3/account/info then /assets | API key, secret, API passphrase; overall read-only, uta_mgt only. One-time in-memory verification; no recurring connection. Owner gate now precedes provider access and preserves refreshed cookies. Redirects rejected. Empty numeric strings remain unknown. |
+| Bitget | Accounts → POST/GET/DELETE /api/connections/bitget, POST …/refresh (owner-only); one-time POST …/verify retained | Read-only key (readonly/read-only permType, uta_mgt, no uta_trade/withdraw/copy scopes) re-checked on every refresh. Key, secret and passphrase are AES-256-GCM sealed server-side (`CONNECTION_SECRETS_KEY`) in a service-role-only table; never returned to or stored in the browser. Client is GET-only to three allowlisted paths. Positions refused by Bitget are shown unavailable, never zero. See BITGET_READONLY_CONNECTION.md (10 Nov 2026). |
 | BTCC primary Accounts | Official external links | No credential collection; no verified current native API connection. |
 | Legacy BTCC Connection | Advanced ManagerShell → owner-protected live/status | Removed conflicting credential/activation checklist. Configuration is not proof of provider support. Financial web execution hard stop remains. |
 | Phantom | connectWallet → injected phantom.solana.connect | Public address consent only; no signature or transaction. |
@@ -32,3 +32,8 @@ The previously spoken Bitget passphrase must not be reused. Before any separatel
 Local built-app synthetic HTTP checks cover nonowner credential-route rejection and refresh-cookie preservation without calling Bitget. Full web tests/build and Sentinel tests run separately. Browser viewport results are synthetic local sessions, not real hosted JWT, iPhone Safari or exchange acceptance. Official USD aggregate equity remains distinct from USDT. Funding/cash-flow reconciliation, durable observations, missing positions/fills and actual net returns remain unavailable where evidence is absent.
 
 The legacy capabilities API also claimed VERIFIED native copying without current acceptance. It now requires the owner and returns unverified provider capability and blocked execution regardless of configuration. Mounted HTTP tests assert these states.
+
+
+## Update — 10 November 2026
+
+Bitget moved from a one-time check to a persistent, re-verifiable read-only connection (see `BITGET_READONLY_CONNECTION.md`). The previously separate `src/lib/bitget-readonly.ts` check had drifted from the route (it still rejected Bitget's live `readonly` permType); both now share one implementation, matching the #92 rule. Storage is inactive until the server-only keys are set in Vercel and migration `20261110` is applied to the dedicated project. No credential was requested, entered or used in this change; all provider and database behaviour was exercised with synthetic fixtures and a disposable local PostgreSQL.
