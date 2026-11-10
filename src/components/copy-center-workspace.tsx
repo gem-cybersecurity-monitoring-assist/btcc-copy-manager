@@ -11,6 +11,7 @@ import {
   type BitgetConnectionView,
 } from "./bitget-connection-panel";
 import { BtccAccountPanel } from "./btcc-account-panel";
+import { Mt5ConnectionPanel } from "./mt5-connection-panel";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = {
@@ -97,9 +98,9 @@ const starterProviders: Provider[] = [
     id: "mt5",
     name: "MetaTrader 5",
     kind: "terminal",
-    description: "External trading terminal / broker account.",
+    description: "Investor (read-only) login for an MT5 broker account.",
     state: "not-connected",
-    note: "Broker integration is not implemented in this release.",
+    note: "Save the MT5 investor login in Accounts. It stays not connected until an MT5 bridge is chosen; no figures are shown before then.",
   },
 ];
 
@@ -1378,6 +1379,7 @@ export function CopyCenterWorkspace({
               <BitgetConnectionPanel mode="accounts" onStatus={onBitgetStatus} />
             )}
             {cloudSession.authenticated && <BtccAccountPanel mode="accounts" />}
+            {cloudSession.authenticated && <Mt5ConnectionPanel mode="accounts" />}
             <div className="cc-provider-grid">
               {providers
                 .filter((p) => p.kind === "exchange")
@@ -1427,6 +1429,7 @@ export function CopyCenterWorkspace({
               <BitgetConnectionPanel mode="positions" onStatus={onBitgetStatus} />
             )}
             {cloudSession.authenticated && <BtccAccountPanel mode="positions" />}
+            {cloudSession.authenticated && <Mt5ConnectionPanel mode="positions" />}
             <AccountEvidencePanel />
             <section className="cc-position-card">
               <span className="cc-position-icon">

@@ -78,6 +78,28 @@ for (const [path, method] of [
   assert.ok(result.missing.includes("SUPABASE_SERVICE_ROLE_KEY") && result.missing.includes("CONNECTION_SECRETS_KEY"));
   gates.push(method + " " + path);
 }
+// MT5: owner-only; without storage keys the owner gets an explicit unconfigured state and bridge status.
+for (const [path, method] of [
+  ["/api/connections/mt5", "GET"],
+  ["/api/connections/mt5", "POST"],
+  ["/api/connections/mt5", "DELETE"],
+  ["/api/connections/mt5/refresh", "POST"],
+]) {
+  const body = method === "GET" ? {} : { body: path.endsWith("/mt5") && method === "POST" ? JSON.stringify({ login: "10000001", server: "Example-MT5", investorPassword: "p" }) : "{}" };
+  for (const [cookie, expected] of [["", 401], [other, 403]]) {
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    assert.equal(r.status, expected, path + " " + method);
+    assert.match(r.headers.get("cache-control"), /no-store/);
+  }
+  if (method !== "GET") {
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    assert.equal(cross.status, 403, path + " cross-site");
+  }
+  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" }, ...body });
+  assert.equal(r.status, 503, path + " " + method + " owner");
+  assert.equal((await r.json()).code, "connection_storage_not_configured");
+  gates.push(method + " " + path);
+}
 // BTCC: owner-only; provider unavailable without server credentials; imports refused without storage.
 for (const [path, method, ownerStatus] of [
   ["/api/connections/btcc", "GET", 200],

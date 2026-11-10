@@ -12,7 +12,8 @@
 | Phantom | connectWallet → injected phantom.solana.connect | Public address consent only; no signature or transaction. |
 | MetaMask | connectWallet → eth_requestAccounts | Public address consent only; no balance verification. |
 | Base | connectWallet → eth_requestAccounts, chain switch/add, eth_chainId | Wallet/network consent; no transfer. Not an exchange account or balance feed. |
-| Farcaster / MT5 | Advanced setup notice | Unsupported adapters; no authenticated connection. |
+| Farcaster | Advanced setup notice | Unsupported adapter; no authenticated connection. |
+| MT5 | Accounts → GET/POST/DELETE /api/connections/mt5, POST …/refresh (owner-only) | Investor login saved with the password AES-256-GCM sealed server-side. No bridge is configured, so status is PAUSED / bridge_not_configured and no figures are shown. Bridge contract is read-only; logins that can trade are rejected and their password deleted. See MT5_INVESTOR_CONNECTION.md. |
 | Browser / Steel / purchase | Secondary tools → existing owner-wrapped APIs | Separate legacy tools, not official exchange API connections. No activation performed. |
 
 ## Official documentation rechecked
