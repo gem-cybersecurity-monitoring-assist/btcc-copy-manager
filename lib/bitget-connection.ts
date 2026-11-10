@@ -181,7 +181,7 @@ export async function connectBitget(deps: BitgetConnectionDeps, userId: string, 
       status: "READ_ONLY" as const,
       externalAccountRef: snapshot.exchangeUserId ? "bitget-uta:" + snapshot.exchangeUserId : null,
       lastVerifiedAt: snapshot.capturedAt,
-      lastSnapshot: snapshot as unknown as Record<string, unknown>,
+      lastSnapshot: { ...(snapshot as unknown as Record<string, unknown>), ledgerRecordedAt: snapshot.capturedAt },
       lastErrorCode: null,
     };
     row = existing ? await store.updateConnection(userId, existing.id, patch) : await store.insertConnection(userId, VENUE, patch);
@@ -227,6 +227,14 @@ async function loadCredentials(deps: BitgetConnectionDeps, userId: string, row: 
   }
 }
 
+/** Live refreshes may run every minute; the performance history keeps at most one point per interval. */
+export const LEDGER_INTERVAL_MS = 15 * 60 * 1000;
+
+export function ledgerDue(previous: Record<string, unknown> | null, capturedAt: string): boolean {
+  const last = typeof previous?.ledgerRecordedAt === "string" ? Date.parse(previous.ledgerRecordedAt) : NaN;
+  return !Number.isFinite(last) || Date.parse(capturedAt) - last >= LEDGER_INTERVAL_MS;
+}
+
 export async function refreshBitgetConnection(deps: BitgetConnectionDeps, userId: string): Promise<ServiceResult> {
   const blocked = notConfigured(deps);
   if (blocked) return blocked;
@@ -257,21 +265,27 @@ export async function refreshBitgetConnection(deps: BitgetConnectionDeps, userId
     } catch { /* the 403 below still blocks use */ }
     return notReadOnly(result.permission.permType, result.permission.permissions);
   }
+  let shouldRecord = false;
   try {
     if (loaded.needsReseal) {
       const sealed = sealSecret(deps.keyring!, loaded.credentials, { userId, connectionId: row.id, venue: VENUE });
       await store.putSecret(userId, row.id, VENUE, sealed, deps.keyring!.current.version);
     }
+    const previous = row.lastSnapshot;
+    shouldRecord = ledgerDue(previous, result.snapshot.capturedAt);
+    const ledgerRecordedAt = shouldRecord
+      ? result.snapshot.capturedAt
+      : (typeof previous?.ledgerRecordedAt === "string" ? previous.ledgerRecordedAt : null);
     row = await store.updateConnection(userId, row.id, {
       status: "READ_ONLY",
       lastVerifiedAt: result.snapshot.capturedAt,
-      lastSnapshot: result.snapshot as unknown as Record<string, unknown>,
+      lastSnapshot: { ...(result.snapshot as unknown as Record<string, unknown>), ledgerRecordedAt },
       lastErrorCode: null,
     });
   } catch (error) {
     return storeFailure(error);
   }
-  const ledgerRecorded = await recordLedger(deps, userId, row.id, result.snapshot);
+  const ledgerRecorded = shouldRecord ? await recordLedger(deps, userId, row.id, result.snapshot) : false;
   return { status: 200, body: { ok: true, connection: publicConnection(row), ledgerRecorded } };
 }
 

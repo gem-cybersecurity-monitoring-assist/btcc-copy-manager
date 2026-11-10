@@ -261,3 +261,36 @@ test("browser code never persists Bitget credentials to storage or the cloud wor
   // Inputs are cleared after every save/verify attempt.
   assert.ok((workspace.match(/setBgSecret\(""\)/g) ?? []).length >= 2);
 });
+
+test("live refresh: history gets at most one point per 15 minutes", async () => {
+  const { ledgerDue, LEDGER_INTERVAL_MS } = await import("../lib/bitget-connection.ts");
+  assert.equal(ledgerDue(null, "2026-11-10T12:00:00Z"), true);
+  assert.equal(ledgerDue({ ledgerRecordedAt: "2026-11-10T12:00:00Z" }, "2026-11-10T12:05:00Z"), false);
+  assert.equal(ledgerDue({ ledgerRecordedAt: "2026-11-10T12:00:00Z" }, new Date(Date.parse("2026-11-10T12:00:00Z") + LEDGER_INTERVAL_MS).toISOString()), true);
+
+  const mem = memoryStore();
+  let clock = Date.parse("2026-11-10T12:00:00Z");
+  const d = { ...deps(fakeBitget(), mem).deps, now: () => new Date(clock) };
+  await connectBitget(d, owner, creds);           // ledger point 1
+  clock += 60_000; await refreshBitgetConnection(d, owner);  // 1 min later: skipped
+  clock += 60_000; await refreshBitgetConnection(d, owner);  // 2 min: skipped
+  clock += 15 * 60_000; await refreshBitgetConnection(d, owner); // 17 min: point 2
+  assert.equal(mem.ledger.length, 2);
+  assert.equal([...mem.rows.values()][0].lastVerifiedAt, new Date(clock).toISOString(), "balances still refresh every time");
+});
+
+test("panels refresh live only while visible", () => {
+  const hook = readFileSync(join(process.cwd(), "src/components/use-live-refresh.ts"), "utf8");
+  assert.match(hook, /document\.visibilityState === "visible"/);
+  assert.match(readFileSync(join(process.cwd(), "src/components/bitget-connection-panel.tsx"), "utf8"), /useLiveRefresh\(\(\) => act\("refresh", true\), 60_000/);
+  assert.match(readFileSync(join(process.cwd(), "src/components/market-overview.tsx"), "utf8"), /useLiveRefresh\(\(\) => refresh\(true\), 60_000\)/);
+});
+
+test("real mode: no simulated data can enter allocations", () => {
+  const engine = readFileSync(join(process.cwd(), "src/app/copy-trading/engine/IntelligenceEngine.tsx"), "utf8");
+  assert.match(engine, /Removed leftover simulated strategies/);
+  assert.doesNotMatch(engine, /Simulation lab/);
+  const allocation = readFileSync(join(process.cwd(), "src/app/copy-trading/engine/AnalysisTabs.tsx"), "utf8");
+  assert.match(allocation, /const includeSim = false;/);
+  assert.doesNotMatch(allocation, /Include simulated data/);
+});

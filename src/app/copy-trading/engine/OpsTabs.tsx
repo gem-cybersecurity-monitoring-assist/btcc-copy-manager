@@ -1,5 +1,5 @@
 "use client";
-// F · Monitoring & audit, G · Simulation lab, H · Wallets.
+// F · Monitoring & audit, G · Backtest lab, H · Wallets.
 import { useMemo, useState } from "react";
 import { DEFAULT_BACKTEST, runBacktest, valuePaperPortfolio, type BacktestConfig, type BacktestReport } from "../../../../lib/engine/backtest.ts";
 import { runMonitoring } from "../../../../lib/engine/monitoring.ts";
@@ -47,7 +47,7 @@ export function MonitoringTab({ engine, onChange }: { engine: EngineState; onCha
   );
 }
 
-// ---- G · Simulation lab ------------------------------------------------------
+// ---- G · Backtest lab ------------------------------------------------------
 
 const TONES = { equal: "#635bff", risk_adjusted: "#198365", score_weighted: "#d99b32", cash: "#8a95a6" } as const;
 
@@ -77,7 +77,7 @@ export function LabTab({ engine, onChange }: { engine: EngineState; onChange: En
         <NumberField label="Data delay (periods)" value={config.delayPeriods} min={0} max={30} step="1" onChange={(v) => setConfig({ ...config, delayPeriods: Math.round(v) })} />
         <NumberField label="Rebalance cost (% of traded)" value={config.rebalanceCostPct} max={10} onChange={(v) => setConfig({ ...config, rebalanceCostPct: v })} />
       </div>
-      <p className="cell-sub">Uses your current risk policy, planner caps (per-provider limit, reserve), provider minimums, and scoring weights. Simulated strategies are included here so the engine can be tested.</p>
+      <p className="cell-sub">Uses your current risk policy, planner caps (per-provider limit, reserve), provider minimums, and scoring weights.</p>
       <div className="engine-actions"><button type="button" className="primary-btn" onClick={run} disabled={!engine.strategies.some((s) => s.series)}>Run backtest</button></div>
       {error && <p className="form-message error" role="alert">{error}</p>}
       {report && <article className="engine-card wide">

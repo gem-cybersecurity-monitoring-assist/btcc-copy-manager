@@ -4,6 +4,7 @@
 // last snapshot from the server; credentials never reach this component after
 // submission and are never written to browser storage.
 import { useCallback, useEffect, useState } from "react";
+import { useLiveRefresh } from "./use-live-refresh";
 
 export const BITGET_CONNECTION_EVENT = "gem:bitget-connection-changed";
 
@@ -44,6 +45,7 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
   const [busy, setBusy] = useState<"" | "refresh" | "disconnect">("");
   const [message, setMessage] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
+  const [live, setLive] = useState(true);
 
   const apply = useCallback((raw: unknown) => {
     const c = raw as BitgetConnectionView | null;
@@ -53,7 +55,7 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
   }, [onStatus]);
 
   const load = useCallback(async () => {
-    setState("loading");
+    setState((current) => (current === "ready" ? current : "loading"));
     try {
       const response = await fetch("/api/connections/bitget", { cache: "no-store", credentials: "same-origin" });
       const data = await response.json().catch(() => ({}));
@@ -77,9 +79,10 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
     return () => window.removeEventListener(BITGET_CONNECTION_EVENT, listener);
   }, [load]);
 
-  async function act(kind: "refresh" | "disconnect") {
+  async function act(kind: "refresh" | "disconnect", background = false) {
     if (kind === "disconnect" && !window.confirm("Disconnect Bitget? The encrypted credentials will be deleted from the server. Past balance observations stay in your history.")) return;
-    setBusy(kind); setMessage("");
+    if (background && busy) return;
+    if (!background) { setBusy(kind); setMessage(""); }
     try {
       const response = await fetch(kind === "refresh" ? "/api/connections/bitget/refresh" : "/api/connections/bitget", {
         method: kind === "refresh" ? "POST" : "DELETE",
@@ -90,20 +93,25 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error : "The request failed.");
       apply(data.connection);
-      setMessage(kind === "refresh"
-        ? "Re-verified as read-only and refreshed from Bitget."
-        : "Bitget disconnected. Stored credentials were deleted.");
-      window.dispatchEvent(new Event("gem:account-evidence-changed"));
+      if (!background)
+        setMessage(kind === "refresh"
+          ? "Re-verified as read-only and refreshed from Bitget."
+          : "Bitget disconnected. Stored credentials were deleted.");
+      else setMessage("");
+      if (!background || data.ledgerRecorded) window.dispatchEvent(new Event("gem:account-evidence-changed"));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The request failed.");
       void load();
     } finally {
-      setBusy("");
+      if (!background) setBusy("");
     }
   }
 
-  const live = connection && connection.status !== "DISCONNECTED";
-  const snapshot = live ? connection.snapshot : null;
+  const connected = connection && connection.status !== "DISCONNECTED";
+  const snapshot = connected ? connection.snapshot : null;
+  // Live mode: re-verify and re-read every minute while visible. Only for a
+  // healthy read-only connection; an ERROR state waits for the owner.
+  useLiveRefresh(() => act("refresh", true), 60_000, live && state === "ready" && connection?.status === "READ_ONLY");
 
   return (
     <section className="cc-settings-card" aria-label="Bitget read-only connection" style={{ minWidth: 0, overflowWrap: "anywhere" }}>
@@ -112,8 +120,11 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
           <h2>Bitget {mode === "positions" ? "positions" : "account"}</h2>
           <p className="cc-lead">Official Bitget API · read-only key · no trading, transfers or withdrawals.</p>
         </div>
-        {live && (
+        {connected && (
           <div className="cc-modal-actions">
+            <button className="cc-text-button" aria-pressed={live} onClick={() => setLive((on) => !on)}>
+              {live ? "Live: on" : "Live: off"}
+            </button>
             <button className="cc-card-button" disabled={busy !== ""} onClick={() => void act("refresh")}>
               {busy === "refresh" ? "Re-verifying…" : "Re-verify & refresh"}
             </button>
@@ -136,13 +147,13 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
             No balances are shown. The one-time verification in Accounts still works.
           </p>
         )}
-        {state === "ready" && !live && (
+        {state === "ready" && !connected && (
           <p>
             <span className="cc-pill cc-pill-off">Not connected</span>{" "}
             No Bitget data is shown. {mode === "accounts" ? "Open Bitget below and save a read-only connection." : "Connect Bitget in Accounts to see live positions."}
           </p>
         )}
-        {state === "ready" && live && connection.status === "ERROR" && (
+        {state === "ready" && connected && connection.status === "ERROR" && (
           <p>
             <span className="cc-pill cc-pill-off">Needs attention</span>{" "}
             {connection.lastErrorCode === "not_read_only"
@@ -157,7 +168,8 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
         <>
           <p>
             <span className="cc-pill cc-pill-safe">Live read-only</span>{" "}
-            Read from Bitget at <time dateTime={snapshot.capturedAt}>{new Date(snapshot.capturedAt).toLocaleString()}</time>. Use Re-verify &amp; refresh for current figures.
+            Read from Bitget at <time dateTime={snapshot.capturedAt}>{new Date(snapshot.capturedAt).toLocaleString()}</time>.{" "}
+            {live && connection?.status === "READ_ONLY" ? "Updating every minute while this page is open." : "Live updates are off; use Re-verify & refresh."}
           </p>
           {mode === "accounts" && (
             <>
