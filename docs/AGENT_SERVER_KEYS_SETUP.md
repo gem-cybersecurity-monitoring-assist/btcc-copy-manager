@@ -25,13 +25,20 @@ You are configuring two server-only secrets so that the Stage 1 read-only connec
 
 ## Steps
 
-### 1. Give the PR branch the same dedicated Preview configuration
+### 1. Give the PR branch the same dedicated Preview configuration — DONE 10 Nov 2026
+
+Already completed by the coding agent: the 18 non-secret branch-scoped variables (dedicated `SUPABASE_URL`, public anon key, `COPY_CENTER_OWNER_USER_ID`, paper-mode settings and empty credential overrides) were copied to Preview · `claude/copy-center-real-accounts-1jsir9`. Do not add them again; just check they are present.
+
+<details><summary>Original step</summary>
+
 
 In Vercel → `btcc-copy-manager` → Settings → Environment Variables:
 - Find every Preview variable scoped to branch `feat/dedicated-database-preview`.
 - Add the same variables, with the same values, scoped to Preview and branch `claude/copy-center-real-accounts-1jsir9`. This includes the empty overrides, which must stay empty.
 - Enter values through Vercel's form only. Do not paste them anywhere else.
 - Do not change the existing `feat/dedicated-database-preview` variables or any Production variable.
+
+</details>
 
 ### 2. Add the Supabase server key (Preview, branch `claude/copy-center-real-accounts-1jsir9` only)
 
@@ -73,4 +80,4 @@ Send the owner a short report containing:
 - confirmation that Production is unchanged and no values were displayed or stored elsewhere;
 - anything that did not match these instructions.
 
-The owner then tells the coding agent, which applies migration `20261110_gem_copy_connection_secrets.sql` to `gem-copy-center` and verifies it.
+The owner then gets migration `20261110_gem_copy_connection_secrets.sql` applied to `gem-copy-center`. The coding agent's Supabase connector currently cannot see that project (it is in the support371 organization). So either reconnect that connector to the support371 organization and ask the coding agent to apply it, or have the owner paste the file's contents into the Supabase SQL editor for `gem-copy-center` and run it once. The migration is idempotent, so running it twice is harmless.
