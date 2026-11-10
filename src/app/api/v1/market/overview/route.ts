@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const response = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin%2Cethereum%2Csolana&price_change_percentage=24h", {
       headers: { Accept: "application/json" },
-      next: { revalidate: 120 },
+      next: { revalidate: 30 },
       signal: AbortSignal.timeout(7000),
     });
     if (!response.ok) throw new Error("Market provider is unavailable");

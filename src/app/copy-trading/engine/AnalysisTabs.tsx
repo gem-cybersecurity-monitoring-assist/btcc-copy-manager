@@ -75,7 +75,9 @@ export function IntelligenceTab({ engine, onChange, evaluations }: { engine: Eng
 // ---- D · Capital allocation ------------------------------------------------
 
 export function AllocationTab({ engine, onChange, evaluations, now, startWithSimulated = false }: { engine: EngineState; onChange: EngineChange; evaluations: StrategyEvaluation[]; now: Date; startWithSimulated?: boolean }) {
-  const [includeSim, setIncludeSim] = useState(startWithSimulated);
+  // Real mode: simulated strategies are never included in allocations.
+  const includeSim = false;
+  void startWithSimulated;
   const [message, setMessage] = useState("");
   const planner = engine.planner;
   const names = new Map(engine.strategies.map((s) => [s.id, s.name]));
@@ -86,11 +88,11 @@ export function AllocationTab({ engine, onChange, evaluations, now, startWithSim
   const usesSim = includeSim && plan.allocations.some((a) => a.strategyId.startsWith("sim-"));
 
   function savePaper() {
-    if (engine.paperPortfolios.length >= ENGINE_LIMITS.paperPortfolios) return setMessage("Paper portfolio limit reached; delete one in the Simulation lab.");
+    if (engine.paperPortfolios.length >= ENGINE_LIMITS.paperPortfolios) return setMessage("Paper portfolio limit reached; delete one in the Backtest lab.");
     const latest = engine.strategies.flatMap((s) => s.series?.dates.slice(-1) ?? []).sort().at(-1) ?? now.toISOString().slice(0, 10);
     const pp = createPaperPortfolio({ id: newId("paper"), name: `${METHOD_LABEL[plan.method]} · ${now.toISOString().slice(0, 10)}${usesSim ? " · SIM" : ""}`, method: plan.method, allocations: plan.allocations, cashUsd: plan.reserveUsd + plan.unallocatedUsd, startDate: latest, createdAt: now.toISOString() });
     onChange({ ...engine, paperPortfolios: [...engine.paperPortfolios, pp] }, { action: "paper_created", detail: `Paper portfolio "${pp.name}" with ${pp.positions.length} positions, starting after ${latest}.` });
-    setMessage("Saved as a paper portfolio. It is valued in the Simulation lab as new history is recorded; no money moves.");
+    setMessage("Saved as a paper portfolio. It is valued in the Backtest lab as new history is recorded; no money moves.");
   }
 
   return (
@@ -101,7 +103,7 @@ export function AllocationTab({ engine, onChange, evaluations, now, startWithSim
         <NumberField label="Max per provider (USD, 0 = no $ cap)" value={planner.maxPerProviderUsd} onChange={(v) => setPlanner({ maxPerProviderUsd: v })} />
         <label>Method<select value={planner.method} onChange={(e) => setPlanner({ method: e.target.value as AllocationMethod })}>{Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <label className="check"><input type="checkbox" checked={planner.allowUnknownMinimum} onChange={(e) => setPlanner({ allowUnknownMinimum: e.target.checked })} /> Allow providers whose minimum is unknown</label>
-        <label className="check"><input type="checkbox" checked={includeSim} onChange={(e) => setIncludeSim(e.target.checked)} /> Include simulated data (testing only)</label>
+        
       </div>
       {usesSim && <Notice tone="bad"><strong>SIMULATED.</strong> This proposal uses generated data to demonstrate the engine. It is not a recommendation for real money.</Notice>}
       <div className="engine-kpis">

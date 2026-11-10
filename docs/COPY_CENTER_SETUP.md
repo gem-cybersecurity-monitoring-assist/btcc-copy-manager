@@ -18,6 +18,8 @@ Set `SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public anon/publishable key
 
 Never configure a Supabase service-role key for this feature. The server uses the signed-in user's access token and database row-level security.
 
+For the saved read-only Bitget connection, also set the server-only `SUPABASE_SERVICE_ROLE_KEY` and `CONNECTION_SECRETS_KEY` (see `BITGET_READONLY_CONNECTION.md`). Never give either a `NEXT_PUBLIC_` name.
+
 ## Supabase database
 
 The existing connected Supabase project already has both workspace migrations applied and verified (November 5, 2026). For a new project, apply them in this order:

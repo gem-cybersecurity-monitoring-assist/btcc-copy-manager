@@ -1,10 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
+import {
+  SYNC_META_KEY,
+  decideSync,
+  fingerprint,
+  readSyncMeta,
+  syncablePreferences,
+  type SyncMeta,
+} from "../../lib/cloud-sync.ts";
+import type { CopyCenterPreferences } from "../../lib/workspace.ts";
 import { AccountEvidencePanel } from "./account-evidence-panel";
 import { PerformancePanel } from "./performance-panel";
 import { MarketOverview } from "./market-overview";
+import {
+  BITGET_CONNECTION_EVENT,
+  BitgetConnectionPanel,
+  type BitgetConnectionView,
+} from "./bitget-connection-panel";
+import { BtccAccountPanel } from "./btcc-account-panel";
+import { Mt5ConnectionPanel } from "./mt5-connection-panel";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = {
@@ -43,17 +59,17 @@ const starterProviders: Provider[] = [
     id: "btcc",
     name: "BTCC",
     kind: "exchange",
-    description: "Exchange account and copy-trading research.",
+    description: "Read-only status and owner-imported balances, positions and copy history.",
     state: "not-connected",
-    note: "BTCC futures API availability is unverified. Use BTCC’s official web/app Copy Trading screen for now; do not enter API credentials here.",
+    note: "The BTCC futures API is suspended, so no live connection exists. Import your own BTCC CSV exports in Accounts; they are labelled owner-imported, not live. Do not enter BTCC credentials here.",
   },
   {
     id: "bitget",
     name: "Bitget",
     kind: "exchange",
-    description: "One-time read-only account-assets verification.",
+    description: "Live read-only balances and positions through the official API.",
     state: "not-connected",
-    note: "A one-time read-only account-assets check is available after sign-in; credentials are not stored.",
+    note: "Save a read-only Bitget API key after sign-in. It is encrypted on the GEM server and never stored in this browser.",
   },
   {
     id: "phantom",
@@ -91,9 +107,9 @@ const starterProviders: Provider[] = [
     id: "mt5",
     name: "MetaTrader 5",
     kind: "terminal",
-    description: "External trading terminal / broker account.",
+    description: "Investor (read-only) login for an MT5 broker account.",
     state: "not-connected",
-    note: "Broker integration is not implemented in this release.",
+    note: "Save the MT5 investor login in Accounts. It stays not connected until an MT5 bridge is chosen; no figures are shown before then.",
   },
 ];
 
@@ -172,6 +188,20 @@ export function CopyCenterWorkspace({
     initialAuthMode,
   );
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<
+    "off" | "checking" | "synced" | "pending" | "saving" | "conflict" | "error"
+  >("off");
+  const [syncError, setSyncError] = useState("");
+  const [syncConflict, setSyncConflict] = useState<{
+    cloud: CopyCenterPreferences;
+    updatedAt: string | null;
+  } | null>(null);
+  const [syncReady, setSyncReady] = useState(false);
+  const syncMetaRef = useRef<SyncMeta | null>(null);
+  const syncInFlightRef = useRef(false);
+  const syncRerunRef = useRef(false);
+  const syncRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localPrefsRef = useRef<CopyCenterPreferences | null>(null);
   useEffect(() => {
     if (!accountOnly || !cloudSession.authenticated) return;
     let active = true;
@@ -203,6 +233,37 @@ export function CopyCenterWorkspace({
   const [bgMessage, setBgMessage] = useState("");
   const [bgResult, setBgResult] = useState<BitgetVerification | null>(null);
   const [bgBusy, setBgBusy] = useState(false);
+  const onBitgetStatus = useCallback(
+    (connection: BitgetConnectionView | null) => {
+      setProviders((old) =>
+        old.map((p) => {
+          if (p.id !== "bitget") return p;
+          if (connection && connection.status === "READ_ONLY")
+            return {
+              ...p,
+              state: "connected",
+              note:
+                "Read-only connection saved" +
+                (connection.lastVerifiedAt
+                  ? "; last verified " +
+                    new Date(connection.lastVerifiedAt).toLocaleString()
+                  : "") +
+                ". Credentials are encrypted on the server.",
+            };
+          if (connection && connection.status === "ERROR")
+            return {
+              ...p,
+              state: "not-connected",
+              note: "The saved Bitget connection needs attention. Review it in Accounts.",
+            };
+          return p.state === "connected"
+            ? { ...p, state: "not-connected", note: starterProviders.find((x) => x.id === "bitget")!.note }
+            : p;
+        }),
+      );
+    },
+    [],
+  );
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requested = accountOnly ? "settings" : params.get("view");
@@ -280,6 +341,25 @@ export function CopyCenterWorkspace({
         : outcome.message,
     );
   }, []);
+
+  // Bitget connection state always comes from the server, never browser storage.
+  useEffect(() => {
+    if (!cloudSession.authenticated) return;
+    const controller = new AbortController();
+    void fetch("/api/connections/bitget", {
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data && data.ok === true) onBitgetStatus(data.connection ?? null);
+      })
+      .catch(() => {
+        /* Status stays "not connected"; nothing is inferred. */
+      });
+    return () => controller.abort();
+  }, [cloudSession.authenticated, onBitgetStatus]);
 
   useEffect(() => {
     try {
@@ -614,140 +694,222 @@ export function CopyCenterWorkspace({
     }
   }
 
+  // ---- Cloud sync: automatic restore, debounced save, conflict-safe. ----
+  const localPrefs = useMemo(
+    () => syncablePreferences({ budget, maxLoss, activity, walletAddresses }),
+    [budget, maxLoss, activity, walletAddresses],
+  );
+  const localFingerprint = fingerprint(localPrefs);
+
+  function readMeta(): SyncMeta | null {
+    try {
+      return readSyncMeta(localStorage.getItem(SYNC_META_KEY), cloudSession.user?.id);
+    } catch {
+      return null;
+    }
+  }
+  function writeMeta(prefs: CopyCenterPreferences | null, updatedAt: string | null) {
+    const userId = cloudSession.user?.id;
+    if (!userId) return;
+    const meta: SyncMeta = { userId, updatedAt, fingerprint: fingerprint(prefs) };
+    syncMetaRef.current = meta;
+    try {
+      localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+    } catch {
+      /* Sync still works for this tab without remembered metadata. */
+    }
+    setCloudUpdatedAt(updatedAt);
+  }
+  function applyPreferences(prefs: CopyCenterPreferences) {
+    setBudget(prefs.budget);
+    setMaxLoss(prefs.maxLoss);
+    setActivity(prefs.activity.slice(0, 50));
+    setWalletAddresses({ ...(prefs.walletAddresses ?? {}) });
+  }
+
+  async function readCloud() {
+    const response = await fetch("/api/workspace", { cache: "no-store", credentials: "same-origin" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw new Error(typeof data.error === "string" ? data.error : "The cloud workspace could not be read.");
+    const workspace = data.workspace && typeof data.workspace === "object" ? data.workspace : null;
+    const cloud = workspace?.copyCenter ? syncablePreferences(workspace.copyCenter) : null;
+    return { workspace, cloud, updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null };
+  }
+
+  async function pushLocal(current: Awaited<ReturnType<typeof readCloud>>, prefs: CopyCenterPreferences) {
+    setSyncStatus("saving");
+    const base = current.workspace ?? { traders: [], savedReviews: [], portfolioSnapshots: [] };
+    const response = await fetch("/api/workspace", {
+      method: "PUT",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedUpdatedAt: current.updatedAt, workspace: { ...base, copyCenter: prefs } }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 409) return "retry" as const;
+    if (!response.ok || result.error)
+      throw new Error(typeof result.error === "string" ? result.error : "Cloud save failed.");
+    writeMeta(prefs, typeof result.updatedAt === "string" ? result.updatedAt : null);
+    return "saved" as const;
+  }
+
+  /** Compares this device, the cloud and the last synced state, then acts. */
+  async function reconcile(options: { force?: "cloud" | "local" } = {}) {
+    if (!cloudSession.authenticated) return;
+    if (syncInFlightRef.current) {
+      syncRerunRef.current = true;
+      return;
+    }
+    syncInFlightRef.current = true;
+    if (syncRetryRef.current) {
+      clearTimeout(syncRetryRef.current);
+      syncRetryRef.current = null;
+    }
+    setSyncStatus((status) => (status === "off" ? "checking" : status));
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const current = await readCloud();
+        const prefs = localPrefsRef.current;
+        const action = options.force === "cloud"
+          ? (current.cloud ? "apply_cloud" : "in_sync")
+          : options.force === "local"
+            ? "push_local"
+            : decideSync({ local: prefs, cloud: current.cloud, meta: syncMetaRef.current });
+        if (action === "conflict") {
+          setSyncConflict({ cloud: current.cloud!, updatedAt: current.updatedAt });
+          setSyncStatus("conflict");
+          return;
+        }
+        setSyncConflict(null);
+        if (action === "apply_cloud" && current.cloud) {
+          applyPreferences(current.cloud);
+          localPrefsRef.current = current.cloud;
+          writeMeta(current.cloud, current.updatedAt);
+        } else if (action === "push_local" && prefs) {
+          if ((await pushLocal(current, prefs)) === "retry") continue;
+        } else {
+          writeMeta(prefs, current.updatedAt);
+        }
+        setSyncStatus("synced");
+        setSyncError("");
+        return;
+      }
+      setSyncStatus("pending");
+    } catch (error) {
+      setSyncStatus("error");
+      setSyncError((error instanceof Error ? error.message : "Cloud sync failed").replace(/[.\s]+$/, ""));
+      // Retry automatically; changes stay on this device meanwhile.
+      if (syncRetryRef.current) clearTimeout(syncRetryRef.current);
+      syncRetryRef.current = setTimeout(() => void reconcileRef.current(), 30_000);
+    } finally {
+      syncInFlightRef.current = false;
+      setSyncReady(true);
+      if (syncRerunRef.current) {
+        syncRerunRef.current = false;
+        setTimeout(() => void reconcileRef.current(), 300);
+      }
+    }
+  }
+
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
+  useEffect(() => {
+    localPrefsRef.current = localPrefs;
+  }, [localPrefs]);
+  // Restore automatically once signed in and local data has loaded.
+  useEffect(() => {
+    if (!cloudSession.authenticated || !storageReady || accountOnly) {
+      setSyncStatus("off");
+      setSyncReady(false);
+      setSyncConflict(null);
+      if (syncRetryRef.current) clearTimeout(syncRetryRef.current);
+      return;
+    }
+    syncMetaRef.current = readMeta();
+    void reconcileRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudSession.authenticated, cloudSession.user?.id, storageReady, accountOnly]);
+  // Save automatically shortly after a change on this device.
+  useEffect(() => {
+    if (!syncReady || !cloudSession.authenticated || syncConflict) return;
+    if (localFingerprint === syncMetaRef.current?.fingerprint) return;
+    setSyncStatus("pending");
+    const timer = setTimeout(() => void reconcileRef.current(), 2000);
+    return () => clearTimeout(timer);
+  }, [localFingerprint, syncReady, cloudSession.authenticated, syncConflict]);
+  // Pick up changes made on other devices when this tab becomes active again.
+  useEffect(() => {
+    if (!syncReady || !cloudSession.authenticated) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && !syncConflict) void reconcileRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [syncReady, cloudSession.authenticated, syncConflict]);
+
   async function syncCloud(mode: "save" | "restore") {
     if (cloudBusy) return;
     setCloudBusy(true);
     setCloudMessage("");
+    await reconcile({ force: mode === "save" ? "local" : "cloud" });
+    setCloudMessage(
+      mode === "save"
+        ? "This device's preferences were saved to your account. Exchange credentials are never part of the workspace."
+        : "Cloud preferences applied on this device. Wallet sessions must be re-verified in this browser.",
+    );
+    setCloudBusy(false);
+  }
+
+  async function saveBitget() {
+    setBgBusy(true);
+    setBgMessage("");
+    setBgResult(null);
     try {
-      const get = await fetch("/api/workspace", {
-        cache: "no-store",
+      if (!cloudSession.authenticated)
+        throw new Error("Sign in first to connect an exchange account.");
+      const response = await fetch("/api/connections/bitget", {
+        method: "POST",
         credentials: "same-origin",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: bgKey,
+          secret: bgSecret,
+          passphrase: bgPhrase,
+        }),
       });
-      const current = await get.json().catch(() => ({}));
-      if (!get.ok)
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok !== true)
         throw new Error(
-          typeof current.error === "string"
-            ? current.error
-            : "Sign in to use cloud sync.",
+          typeof data.error === "string"
+            ? data.error
+            : "Bitget connection failed.",
         );
-      if (mode === "restore") {
-        if (!current.workspace?.copyCenter)
-          throw new Error(
-            "There are no saved Copy Center preferences in the cloud account yet.",
-          );
-        const saved = current.workspace.copyCenter as {
-          budget?: unknown;
-          maxLoss?: unknown;
-          activity?: unknown[];
-          walletAddresses?: unknown;
-        };
-        if (
-          typeof saved.budget !== "string" ||
-          typeof saved.maxLoss !== "string" ||
-          !Array.isArray(saved.activity)
-        )
-          throw new Error(
-            "The saved Copy Center settings are invalid; local data was not changed.",
-          );
-        setBudget(saved.budget);
-        setMaxLoss(saved.maxLoss);
-        if (
-          saved.walletAddresses &&
-          typeof saved.walletAddresses === "object" &&
-          !Array.isArray(saved.walletAddresses)
-        ) {
-          const candidate = saved.walletAddresses as Record<string, unknown>;
-          setWalletAddresses({
-            ...(typeof candidate.phantom === "string"
-              ? { phantom: candidate.phantom }
-              : {}),
-            ...(typeof candidate.metamask === "string"
-              ? { metamask: candidate.metamask }
-              : {}),
-            ...(typeof candidate.base === "string"
-              ? { base: candidate.base }
-              : {}),
-          });
-        } else {
-          setWalletAddresses({});
-        }
-        setActivity(
-          saved.activity
-            .filter((item): item is Activity =>
-              Boolean(
-                item &&
-                  typeof item === "object" &&
-                  typeof (item as Activity).id === "string" &&
-                  typeof (item as Activity).at === "string" &&
-                  typeof (item as Activity).title === "string" &&
-                  typeof (item as Activity).detail === "string",
-              ),
-            )
-            .slice(0, 50),
-        );
-        setCloudUpdatedAt(
-          typeof current.updatedAt === "string" ? current.updatedAt : null,
-        );
-        setCloudMessage(
-          "Cloud preferences restored. Wallet sessions must be re-verified in this browser.",
-        );
-      } else {
-        if (cloudUpdatedAt !== null && current.updatedAt !== cloudUpdatedAt)
-          throw new Error(
-            "Cloud records changed in another session. Your local records were kept. Restore and compare before saving.",
-          );
-        if (
-          cloudUpdatedAt === null &&
-          current.workspace &&
-          !window.confirm(
-            "A saved workspace already exists. Replace its Copy Center preferences with this browser's preferences? Trader research records will be preserved.",
-          )
-        )
-          return;
-        const base =
-          current.workspace && typeof current.workspace === "object"
-            ? current.workspace
-            : { traders: [], savedReviews: [], portfolioSnapshots: [] };
-        const response = await fetch("/api/workspace", {
-          method: "PUT",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            expectedUpdatedAt: cloudUpdatedAt ?? current.updatedAt ?? null,
-            workspace: {
-              ...base,
-              copyCenter: {
-                budget,
-                maxLoss,
-                activity: activity.slice(0, 50),
-                walletAddresses,
-              },
-            },
-          }),
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || result.error)
-          throw new Error(
-            typeof result.error === "string"
-              ? result.error
-              : "Cloud save failed.",
-          );
-        setCloudUpdatedAt(
-          typeof result.updatedAt === "string"
-            ? result.updatedAt
-            : new Date().toISOString(),
-        );
-        setCloudMessage(
-          "Workspace saved to your authenticated cloud account. Exchange credentials and wallet secrets are not uploaded.",
-        );
-      }
+      onBitgetStatus(data.connection ?? null);
+      window.dispatchEvent(new Event(BITGET_CONNECTION_EVENT));
+      window.dispatchEvent(new Event("gem:account-evidence-changed"));
+      log(
+        "Bitget connected (read-only)",
+        "Read-only permissions verified; balances read. Credentials are encrypted on the server. No order or transfer endpoint exists.",
+      );
+      setBgMessage(
+        "Read-only connection saved. Balances and positions are shown in Accounts and Positions; use Re-verify & refresh any time.",
+      );
     } catch (error) {
-      setCloudMessage(
-        error instanceof Error ? error.message : "Cloud sync failed.",
+      setBgMessage(
+        error instanceof Error ? error.message : "Connection failed.",
       );
     } finally {
-      setCloudBusy(false);
+      setBgKey("");
+      setBgSecret("");
+      setBgPhrase("");
+      setBgBusy(false);
     }
   }
 
@@ -1173,7 +1335,13 @@ export function CopyCenterWorkspace({
                 <span>Workspace storage</span>
                 <strong className="cc-stat-word">
                   {cloudSession.authenticated
-                    ? "Cloud available"
+                    ? syncStatus === "synced"
+                      ? "Synced"
+                      : syncStatus === "conflict"
+                        ? "Needs your choice"
+                        : syncStatus === "error"
+                          ? "Not synced"
+                          : "Syncing"
                     : "This browser"}
                 </strong>
                 <button
@@ -1181,7 +1349,7 @@ export function CopyCenterWorkspace({
                   onClick={() => setView("settings")}
                 >
                   {cloudSession.authenticated
-                    ? "Save or restore →"
+                    ? "Sync settings →"
                     : "Create a free account →"}
                 </button>
               </article>
@@ -1271,15 +1439,21 @@ export function CopyCenterWorkspace({
                 </p>
               </div>
             </section>
+            {cloudSession.authenticated && (
+              <BitgetConnectionPanel mode="accounts" onStatus={onBitgetStatus} />
+            )}
+            {cloudSession.authenticated && <BtccAccountPanel mode="accounts" />}
+            {cloudSession.authenticated && <Mt5ConnectionPanel mode="accounts" />}
             <div className="cc-provider-grid">
               {providers
                 .filter((p) => p.kind === "exchange")
                 .map(renderProvider)}
             </div>
             <p className="cc-footnote">
-              Provider access is shown only when verified. BTCC native copy
-              operations are not connected; Bitget currently supports a one-time
-              account check.
+              Provider access is shown only when verified. Bitget figures come
+              from the official API with a read-only key. BTCC native copy
+              operations are not connected. Nothing here can trade, transfer or
+              withdraw.
             </p>
             <details className="cc-disclosure">
               <summary>
@@ -1315,6 +1489,11 @@ export function CopyCenterWorkspace({
                 </p>
               </div>
             </section>
+            {cloudSession.authenticated && (
+              <BitgetConnectionPanel mode="positions" onStatus={onBitgetStatus} />
+            )}
+            {cloudSession.authenticated && <BtccAccountPanel mode="positions" />}
+            {cloudSession.authenticated && <Mt5ConnectionPanel mode="positions" />}
             <AccountEvidencePanel />
             <section className="cc-position-card">
               <span className="cc-position-icon">
@@ -1322,7 +1501,7 @@ export function CopyCenterWorkspace({
               </span>
               <div>
                 <span className="cc-pill cc-pill-muted">
-                  No live positions synced
+                  Local records · not exchange data
                 </span>
                 <h2>Positions and approvals</h2>
                 <p>
@@ -1343,9 +1522,9 @@ export function CopyCenterWorkspace({
               <div>
                 <strong>Live portfolio</strong>
                 <p>
-                  Live positions are not synchronized. Saved balance observations
-                  are shown separately above when available. An account check
-                  does not enable trading.
+                  Live Bitget positions appear above once a read-only connection
+                  is saved; refresh them on demand. Saved balance observations are
+                  shown separately. A read-only connection cannot trade.
                 </p>
                 <button
                   className="cc-text-button"
@@ -1596,14 +1775,14 @@ export function CopyCenterWorkspace({
                         disabled={cloudBusy}
                         onClick={() => void syncCloud("save")}
                       >
-                        {cloudBusy ? "Working…" : "Save to cloud"}
+                        {cloudBusy ? "Working…" : "Save this device now"}
                       </button>
                       <button
                         className="cc-button cc-button-secondary"
                         disabled={cloudBusy}
                         onClick={() => void syncCloud("restore")}
                       >
-                        Restore cloud data
+                        Use cloud version
                       </button>
                     </>
                   )}
@@ -1616,10 +1795,42 @@ export function CopyCenterWorkspace({
                   </button>
                 </div>
               )}
-              {cloudUpdatedAt && (
-                <p className="cc-form-note">
-                  Last cloud sync: {new Date(cloudUpdatedAt).toLocaleString()}
+              {cloudSession.authenticated && !accountOnly && (
+                <p className="cc-form-note" role="status" aria-live="polite">
+                  {syncStatus === "checking" && "Checking your cloud workspace…"}
+                  {syncStatus === "pending" && "Changes on this device will sync in a moment."}
+                  {syncStatus === "saving" && "Saving to your account…"}
+                  {syncStatus === "synced" &&
+                    "Synced across your devices" +
+                      (cloudUpdatedAt ? " · cloud revision " + new Date(cloudUpdatedAt).toLocaleString() : "") +
+                      ". Changes save automatically."}
+                  {syncStatus === "error" &&
+                    "Not synced: " + (syncError || "the cloud workspace could not be reached") + ". Your changes are kept on this device and will sync when it is reachable."}
+                  {syncStatus === "conflict" && "Your preferences changed on this device and in the cloud. Choose which to keep."}
                 </p>
+              )}
+              {syncConflict && !accountOnly && (
+                <div className="cc-notice" role="alert">
+                  <span className="cc-notice-icon">!</span>
+                  <div>
+                    <strong>Two versions of your preferences</strong>
+                    <p>
+                      Cloud: planning amount {syncConflict.cloud.budget}, loss threshold {syncConflict.cloud.maxLoss}%,{" "}
+                      {syncConflict.cloud.activity.length} activity entries
+                      {syncConflict.updatedAt ? ", saved " + new Date(syncConflict.updatedAt).toLocaleString() : ""}.
+                      This device: planning amount {budget}, loss threshold {maxLoss}%, {activity.length} activity entries.
+                      Nothing is overwritten until you choose.
+                    </p>
+                    <div className="cc-modal-actions">
+                      <button className="cc-button" disabled={cloudBusy} onClick={() => void syncCloud("restore")}>
+                        Use cloud version
+                      </button>
+                      <button className="cc-button cc-button-secondary" disabled={cloudBusy} onClick={() => void syncCloud("save")}>
+                        Keep this device's version
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
               {cloudMessage && (
                 <p className="cc-form-note" role="status">
@@ -1804,15 +2015,16 @@ export function CopyCenterWorkspace({
                 className="cc-credential-form"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void verifyBitget();
+                  void saveBitget();
                 }}
               >
                 <p className="cc-form-note">
-                  Read-only account-assets check only. Use a Bitget API key
-                  whose overall permission type is read-only and whose only
-                  permission is UTA management. Read-and-write keys are
-                  rejected. The key and secret are sent to the GEM server for
-                  this verification request and are not saved.
+                  Use a Bitget API key whose overall permission type is
+                  read-only and whose permission is UTA management. Keys with
+                  trading, copy-trading or withdrawal permissions are rejected.
+                  Saving encrypts the key on the GEM server (never in this
+                  browser) so balances can be refreshed on demand. Choose
+                  &ldquo;Verify once&rdquo; to check without saving.
                 </p>
                 <label className="cc-field">
                   API key
@@ -1847,12 +2059,22 @@ export function CopyCenterWorkspace({
                     required
                   />
                 </label>
-                <button
-                  className="cc-button"
-                  disabled={bgBusy || !cloudSession.authenticated}
-                >
-                  {bgBusy ? "Verifying…" : "Verify read-only access"}
-                </button>
+                <div className="cc-modal-actions">
+                  <button
+                    className="cc-button"
+                    disabled={bgBusy || !cloudSession.authenticated}
+                  >
+                    {bgBusy ? "Verifying…" : "Save read-only connection"}
+                  </button>
+                  <button
+                    type="button"
+                    className="cc-button cc-button-secondary"
+                    disabled={bgBusy || !cloudSession.authenticated}
+                    onClick={() => void verifyBitget()}
+                  >
+                    Verify once without saving
+                  </button>
+                </div>
                 {bgMessage && (
                   <p className="cc-form-note" role="status">
                     {bgMessage}
@@ -1896,7 +2118,10 @@ export function CopyCenterWorkspace({
                     closed pending a restoration notice. GEM has not verified
                     that the futures API has been restored. Do not enter BTCC
                     API credentials here; manage copy activation directly in
-                    BTCC's official Copy Trading screen.
+                    BTCC's official Copy Trading screen. To see your BTCC
+                    balances, positions and copy history here, import CSV
+                    exports in Accounts. They are shown as owner-imported, not
+                    live.
                   </p>
                   <a
                     href="https://www.btcc.com/en-US/copy-trading"

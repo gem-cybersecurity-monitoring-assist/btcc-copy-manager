@@ -26,6 +26,7 @@ export function AccountEvidencePanel() {
     return () => { controller.signal.removeEventListener("abort", onTimeout); controller.abort(); clearTimeout(timeout); };
   }, [revision]);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const reload = () => setRevision(x => x + 1); window.addEventListener("gem:account-evidence-changed", reload); return () => window.removeEventListener("gem:account-evidence-changed", reload); }, []);
   return <section aria-label="Saved account evidence">
     <div className="cc-section-head"><div><h2>Saved account evidence</h2><p>Owner-scoped balance observations. These do not establish a current exchange connection.</p></div><button className="cc-card-button" disabled={state === "loading"} onClick={() => setRevision(x => x + 1)}>Refresh account evidence</button></div>
     <div role="status">{state === "loading" ? "Loading account evidence…" : state === "unavailable" ? "Account evidence is unavailable. Your session or account record service may need attention. No balances are inferred." : rows.length === 0 ? "No saved account observations yet. A one-time API check does not save account history." : "Latest saved observations by account, source and currency."}</div>

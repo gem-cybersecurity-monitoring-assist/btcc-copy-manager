@@ -76,5 +76,5 @@ async function ownerPOST(request: NextRequest) {
 }
 
 export async function POST(request: OwnerRequest) {
-  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true });
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, accountControl: true });
 }

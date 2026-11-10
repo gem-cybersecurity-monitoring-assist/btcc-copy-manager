@@ -5,15 +5,16 @@
 | Entry | Handler / boundary | Credentials and result |
 | --- | --- | --- |
 | GEM account | CopyCenterWorkspace auth → /api/auth/* → server Supabase Auth | GEM email/password for GEM sign-in, not exchange login. Signup does not grant owner access. |
-| Cloud restore/save | syncCloud → /api/workspace → owner session/JWT/RLS | Planning payload only; revision-conditional writes, no provider secrets. |
-| Bitget | verifyBitget → POST /api/connections/bitget/verify → signed GET /api/v3/account/info then /assets | API key, secret, API passphrase; overall read-only, uta_mgt only. One-time in-memory verification; no recurring connection. Owner gate now precedes provider access and preserves refreshed cookies. Redirects rejected. Empty numeric strings remain unknown. |
-| BTCC primary Accounts | Official external links | No credential collection; no verified current native API connection. |
+| Cloud sync | Automatic: reconcile on sign-in and tab focus, debounced save → /api/workspace → owner session/JWT/RLS | Whitelisted planning preferences only (budget, loss threshold, activity, public wallet addresses); revision-conditional writes; conflicts prompt the owner and overwrite nothing; no provider secrets. See CLOUD_SYNC.md. |
+| Bitget | Accounts → POST/GET/DELETE /api/connections/bitget, POST …/refresh (owner-only); one-time POST …/verify retained | Read-only key (readonly/read-only permType, uta_mgt, no uta_trade/withdraw/copy scopes) re-checked on every refresh. Key, secret and passphrase are AES-256-GCM sealed server-side (`CONNECTION_SECRETS_KEY`) in a service-role-only table; never returned to or stored in the browser. Client is GET-only to three allowlisted paths. Positions refused by Bitget are shown unavailable, never zero. See BITGET_READONLY_CONNECTION.md (10 Nov 2026). |
+| BTCC primary Accounts | Accounts/Positions → GET /api/connections/btcc, POST …/check, POST/DELETE …/import (owner-only) | No credential collection in the browser. Adapter reports provider_unavailable with the 13 Feb 2026 suspension reason; an owner-triggered check (server env credentials only) may call login + position list, nothing else. Owner CSV imports (balances, positions, copy history) are strictly validated and always labelled "owner-imported, not live". See BTCC_READONLY_ACCOUNT.md. |
 | Legacy BTCC Connection | Advanced ManagerShell → owner-protected live/status | Removed conflicting credential/activation checklist. Configuration is not proof of provider support. Financial web execution hard stop remains. |
 | Phantom | connectWallet → injected phantom.solana.connect | Public address consent only; no signature or transaction. |
 | MetaMask | connectWallet → eth_requestAccounts | Public address consent only; no balance verification. |
 | Base | connectWallet → eth_requestAccounts, chain switch/add, eth_chainId | Wallet/network consent; no transfer. Not an exchange account or balance feed. |
-| Farcaster / MT5 | Advanced setup notice | Unsupported adapters; no authenticated connection. |
-| Browser / Steel / purchase | Secondary tools → existing owner-wrapped APIs | Separate legacy tools, not official exchange API connections. No activation performed. |
+| Farcaster | Advanced setup notice | Unsupported adapter; no authenticated connection. |
+| MT5 | Accounts → GET/POST/DELETE /api/connections/mt5, POST …/refresh (owner-only) | Investor login saved with the password AES-256-GCM sealed server-side. No bridge is configured, so status is PAUSED / bridge_not_configured and no figures are shown. Bridge contract is read-only; logins that can trade are rejected and their password deleted. See MT5_INVESTOR_CONNECTION.md. |
+| Browser / Steel / purchase | Secondary tools → existing owner-wrapped APIs | Separate legacy tools, not official exchange API connections. Read-only stage (10 Nov 2026): remote-browser account control (`POST /api/v1/steel/input`, both Browserbase BTCC login POSTs) is refused with `403 read_only_stage` unless `COPY_CENTER_ACCOUNT_CONTROL_ENABLED=true`; live/purchase execution stays hard-stopped. |
 
 ## Official documentation rechecked
 
@@ -32,3 +33,15 @@ The previously spoken Bitget passphrase must not be reused. Before any separatel
 Local built-app synthetic HTTP checks cover nonowner credential-route rejection and refresh-cookie preservation without calling Bitget. Full web tests/build and Sentinel tests run separately. Browser viewport results are synthetic local sessions, not real hosted JWT, iPhone Safari or exchange acceptance. Official USD aggregate equity remains distinct from USDT. Funding/cash-flow reconciliation, durable observations, missing positions/fills and actual net returns remain unavailable where evidence is absent.
 
 The legacy capabilities API also claimed VERIFIED native copying without current acceptance. It now requires the owner and returns unverified provider capability and blocked execution regardless of configuration. Mounted HTTP tests assert these states.
+
+
+## Update — 10 November 2026
+
+Bitget moved from a one-time check to a persistent, re-verifiable read-only connection (see `BITGET_READONLY_CONNECTION.md`). The previously separate `src/lib/bitget-readonly.ts` check had drifted from the route (it still rejected Bitget's live `readonly` permType); both now share one implementation, matching the #92 rule. Storage is inactive until the server-only keys are set in Vercel and migration `20261110` is applied to the dedicated project. No credential was requested, entered or used in this change; all provider and database behaviour was exercised with synthetic fixtures and a disposable local PostgreSQL.
+
+
+## Project review — 10 November 2026
+
+- Rendered 16 pages at 390 and 1440 px as the owner against the synthetic fixture: no page errors, no horizontal overflow, no failed loads. Simulated strategies appear only in the Simulation lab, labelled SIMULATED. Trader discovery and opportunities stay empty without a verified provider. A stale "Demo rows" footnote on Trader intelligence was removed.
+- The routes that could operate an exchange account were owner-only but not stage-gated. They are now refused in read-only mode, as described above.
+- Open items needing an owner decision are listed in PR #93: Bitget position scope, the MT5 bridge, production `BTCC_*` and other secrets stored as readable "encrypted" Vercel variables, and the production cutover gates.

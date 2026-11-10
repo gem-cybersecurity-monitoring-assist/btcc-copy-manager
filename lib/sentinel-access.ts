@@ -1,6 +1,6 @@
 import type { CloudService, Result, SessionCookies } from "./cloud-core.ts";
 
-type Access = { allowed: boolean; result: Result };
+type Access = { allowed: boolean; result: Result; userId?: string };
 /** Shared Sentinel data is owner-only; ordinary workspace signup grants no access. */
 export async function authorizeSentinelOwner(
   service: Pick<CloudService, "getSession"> | null,
@@ -69,6 +69,7 @@ export async function authorizeSentinelOwner(
     );
   return {
     allowed: true,
+    userId: owner,
     result: { status: 200, body: {}, cookies: lookup.cookies },
   };
 }
