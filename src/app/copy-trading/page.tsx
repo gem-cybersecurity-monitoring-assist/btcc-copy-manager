@@ -291,15 +291,15 @@ export default function CopyTradingPage() {
         <div className="table-wrap"><table>
           <thead><tr><th>Trader / venue</th><th>Period</th><th>ROI*</th><th>Max drawdown*</th><th>Win rate*</th><th>Trades*</th><th>Risk screen</th><th>Actions</th></tr></thead>
           <tbody>{traders.length === 0 && <tr><td colSpan={8} className="empty-cell">{!loaded ? "Loading records…" : manualTraders.length === 0 ? "No trader records yet. Add a profile you reviewed on the exchange using the form below." : "No traders match the current search or exchange filter."}</td></tr>}
-          {traders.map((t) => <tr key={(t.history === "Demo data" ? "demo:" : "user:") + traderKey(t)}>
+          {traders.map((t) => <tr key={"user:" + traderKey(t)}>
             <td><strong>{t.name}</strong><span className="cell-sub">{t.venue} · {t.history}</span></td>
             <td>{t.period}</td><td className={t.roi >= 0 ? "positive" : "negative"}>{t.roi.toFixed(1)}%</td><td>{t.drawdown.toFixed(1)}%</td><td>{t.winRate}%</td><td>{t.trades}</td>
             <td><span className="score">{scoreTrader(t)}/100</span><span className="cell-sub">{t.leverage} leverage</span></td>
             <td><div className="row-actions"><button type="button" className={saved.includes(t.name) ? "saved-btn" : "review-btn"} aria-pressed={saved.includes(t.name)} onClick={() => toggleSaved(t.name)}>{saved.includes(t.name) ? "Saved ✓" : "Save review"}</button>
-              {t.history !== "Demo data" && <><button type="button" className="review-btn" onClick={() => editTrader(t)} aria-label={`Edit ${t.name}`}>Edit</button><button type="button" className="danger-btn" onClick={() => removeTrader(t)} aria-label={`Delete ${t.name}`}>Delete</button></>}</div></td>
+              {<><button type="button" className="review-btn" onClick={() => editTrader(t)} aria-label={`Edit ${t.name}`}>Edit</button><button type="button" className="danger-btn" onClick={() => removeTrader(t)} aria-label={`Delete ${t.name}`}>Delete</button></>}</div></td>
           </tr>)}</tbody>
         </table></div>
-        <p className="footnote">*Demo rows are illustrative; user-entered rows are transcribed by you and not independently verified. The score is a simple screening heuristic, not a forecast. Real evaluation must include verified history, fees, funding, profit share, slippage, leverage, data freshness, and drawdown across different market conditions.</p>
+        <p className="footnote">*Rows are entered by you and not independently verified. The score is a simple screening heuristic, not a forecast. Real evaluation must include verified history, fees, funding, profit share, slippage, leverage, data freshness, and drawdown across different market conditions.</p>
         <div className="manual-entry-card">
           <p className="eyebrow">ADD A REAL PROFILE FROM YOUR EXCHANGE</p><h3>Record a trader for comparison</h3>
           <p className="muted">Open the trader profile on BTCC or Bitget, then transcribe the displayed figures here. This does not connect to the exchange or start copying.</p>

@@ -14,7 +14,7 @@
 | Base | connectWallet → eth_requestAccounts, chain switch/add, eth_chainId | Wallet/network consent; no transfer. Not an exchange account or balance feed. |
 | Farcaster | Advanced setup notice | Unsupported adapter; no authenticated connection. |
 | MT5 | Accounts → GET/POST/DELETE /api/connections/mt5, POST …/refresh (owner-only) | Investor login saved with the password AES-256-GCM sealed server-side. No bridge is configured, so status is PAUSED / bridge_not_configured and no figures are shown. Bridge contract is read-only; logins that can trade are rejected and their password deleted. See MT5_INVESTOR_CONNECTION.md. |
-| Browser / Steel / purchase | Secondary tools → existing owner-wrapped APIs | Separate legacy tools, not official exchange API connections. No activation performed. |
+| Browser / Steel / purchase | Secondary tools → existing owner-wrapped APIs | Separate legacy tools, not official exchange API connections. Read-only stage (10 Nov 2026): remote-browser account control (`POST /api/v1/steel/input`, both Browserbase BTCC login POSTs) is refused with `403 read_only_stage` unless `COPY_CENTER_ACCOUNT_CONTROL_ENABLED=true`; live/purchase execution stays hard-stopped. |
 
 ## Official documentation rechecked
 
@@ -38,3 +38,10 @@ The legacy capabilities API also claimed VERIFIED native copying without current
 ## Update — 10 November 2026
 
 Bitget moved from a one-time check to a persistent, re-verifiable read-only connection (see `BITGET_READONLY_CONNECTION.md`). The previously separate `src/lib/bitget-readonly.ts` check had drifted from the route (it still rejected Bitget's live `readonly` permType); both now share one implementation, matching the #92 rule. Storage is inactive until the server-only keys are set in Vercel and migration `20261110` is applied to the dedicated project. No credential was requested, entered or used in this change; all provider and database behaviour was exercised with synthetic fixtures and a disposable local PostgreSQL.
+
+
+## Project review — 10 November 2026
+
+- Rendered 16 pages at 390 and 1440 px as the owner against the synthetic fixture: no page errors, no horizontal overflow, no failed loads. Simulated strategies appear only in the Simulation lab, labelled SIMULATED. Trader discovery and opportunities stay empty without a verified provider. A stale "Demo rows" footnote on Trader intelligence was removed.
+- The routes that could operate an exchange account were owner-only but not stage-gated. They are now refused in read-only mode, as described above.
+- Open items needing an owner decision are listed in PR #93: Bitget position scope, the MT5 bridge, production `BTCC_*` and other secrets stored as readable "encrypted" Vercel variables, and the production cutover gates.

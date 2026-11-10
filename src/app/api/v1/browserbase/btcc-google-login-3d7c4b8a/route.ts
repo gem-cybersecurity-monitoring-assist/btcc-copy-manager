@@ -249,5 +249,5 @@ export async function GET(request: OwnerRequest) {
 }
 
 export async function POST(request: OwnerRequest) {
-  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, requireJson: false });
+  return withOwnerRequest(request, () => ownerPOST(request), { mutation: true, requireJson: false, accountControl: true });
 }

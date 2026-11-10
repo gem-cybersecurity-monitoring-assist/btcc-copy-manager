@@ -52,6 +52,9 @@ for (const [cookie, expected] of [["", 401], [other, 403]]) {
   assert.equal(r.status, expected, "Bitget owner boundary");
   assert.match(r.headers.get("cache-control"), /no-store/);
 }
+// Connection-route checks use their own client address so they do not consume
+// the rate-limit budget of the workspace checks below.
+const isolatedClient = { "x-forwarded-for": "10.77.0.1" };
 // Persistent read-only connection routes: owner-only, same-origin writes, and
 // without server-only storage keys the owner gets an explicit unconfigured state.
 for (const [path, method] of [
@@ -62,21 +65,31 @@ for (const [path, method] of [
 ]) {
   const body = method === "GET" ? {} : { body: "{}" };
   for (const [cookie, expected] of [["", 401], [other, 403]]) {
-    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(r.status, expected, path + " " + method);
     assert.match(r.headers.get("cache-control"), /no-store/);
   }
   if (method !== "GET") {
-    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(cross.status, 403, path + " cross-site");
   }
-  const ownerResult = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" },
+  const ownerResult = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json", ...isolatedClient },
     ...(method === "POST" && path.endsWith("/bitget") ? { body: JSON.stringify({ apiKey: "k", secret: "s", passphrase: "p" }) } : body) });
   assert.equal(ownerResult.status, 503, path + " " + method + " unconfigured");
   const result = await ownerResult.json();
   assert.equal(result.code, "connection_storage_not_configured");
   assert.ok(result.missing.includes("SUPABASE_SERVICE_ROLE_KEY") && result.missing.includes("CONNECTION_SECRETS_KEY"));
   gates.push(method + " " + path);
+}
+// Read-only stage: remote-browser account control is refused even for the owner.
+for (const path of [
+  "/api/v1/steel/input",
+  "/api/v1/browserbase/btcc-login-bcc195fa-5093-4d1e-8790-527dbc9eb915",
+  "/api/v1/browserbase/btcc-google-login-3d7c4b8a",
+]) {
+  const r = await fetch(base + path, { method: "POST", headers: { Cookie: owner, Origin: base, "Content-Type": "application/json", ...isolatedClient }, body: JSON.stringify({ action: "tap", x: 1, y: 1 }) });
+  assert.equal(r.status, 403, path + " owner account control");
+  assert.equal((await r.json()).code, "read_only_stage");
 }
 // MT5: owner-only; without storage keys the owner gets an explicit unconfigured state and bridge status.
 for (const [path, method] of [
@@ -87,15 +100,15 @@ for (const [path, method] of [
 ]) {
   const body = method === "GET" ? {} : { body: path.endsWith("/mt5") && method === "POST" ? JSON.stringify({ login: "10000001", server: "Example-MT5", investorPassword: "p" }) : "{}" };
   for (const [cookie, expected] of [["", 401], [other, 403]]) {
-    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(r.status, expected, path + " " + method);
     assert.match(r.headers.get("cache-control"), /no-store/);
   }
   if (method !== "GET") {
-    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(cross.status, 403, path + " cross-site");
   }
-  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" }, ...body });
+  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json", ...isolatedClient }, ...body });
   assert.equal(r.status, 503, path + " " + method + " owner");
   assert.equal((await r.json()).code, "connection_storage_not_configured");
   gates.push(method + " " + path);
@@ -109,15 +122,15 @@ for (const [path, method, ownerStatus] of [
 ]) {
   const body = method === "POST" ? { body: path.endsWith("/import") ? JSON.stringify({ kind: "positions", csv: "Symbol,Side,Size\nBTCUSDT,long,1\n" }) : "{}" } : {};
   for (const [cookie, expected] of [["", 401], [other, 403]]) {
-    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(r.status, expected, path + " " + method);
     assert.match(r.headers.get("cache-control"), /no-store/);
   }
   if (method !== "GET") {
-    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json", ...isolatedClient }, ...body });
     assert.equal(cross.status, 403, path + " cross-site");
   }
-  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" }, ...body });
+  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json", ...isolatedClient }, ...body });
   assert.equal(r.status, ownerStatus, path + " " + method + " owner");
   const result = await r.json();
   if (ownerStatus === 200) {
