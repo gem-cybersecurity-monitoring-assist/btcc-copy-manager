@@ -57,4 +57,4 @@ Local acceptance (disposable PostgreSQL 16, no network listener, no hosted datab
 - the owner can read their own snapshot but not any sealed secret, and cannot write;
 - `anon` has no access.
 
-**Hosted apply (after the Vercel keys are in place):** apply `20261024`, `20261025`, `20261107` and `20261110` in that order to `gem-copy-center` only, following the approved sequence in `OWNER_ACCEPTANCE_AND_DATABASE_CUTOVER.md`. Then confirm read-only that RLS is on for both tables and that there are no `anon` or `authenticated` grants on `gem_copy_connection_secrets`.
+**Hosted apply (after the Vercel keys are in place, see `AGENT_SERVER_KEYS_SETUP.md`):** `20261024`, `20261025` and `20261107` are already applied to `gem-copy-center` (see `CHATGPT_WORKSPACE_HANDOFF.md`). Apply only `20261110` there, to no other project. Then confirm read-only that RLS is on for both tables and that `gem_copy_connection_secrets` has no `anon` or `authenticated` grants.
