@@ -48,3 +48,17 @@ Nothing is deleted from either database, so a rollback loses no stored data.
 
 - **BTCC variables in Production.** Production has encrypted `BTCC_*` variables (`BTCC_API_KEY`, `BTCC_USERNAME`, `BTCC_PASSWORD`, …). After the merge, the owner-only "Check BTCC API now" button uses them for its two read-only calls (login and position list). If they should never be used, set them to empty in Production. Several are of type "encrypted" rather than "Sensitive"; consider re-saving them as Sensitive.
 - **Saved connections don't carry over.** Connections saved on the preview are encrypted with the preview key, so the owner saves the read-only Bitget key once more on production.
+
+
+## Execution record — 10 Nov 2026 (owner gave blanket approval for all pending steps)
+
+| Step | Status |
+|---|---|
+| Gate 2: PR #93 merged | ✅ squash-merged as `e6a1f68` |
+| B: shared envs detached from Production | ✅ `DlYDkeJp3RseeDTL`, `MQ5vTif7G2iCE6Ax` now preview+development; `Lp4XZUI05ZWRReFy` preview |
+| B: Production-only envs created | ✅ `SUPABASE_URL` (`chmN3uJk68mCkOC5`), `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`EPIP0bjHFa1mecdB`), `COPY_CENTER_OWNER_USER_ID` (`vqE2lv8ydzMxsxTp`) → gem-copy-center |
+| C: Production deployment from `main` | started automatically by the merge |
+| A: Production `SUPABASE_SERVICE_ROLE_KEY`, `CONNECTION_SECRETS_KEY`, Auth Site/redirect URLs | ⏳ owner / ChatGPT session (`CHATGPT_PRODUCTION_CUTOVER_SESSION.md`); the coding agent cannot read the service key and its tooling correctly refuses to materialise secrets. Until then the live site's connection panels say "not configured" — sign-in, workspace and sync work. |
+| E: Owner sign-in on the live site | ⏳ owner (sign in with the gem-copy-center account password) |
+
+Rollback ids above are unchanged; follow the Rollback section.
