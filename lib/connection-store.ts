@@ -156,7 +156,7 @@ export class ConnectionStore {
     return { ok: true, status: response.status, data };
   }
 
-  async findConnection(userId: string, venue: Venue): Promise<ConnectionRow | null> {
+  async findConnection(userId: string, venue: Venue, externalAccountRef?: string): Promise<ConnectionRow | null> {
     const query = new URLSearchParams({
       select: CONNECTION_FIELDS,
       user_id: "eq." + requireUuid(userId, "owner"),
@@ -164,6 +164,10 @@ export class ConnectionStore {
       order: "updated_at.desc",
       limit: "1",
     });
+    if (externalAccountRef !== undefined) {
+      if (!/^[a-z0-9:_-]{1,160}$/i.test(externalAccountRef)) throw new StoreError("invalid_identifier", "Invalid account reference.");
+      query.set("external_account_ref", "eq." + externalAccountRef);
+    }
     const { data } = await this.call("/rest/v1/gem_copy_connections?" + query);
     if (!Array.isArray(data)) throw new StoreError("store_invalid", "The connection store returned an unexpected result.");
     return data.length ? parseConnection(data[0]) : null;

@@ -1323,3 +1323,10 @@
   .cc-mobile-nav button { font-size: 9px; gap: 5px; }
   .cc-mobile-nav svg { width: 19px; height: 19px; }
 }
+
+/* Read-only account data tables (Bitget live, BTCC owner-imported). */
+.cc-data-table { overflow-x: auto; margin: 14px 0; }
+.cc-data-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cc-data-table caption { text-align: left; font-weight: 600; color: var(--cc-ink); padding-bottom: 8px; }
+.cc-data-table th, .cc-data-table td { text-align: left; padding: 8px 12px 8px 0; border-bottom: 1px solid var(--cc-border); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cc-data-table thead th { color: var(--cc-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }

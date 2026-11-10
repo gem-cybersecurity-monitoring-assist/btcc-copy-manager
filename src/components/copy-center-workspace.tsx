@@ -10,6 +10,7 @@ import {
   BitgetConnectionPanel,
   type BitgetConnectionView,
 } from "./bitget-connection-panel";
+import { BtccAccountPanel } from "./btcc-account-panel";
 
 type ProviderKind = "exchange" | "wallet" | "network" | "identity" | "terminal";
 type Provider = {
@@ -48,9 +49,9 @@ const starterProviders: Provider[] = [
     id: "btcc",
     name: "BTCC",
     kind: "exchange",
-    description: "Exchange account and copy-trading research.",
+    description: "Read-only status and owner-imported balances, positions and copy history.",
     state: "not-connected",
-    note: "BTCC futures API availability is unverified. Use BTCC’s official web/app Copy Trading screen for now; do not enter API credentials here.",
+    note: "The BTCC futures API is suspended, so no live connection exists. Import your own BTCC CSV exports in Accounts; they are labelled owner-imported, not live. Do not enter BTCC credentials here.",
   },
   {
     id: "bitget",
@@ -1376,6 +1377,7 @@ export function CopyCenterWorkspace({
             {cloudSession.authenticated && (
               <BitgetConnectionPanel mode="accounts" onStatus={onBitgetStatus} />
             )}
+            {cloudSession.authenticated && <BtccAccountPanel mode="accounts" />}
             <div className="cc-provider-grid">
               {providers
                 .filter((p) => p.kind === "exchange")
@@ -1424,6 +1426,7 @@ export function CopyCenterWorkspace({
             {cloudSession.authenticated && (
               <BitgetConnectionPanel mode="positions" onStatus={onBitgetStatus} />
             )}
+            {cloudSession.authenticated && <BtccAccountPanel mode="positions" />}
             <AccountEvidencePanel />
             <section className="cc-position-card">
               <span className="cc-position-icon">
@@ -2016,7 +2019,10 @@ export function CopyCenterWorkspace({
                     closed pending a restoration notice. GEM has not verified
                     that the futures API has been restored. Do not enter BTCC
                     API credentials here; manage copy activation directly in
-                    BTCC's official Copy Trading screen.
+                    BTCC's official Copy Trading screen. To see your BTCC
+                    balances, positions and copy history here, import CSV
+                    exports in Accounts. They are shown as owner-imported, not
+                    live.
                   </p>
                   <a
                     href="https://www.btcc.com/en-US/copy-trading"

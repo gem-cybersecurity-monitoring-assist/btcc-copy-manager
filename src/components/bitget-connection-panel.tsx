@@ -167,7 +167,7 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
                 <article><span>Unrealized PnL (USD)</span><strong>{usd(snapshot.balances.unrealizedPnlUsd)}</strong><p>Not reconciled net return</p></article>
               </div>
               {snapshot.balances.coins.length > 0 ? (
-                <div style={{ overflowX: "auto" }}>
+                <div className="cc-data-table">
                   <table>
                     <caption>Balances by coin</caption>
                     <thead><tr><th scope="col">Coin</th><th scope="col">Equity</th><th scope="col">Available</th><th scope="col">Locked</th><th scope="col">USD value</th></tr></thead>
@@ -189,7 +189,7 @@ export function BitgetConnectionPanel({ mode = "accounts", onStatus }: {
               {snapshot.positions.rows.length === 0 ? (
                 <p>Bitget reported no open positions{snapshot.positions.status === "partial" ? " in the categories that could be read" : ""}.</p>
               ) : (
-                <div style={{ overflowX: "auto" }}>
+                <div className="cc-data-table">
                   <table>
                     <caption>Open positions</caption>
                     <thead><tr><th scope="col">Symbol</th><th scope="col">Side</th><th scope="col">Size</th><th scope="col">Entry</th><th scope="col">Mark</th><th scope="col">Leverage</th><th scope="col">Unrealized PnL</th></tr></thead>

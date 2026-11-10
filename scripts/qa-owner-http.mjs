@@ -78,6 +78,32 @@ for (const [path, method] of [
   assert.ok(result.missing.includes("SUPABASE_SERVICE_ROLE_KEY") && result.missing.includes("CONNECTION_SECRETS_KEY"));
   gates.push(method + " " + path);
 }
+// BTCC: owner-only; provider unavailable without server credentials; imports refused without storage.
+for (const [path, method, ownerStatus] of [
+  ["/api/connections/btcc", "GET", 200],
+  ["/api/connections/btcc/check", "POST", 200],
+  ["/api/connections/btcc/import", "POST", 503],
+  ["/api/connections/btcc/import?kind=positions", "DELETE", 503],
+]) {
+  const body = method === "POST" ? { body: path.endsWith("/import") ? JSON.stringify({ kind: "positions", csv: "Symbol,Side,Size\nBTCUSDT,long,1\n" }) : "{}" } : {};
+  for (const [cookie, expected] of [["", 401], [other, 403]]) {
+    const r = await fetch(base + path, { method, headers: { Cookie: cookie, Origin: base, "Content-Type": "application/json" }, ...body });
+    assert.equal(r.status, expected, path + " " + method);
+    assert.match(r.headers.get("cache-control"), /no-store/);
+  }
+  if (method !== "GET") {
+    const cross = await fetch(base + path, { method, headers: { Cookie: owner, Origin: "https://attacker.example", "Content-Type": "application/json" }, ...body });
+    assert.equal(cross.status, 403, path + " cross-site");
+  }
+  const r = await fetch(base + path, { method, headers: { Cookie: owner, Origin: base, "Content-Type": "application/json" }, ...body });
+  assert.equal(r.status, ownerStatus, path + " " + method + " owner");
+  const result = await r.json();
+  if (ownerStatus === 200) {
+    assert.equal(result.adapter.status, "provider_unavailable");
+    assert.match(result.adapter.reason, /13 February 2026/);
+  } else assert.equal(result.code, "connection_storage_not_configured");
+  gates.push(method + " " + path);
+}
 for (const [cookie, expected] of [["", 401], [other, 403], [owner, 200]]) {
   const r = await fetch(base + "/api/v1/capabilities", { headers: { Cookie: cookie } });
   assert.equal(r.status, expected);
