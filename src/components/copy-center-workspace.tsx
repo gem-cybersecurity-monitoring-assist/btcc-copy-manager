@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readConfirmationRedirect } from "../../lib/cloud-core.ts";
+import {
+  SYNC_META_KEY,
+  decideSync,
+  fingerprint,
+  readSyncMeta,
+  syncablePreferences,
+  type SyncMeta,
+} from "../../lib/cloud-sync.ts";
+import type { CopyCenterPreferences } from "../../lib/workspace.ts";
 import { AccountEvidencePanel } from "./account-evidence-panel";
 import { PerformancePanel } from "./performance-panel";
 import { MarketOverview } from "./market-overview";
@@ -179,6 +188,20 @@ export function CopyCenterWorkspace({
     initialAuthMode,
   );
   const [cloudUpdatedAt, setCloudUpdatedAt] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<
+    "off" | "checking" | "synced" | "pending" | "saving" | "conflict" | "error"
+  >("off");
+  const [syncError, setSyncError] = useState("");
+  const [syncConflict, setSyncConflict] = useState<{
+    cloud: CopyCenterPreferences;
+    updatedAt: string | null;
+  } | null>(null);
+  const [syncReady, setSyncReady] = useState(false);
+  const syncMetaRef = useRef<SyncMeta | null>(null);
+  const syncInFlightRef = useRef(false);
+  const syncRerunRef = useRef(false);
+  const syncRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localPrefsRef = useRef<CopyCenterPreferences | null>(null);
   useEffect(() => {
     if (!accountOnly || !cloudSession.authenticated) return;
     let active = true;
@@ -671,141 +694,176 @@ export function CopyCenterWorkspace({
     }
   }
 
+  // ---- Cloud sync: automatic restore, debounced save, conflict-safe. ----
+  const localPrefs = useMemo(
+    () => syncablePreferences({ budget, maxLoss, activity, walletAddresses }),
+    [budget, maxLoss, activity, walletAddresses],
+  );
+  const localFingerprint = fingerprint(localPrefs);
+
+  function readMeta(): SyncMeta | null {
+    try {
+      return readSyncMeta(localStorage.getItem(SYNC_META_KEY), cloudSession.user?.id);
+    } catch {
+      return null;
+    }
+  }
+  function writeMeta(prefs: CopyCenterPreferences | null, updatedAt: string | null) {
+    const userId = cloudSession.user?.id;
+    if (!userId) return;
+    const meta: SyncMeta = { userId, updatedAt, fingerprint: fingerprint(prefs) };
+    syncMetaRef.current = meta;
+    try {
+      localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+    } catch {
+      /* Sync still works for this tab without remembered metadata. */
+    }
+    setCloudUpdatedAt(updatedAt);
+  }
+  function applyPreferences(prefs: CopyCenterPreferences) {
+    setBudget(prefs.budget);
+    setMaxLoss(prefs.maxLoss);
+    setActivity(prefs.activity.slice(0, 50));
+    setWalletAddresses({ ...(prefs.walletAddresses ?? {}) });
+  }
+
+  async function readCloud() {
+    const response = await fetch("/api/workspace", { cache: "no-store", credentials: "same-origin" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok)
+      throw new Error(typeof data.error === "string" ? data.error : "The cloud workspace could not be read.");
+    const workspace = data.workspace && typeof data.workspace === "object" ? data.workspace : null;
+    const cloud = workspace?.copyCenter ? syncablePreferences(workspace.copyCenter) : null;
+    return { workspace, cloud, updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null };
+  }
+
+  async function pushLocal(current: Awaited<ReturnType<typeof readCloud>>, prefs: CopyCenterPreferences) {
+    setSyncStatus("saving");
+    const base = current.workspace ?? { traders: [], savedReviews: [], portfolioSnapshots: [] };
+    const response = await fetch("/api/workspace", {
+      method: "PUT",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expectedUpdatedAt: current.updatedAt, workspace: { ...base, copyCenter: prefs } }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 409) return "retry" as const;
+    if (!response.ok || result.error)
+      throw new Error(typeof result.error === "string" ? result.error : "Cloud save failed.");
+    writeMeta(prefs, typeof result.updatedAt === "string" ? result.updatedAt : null);
+    return "saved" as const;
+  }
+
+  /** Compares this device, the cloud and the last synced state, then acts. */
+  async function reconcile(options: { force?: "cloud" | "local" } = {}) {
+    if (!cloudSession.authenticated) return;
+    if (syncInFlightRef.current) {
+      syncRerunRef.current = true;
+      return;
+    }
+    syncInFlightRef.current = true;
+    if (syncRetryRef.current) {
+      clearTimeout(syncRetryRef.current);
+      syncRetryRef.current = null;
+    }
+    setSyncStatus((status) => (status === "off" ? "checking" : status));
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const current = await readCloud();
+        const prefs = localPrefsRef.current;
+        const action = options.force === "cloud"
+          ? (current.cloud ? "apply_cloud" : "in_sync")
+          : options.force === "local"
+            ? "push_local"
+            : decideSync({ local: prefs, cloud: current.cloud, meta: syncMetaRef.current });
+        if (action === "conflict") {
+          setSyncConflict({ cloud: current.cloud!, updatedAt: current.updatedAt });
+          setSyncStatus("conflict");
+          return;
+        }
+        setSyncConflict(null);
+        if (action === "apply_cloud" && current.cloud) {
+          applyPreferences(current.cloud);
+          localPrefsRef.current = current.cloud;
+          writeMeta(current.cloud, current.updatedAt);
+        } else if (action === "push_local" && prefs) {
+          if ((await pushLocal(current, prefs)) === "retry") continue;
+        } else {
+          writeMeta(prefs, current.updatedAt);
+        }
+        setSyncStatus("synced");
+        setSyncError("");
+        return;
+      }
+      setSyncStatus("pending");
+    } catch (error) {
+      setSyncStatus("error");
+      setSyncError((error instanceof Error ? error.message : "Cloud sync failed").replace(/[.\s]+$/, ""));
+      // Retry automatically; changes stay on this device meanwhile.
+      if (syncRetryRef.current) clearTimeout(syncRetryRef.current);
+      syncRetryRef.current = setTimeout(() => void reconcileRef.current(), 30_000);
+    } finally {
+      syncInFlightRef.current = false;
+      setSyncReady(true);
+      if (syncRerunRef.current) {
+        syncRerunRef.current = false;
+        setTimeout(() => void reconcileRef.current(), 300);
+      }
+    }
+  }
+
+  const reconcileRef = useRef(reconcile);
+  reconcileRef.current = reconcile;
+  useEffect(() => {
+    localPrefsRef.current = localPrefs;
+  }, [localPrefs]);
+  // Restore automatically once signed in and local data has loaded.
+  useEffect(() => {
+    if (!cloudSession.authenticated || !storageReady || accountOnly) {
+      setSyncStatus("off");
+      setSyncReady(false);
+      setSyncConflict(null);
+      if (syncRetryRef.current) clearTimeout(syncRetryRef.current);
+      return;
+    }
+    syncMetaRef.current = readMeta();
+    void reconcileRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudSession.authenticated, cloudSession.user?.id, storageReady, accountOnly]);
+  // Save automatically shortly after a change on this device.
+  useEffect(() => {
+    if (!syncReady || !cloudSession.authenticated || syncConflict) return;
+    if (localFingerprint === syncMetaRef.current?.fingerprint) return;
+    setSyncStatus("pending");
+    const timer = setTimeout(() => void reconcileRef.current(), 2000);
+    return () => clearTimeout(timer);
+  }, [localFingerprint, syncReady, cloudSession.authenticated, syncConflict]);
+  // Pick up changes made on other devices when this tab becomes active again.
+  useEffect(() => {
+    if (!syncReady || !cloudSession.authenticated) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && !syncConflict) void reconcileRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [syncReady, cloudSession.authenticated, syncConflict]);
+
   async function syncCloud(mode: "save" | "restore") {
     if (cloudBusy) return;
     setCloudBusy(true);
     setCloudMessage("");
-    try {
-      const get = await fetch("/api/workspace", {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const current = await get.json().catch(() => ({}));
-      if (!get.ok)
-        throw new Error(
-          typeof current.error === "string"
-            ? current.error
-            : "Sign in to use cloud sync.",
-        );
-      if (mode === "restore") {
-        if (!current.workspace?.copyCenter)
-          throw new Error(
-            "There are no saved Copy Center preferences in the cloud account yet.",
-          );
-        const saved = current.workspace.copyCenter as {
-          budget?: unknown;
-          maxLoss?: unknown;
-          activity?: unknown[];
-          walletAddresses?: unknown;
-        };
-        if (
-          typeof saved.budget !== "string" ||
-          typeof saved.maxLoss !== "string" ||
-          !Array.isArray(saved.activity)
-        )
-          throw new Error(
-            "The saved Copy Center settings are invalid; local data was not changed.",
-          );
-        setBudget(saved.budget);
-        setMaxLoss(saved.maxLoss);
-        if (
-          saved.walletAddresses &&
-          typeof saved.walletAddresses === "object" &&
-          !Array.isArray(saved.walletAddresses)
-        ) {
-          const candidate = saved.walletAddresses as Record<string, unknown>;
-          setWalletAddresses({
-            ...(typeof candidate.phantom === "string"
-              ? { phantom: candidate.phantom }
-              : {}),
-            ...(typeof candidate.metamask === "string"
-              ? { metamask: candidate.metamask }
-              : {}),
-            ...(typeof candidate.base === "string"
-              ? { base: candidate.base }
-              : {}),
-          });
-        } else {
-          setWalletAddresses({});
-        }
-        setActivity(
-          saved.activity
-            .filter((item): item is Activity =>
-              Boolean(
-                item &&
-                  typeof item === "object" &&
-                  typeof (item as Activity).id === "string" &&
-                  typeof (item as Activity).at === "string" &&
-                  typeof (item as Activity).title === "string" &&
-                  typeof (item as Activity).detail === "string",
-              ),
-            )
-            .slice(0, 50),
-        );
-        setCloudUpdatedAt(
-          typeof current.updatedAt === "string" ? current.updatedAt : null,
-        );
-        setCloudMessage(
-          "Cloud preferences restored. Wallet sessions must be re-verified in this browser.",
-        );
-      } else {
-        if (cloudUpdatedAt !== null && current.updatedAt !== cloudUpdatedAt)
-          throw new Error(
-            "Cloud records changed in another session. Your local records were kept. Restore and compare before saving.",
-          );
-        if (
-          cloudUpdatedAt === null &&
-          current.workspace &&
-          !window.confirm(
-            "A saved workspace already exists. Replace its Copy Center preferences with this browser's preferences? Trader research records will be preserved.",
-          )
-        )
-          return;
-        const base =
-          current.workspace && typeof current.workspace === "object"
-            ? current.workspace
-            : { traders: [], savedReviews: [], portfolioSnapshots: [] };
-        const response = await fetch("/api/workspace", {
-          method: "PUT",
-          credentials: "same-origin",
-          cache: "no-store",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            expectedUpdatedAt: cloudUpdatedAt ?? current.updatedAt ?? null,
-            workspace: {
-              ...base,
-              copyCenter: {
-                budget,
-                maxLoss,
-                activity: activity.slice(0, 50),
-                walletAddresses,
-              },
-            },
-          }),
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok || result.error)
-          throw new Error(
-            typeof result.error === "string"
-              ? result.error
-              : "Cloud save failed.",
-          );
-        setCloudUpdatedAt(
-          typeof result.updatedAt === "string"
-            ? result.updatedAt
-            : new Date().toISOString(),
-        );
-        setCloudMessage(
-          "Workspace saved to your authenticated cloud account. Exchange credentials and wallet secrets are not uploaded.",
-        );
-      }
-    } catch (error) {
-      setCloudMessage(
-        error instanceof Error ? error.message : "Cloud sync failed.",
-      );
-    } finally {
-      setCloudBusy(false);
-    }
+    await reconcile({ force: mode === "save" ? "local" : "cloud" });
+    setCloudMessage(
+      mode === "save"
+        ? "This device's preferences were saved to your account. Exchange credentials are never part of the workspace."
+        : "Cloud preferences applied on this device. Wallet sessions must be re-verified in this browser.",
+    );
+    setCloudBusy(false);
   }
 
   async function saveBitget() {
@@ -1277,7 +1335,13 @@ export function CopyCenterWorkspace({
                 <span>Workspace storage</span>
                 <strong className="cc-stat-word">
                   {cloudSession.authenticated
-                    ? "Cloud available"
+                    ? syncStatus === "synced"
+                      ? "Synced"
+                      : syncStatus === "conflict"
+                        ? "Needs your choice"
+                        : syncStatus === "error"
+                          ? "Not synced"
+                          : "Syncing"
                     : "This browser"}
                 </strong>
                 <button
@@ -1285,7 +1349,7 @@ export function CopyCenterWorkspace({
                   onClick={() => setView("settings")}
                 >
                   {cloudSession.authenticated
-                    ? "Save or restore →"
+                    ? "Sync settings →"
                     : "Create a free account →"}
                 </button>
               </article>
@@ -1711,14 +1775,14 @@ export function CopyCenterWorkspace({
                         disabled={cloudBusy}
                         onClick={() => void syncCloud("save")}
                       >
-                        {cloudBusy ? "Working…" : "Save to cloud"}
+                        {cloudBusy ? "Working…" : "Save this device now"}
                       </button>
                       <button
                         className="cc-button cc-button-secondary"
                         disabled={cloudBusy}
                         onClick={() => void syncCloud("restore")}
                       >
-                        Restore cloud data
+                        Use cloud version
                       </button>
                     </>
                   )}
@@ -1731,10 +1795,42 @@ export function CopyCenterWorkspace({
                   </button>
                 </div>
               )}
-              {cloudUpdatedAt && (
-                <p className="cc-form-note">
-                  Last cloud sync: {new Date(cloudUpdatedAt).toLocaleString()}
+              {cloudSession.authenticated && !accountOnly && (
+                <p className="cc-form-note" role="status" aria-live="polite">
+                  {syncStatus === "checking" && "Checking your cloud workspace…"}
+                  {syncStatus === "pending" && "Changes on this device will sync in a moment."}
+                  {syncStatus === "saving" && "Saving to your account…"}
+                  {syncStatus === "synced" &&
+                    "Synced across your devices" +
+                      (cloudUpdatedAt ? " · cloud revision " + new Date(cloudUpdatedAt).toLocaleString() : "") +
+                      ". Changes save automatically."}
+                  {syncStatus === "error" &&
+                    "Not synced: " + (syncError || "the cloud workspace could not be reached") + ". Your changes are kept on this device and will sync when it is reachable."}
+                  {syncStatus === "conflict" && "Your preferences changed on this device and in the cloud. Choose which to keep."}
                 </p>
+              )}
+              {syncConflict && !accountOnly && (
+                <div className="cc-notice" role="alert">
+                  <span className="cc-notice-icon">!</span>
+                  <div>
+                    <strong>Two versions of your preferences</strong>
+                    <p>
+                      Cloud: planning amount {syncConflict.cloud.budget}, loss threshold {syncConflict.cloud.maxLoss}%,{" "}
+                      {syncConflict.cloud.activity.length} activity entries
+                      {syncConflict.updatedAt ? ", saved " + new Date(syncConflict.updatedAt).toLocaleString() : ""}.
+                      This device: planning amount {budget}, loss threshold {maxLoss}%, {activity.length} activity entries.
+                      Nothing is overwritten until you choose.
+                    </p>
+                    <div className="cc-modal-actions">
+                      <button className="cc-button" disabled={cloudBusy} onClick={() => void syncCloud("restore")}>
+                        Use cloud version
+                      </button>
+                      <button className="cc-button cc-button-secondary" disabled={cloudBusy} onClick={() => void syncCloud("save")}>
+                        Keep this device's version
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
               {cloudMessage && (
                 <p className="cc-form-note" role="status">

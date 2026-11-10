@@ -61,7 +61,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isText = (value: unknown, max: number = LIMITS.text): value is string => typeof value === "string" && value.length <= max;
 const isNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
-function normalizeCopyCenter(input: unknown): CopyCenterPreferences | null {
+export function normalizeCopyCenter(input: unknown): CopyCenterPreferences | null {
   if (!isRecord(input)) return null;
   const budget = input.budget;
   const maxLoss = input.maxLoss;
