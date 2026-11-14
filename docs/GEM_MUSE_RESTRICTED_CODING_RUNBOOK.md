@@ -47,3 +47,15 @@ For a **public fixed-scope** addition-helper task, validate the JSON against `va
 For private or broader tasks, keep instructions only in the protected queue and return a precise blocked status instead of exposing private code in public GitHub or bypassing the approval path.
 
 Never claim native MCP installation, private unattended coding, secure execution of arbitrary generated code, or production readiness from these restricted pilot tests.
+
+## Extended acceptance: ChatGPT-requested model code in isolated container
+Verified 14 November 2026:
+- Public request file `.github/muse-public-tasks/4d2ea931-b498-4d77-9d9c-e2ce557f6454.json` was submitted from ChatGPT to the pilot branch. The workflow reads the exact changed file from the authenticated GitHub commit API, not shallow checkout `git show HEAD`.
+- Github Actions [run #43548887591](https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/actions/runs/43548887591) succeeded in both stages: independent Qwen 0.5B model generation, strict allowlist validation, behavioral tests, SHA-256 transfer, and isolated review-branch commit.
+- Draft PR [#98](https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/pull/98) is open, unmerged and not deployed; its repository CI and production smoke checks passed.
+- **Sandbox acceptance:** [run #43549707901](https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/actions/runs/43549707901) passed independently. Before publication, the accepted model-derived function was exercised in a disposable Docker container with network disabled, read-only root and source mount, capabilities dropped, non-root uid/gid, no-new-privileges, and explicit memory, CPU, process and time limits. The publishing stage rechecked the source/hash. A new GitHub branch was not created because it already existed; no overwrite was performed.
+- New testable source: `scripts/muse-container-proof.mjs`, `tests/muse-container-proof.test.mjs`, `scripts/muse-public-task-guard.mjs`, and `.github/workflows/muse-public-task-runner.yml`. The full repository CI on the test commit passed.
+- Private Neon evidence task: `b863ec28-bd31-4ab0-a31f-d1fc347a59a3`. A separate append-only `sandbox_verified` event records the independent run. The model coding job was triggered by the **public GitHub task file**, not automatically from this Neon task; this distinction is important.
+- The existing Vercel private task tracker is still available, but a richer tracker deployment hit the Vercel free daily API-deployment cap (HTTP 402, 24-hour retry). Do not claim it was deployed or authorize payment.
+
+**Boundary:** These tests establish a concrete, cost-controlled model-generated code pipeline for one strictly accepted function. They do not certify Docker as a universal escape-proof sandbox, validate model reasoning on arbitrary repositories, authorize production merges, or connect a native ChatGPT `@GEM Muse` write-enabled MCP plugin on Plus.
