@@ -7,3 +7,9 @@ test("rejects wrong repository, task types and versions",()=>{for(const v of [{r
 test("rejects unknown fields and invalid IDs",()=>{for(const v of [{extra:true},{taskId:"../../etc/passwd"},{taskId:"not-a-uuid"}])assert.throws(()=>validateMusePublicTask({...base,...v}))});
 test("rejects secrets and oversized instructions",()=>{for(const instruction of ["Bearer abcdefghijklmnopqrstuvwxyz", "github_pat_abcdefghijk123456", "x".repeat(401), "short"])assert.throws(()=>validateMusePublicTask({...base,instruction}))});
 test("does not allow injected target paths or model selection",()=>{assert.throws(()=>validateMusePublicTask({...base,path:"src/app"}));assert.throws(()=>validateMusePublicTask({...base,model:"paid"}))});
+
+
+test("accepts narrowly scoped clamp requests with distinct kind",()=>{
+ const x=validateMusePublicTask({...base,kind:"clamp_function",instruction:"Create a pure range-clamping helper function with no side effects."});
+ assert.equal(x.kind,"clamp_function");assert.equal(x.repository,base.repository);
+});
