@@ -1,0 +1,51 @@
+name: GEM Muse proposal verification
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/muse-draft-pr-executor.mjs'
+      - 'scripts/muse-proposal-lab.mjs'
+      - 'tests/muse-draft-pr-executor.test.mjs'
+      - 'tests/muse-proposal-lab.test.mjs'
+      - '.github/workflows/muse-proposal-ci.yml'
+  push:
+    branches: ['muse/coding-agent-draft-pr-pilot-20261113']
+    paths:
+      - 'scripts/muse-proposal-lab.mjs'
+      - 'tests/muse-proposal-lab.test.mjs'
+      - '.github/workflows/muse-proposal-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: muse-proposal-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Security and behavior tests
+        run: node --test tests/muse-draft-pr-executor.test.mjs tests/muse-proposal-lab.test.mjs
+      - name: Generate and verify restricted sample task in a disposable folder
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { generateMuseProposal, verifyMuseProposal } from './scripts/muse-proposal-lab.mjs';
+          const output = generateMuseProposal({
+            repository: 'gem-cybersecurity-monitoring-assist/btcc-copy-manager',
+            taskId: '12cf3456-1234-4a56-8bcd-123456789abc',
+            instruction: 'Validate the proposal generator and local syntax checks without writing production code.'
+          });
+          const result = await verifyMuseProposal(output);
+          if (!result.verified || result.sandboxedArbitraryCode || result.modelUsed) process.exit(2);
+          console.log('Restricted generation, syntax and functional verification passed; SHA-256:',result.contentHash);
+          NODE
