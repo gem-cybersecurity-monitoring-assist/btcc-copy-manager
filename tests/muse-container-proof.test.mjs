@@ -26,3 +26,14 @@ test("does not modify the model source contents",()=>fixture(cwd=>{
  verifyMuseInContainer({cwd,execImpl:()=>Buffer.from("passed")});
  assert.equal(readFileSync(path,"utf8"),before);
 }));
+
+
+test("clamp task enforces independent boundary checks in the Docker program",()=>fixture(cwd=>{
+ const args=museContainerArgs({cwd,kind:"clamp_function"});
+ const program=args[args.length-1];
+ assert(program.includes("clamp"));assert(program.includes("f(-5,0,10)"));
+ assert(!program.includes("require('node:child_process')"));
+}));
+test("rejects unsupported kinds before invoking Docker",()=>fixture(cwd=>{
+ assert.throws(()=>museContainerArgs({cwd,kind:"arbitrary_code"}),/not_allowed/);
+}));
