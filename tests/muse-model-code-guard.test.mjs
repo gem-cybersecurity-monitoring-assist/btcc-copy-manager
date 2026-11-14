@@ -29,3 +29,16 @@ test("accepts an export keyword without granting any extra code", () => {
 test("rejects excessive input and invalid input types", () => {
  for (const value of [null, {x:1}, "a".repeat(10001)]) assert.throws(() => validateMuseModelOutput(value));
 });
+
+
+test("accepts strictly allowlisted clamp code with boundary checks",()=>{
+ const r=validateMuseModelOutput("function clamp(value,min,max){return Math.min(Math.max(value,min),max);}",{kind:"clamp_function"});
+ assert.equal(r.verified,true);assert.equal(r.kind,"clamp_function");assert.equal(r.generalSandbox,false);
+ assert.equal(r.allowedScope,"single_clamp_function");
+});
+test("rejects incorrect clamp implementations, hidden side effects and other task kinds",()=>{
+ const bad=["function clamp(value,min,max){return value;}","function clamp(value,min,max){process.exit(0); return Math.min(Math.max(value,min),max);}","function clamp(value,min,max){return Math.max(Math.min(value,min),max);}"];
+ for(const candidate of bad)assert.throws(()=>validateMuseModelOutput(candidate,{kind:"clamp_function"}));
+ assert.throws(()=>validateMuseModelOutput("function add(a,b){return a+b;}",{kind:"clamp_function"}));
+ assert.throws(()=>validateMuseModelOutput("function add(a,b){return a+b;}",{kind:"private_code"}));
+});
