@@ -32,6 +32,7 @@ jobs:
           import {readFile,writeFile} from 'node:fs/promises';
           import {validateMusePublicTask} from './scripts/muse-public-task-guard.mjs';
           const changed=execFileSync('git',['show','--format=','--name-only','HEAD'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+          console.log('Request commit changed paths:',JSON.stringify(changed));
           if(changed.length!==1||!/^\.github\/muse-public-tasks\/[a-f0-9-]+\.json$/.test(changed[0]))throw Error('unexpected_commit_content');
           const raw=await readFile(changed[0],'utf8');
           if(raw.length>1000)throw Error('oversized_task_file');
