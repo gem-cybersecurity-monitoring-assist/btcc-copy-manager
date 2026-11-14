@@ -3,6 +3,5 @@
   "taskId": "4d2ea931-b498-4d77-9d9c-e2ce557f6454",
   "repository": "gem-cybersecurity-monitoring-assist/btcc-copy-manager",
   "kind": "add_function",
-  "instruction": "As a GEM Muse coding worker, generate and verify a small pure JavaScript function that adds two numbers. Keep all changes isolated from production."
+  "instruction": "As a GEM Muse coding worker, generate and verify a small pure JavaScript function that adds two numbers. Exercise the verified code in a no-network, read-only container. Keep all changes isolated from production."
 }
-
