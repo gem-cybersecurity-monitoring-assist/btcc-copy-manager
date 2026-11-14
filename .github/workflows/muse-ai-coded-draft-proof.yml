@@ -1,0 +1,123 @@
+name: GEM Muse model-generated code proof
+on:
+  push:
+    branches:
+      - muse/coding-agent-draft-pr-pilot-20261113
+    paths:
+      - .github/workflows/muse-ai-coded-draft-proof.yml
+permissions:
+  contents: read
+jobs:
+  infer-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    if: github.repository == 'gem-cybersecurity-monitoring-assist/btcc-copy-manager'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify strict validator
+        run: node --test tests/muse-model-code-guard.test.mjs
+      - name: Get checksum-pinned local inference runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .muse-ai
+          curl -fsSL --retry 2 --max-time 100 'https://github.com/ggml-org/llama.cpp/releases/download/b12248/llama-b12248-bin-ubuntu-x64.tar.gz' -o .muse-ai/runtime.tar.gz
+          echo '6b3a530b44f6b0a4ae4872d3b3c8d1edc2ac6bba7d8bd211329a4ba644c0dc65  .muse-ai/runtime.tar.gz' | sha256sum --check --status
+          tar -xzf .muse-ai/runtime.tar.gz -C .muse-ai
+      - name: Download public open-weight coding model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 2 --max-time 180 'https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf?download=true' -o .muse-ai/model.gguf
+          size=$(stat -c%s .muse-ai/model.gguf)
+          test "$size" -gt 300000000
+          test "$size" -lt 600000000
+          head -c 4 .muse-ai/model.gguf | grep -q GGUF
+          echo '0128e77564e43d40682f82d7ebe8a9abdf0c24c8f55fa85629f8cc156b1b6560  .muse-ai/model.gguf' | sha256sum --check --status
+      - name: Generate actual model code as untrusted text
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli="$(find .muse-ai -type f -name llama-cli | head -n 1)"
+          test -n "$cli"
+          chmod +x "$cli"
+          export LD_LIBRARY_PATH="$(dirname "$cli")"
+          timeout 110s "$cli" -m .muse-ai/model.gguf -p 'Write only a JavaScript function declaration named add that accepts parameters a and b and returns their arithmetic sum. No markdown, explanation, import, or other code.' -n 90 -c 1024 --temp 0 --no-display-prompt > .muse-ai/model-output.txt 2> .muse-ai/inference.log
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          import { validateMuseModelOutput } from './scripts/muse-model-code-guard.mjs';
+          const output=await readFile('.muse-ai/model-output.txt','utf8');
+          const result=validateMuseModelOutput(output);
+          if(!result.verified||!result.modelUsed||result.generalSandbox) throw Error('model_code_not_safe');
+          await writeFile('.muse-ai/verified.mjs',result.source,{mode:0o600});
+          await writeFile('.muse-ai/sha256.txt',result.sha256+'\n',{mode:0o600});
+          console.log('MODEL GENERATED VERIFIED CODE: '+result.source.trim());
+          console.log('MODEL GENERATED SHA-256: '+result.sha256);
+          NODE
+      - name: Export only strictly validated model output
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gem-muse-verified-model-code
+          path: |
+            .muse-ai/verified.mjs
+            .muse-ai/sha256.txt
+          retention-days: 3
+  publish-to-unmerged-branch:
+    needs: infer-and-verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gem-muse-verified-model-code
+          path: .muse-ai
+      - name: Independently verify downloaded code artifact before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { validateMuseModelOutput } from './scripts/muse-model-code-guard.mjs';
+          const source=await readFile('.muse-ai/verified.mjs','utf8');
+          const hash=(await readFile('.muse-ai/sha256.txt','utf8')).trim();
+          const result=validateMuseModelOutput(source);
+          if(result.sha256!==hash || result.source!==source || !result.verified) throw Error('model_artifact_invalid');
+          console.log('Artifact hash and strict code allowlist reverified:',hash);
+          NODE
+      - name: Publish model-generated code to isolated branch only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_PROMPT_DISABLED: '1'
+        run: |
+          set -euo pipefail
+          repo='gem-cybersecurity-monitoring-assist/btcc-copy-manager'
+          branch='muse/ai-model-verified-20261114'
+          path='scripts/muse-proposals/ai-generated-add.mjs'
+          if gh api "repos/$repo/git/ref/heads/$branch" >/dev/null 2>&1; then
+            echo 'Verified AI proposal branch already exists: no overwrite or duplicate.'
+            exit 0
+          fi
+          base="$(gh api "repos/$repo/branches/main" --jq '.commit.sha')"
+          [[ "$base" =~ ^[a-f0-9]{40}$ ]]
+          gh api "repos/$repo/git/refs" -X POST -f ref="refs/heads/$branch" -f sha="$base" >/dev/null
+          content="$(base64 -w 0 .muse-ai/verified.mjs)"
+          gh api "repos/$repo/contents/$path" -X PUT -f message='muse: open-weight model generated code, syntax and function checked' -f content="$content" -f branch="$branch" >/dev/null
+          echo 'AI model code published only on review branch. Owner-authorized account must open draft PR; GitHub Actions policy unchanged.'

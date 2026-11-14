@@ -1,0 +1,69 @@
+name: GEM Muse independent draft-PR proof
+on:
+  push:
+    branches:
+      - muse/coding-agent-draft-pr-pilot-20261113
+    paths:
+      - .github/workflows/muse-draft-pr-proof.yml
+permissions:
+  contents: write
+concurrency:
+  group: gem-muse-pilot-publisher
+  cancel-in-progress: false
+jobs:
+  verified-pilot:
+    if: github.repository == 'gem-cybersecurity-monitoring-assist/btcc-copy-manager'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout isolated pilot source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify executor and proposal tests
+        run: node --test tests/muse-draft-pr-executor.test.mjs tests/muse-proposal-lab.test.mjs
+      - name: Generate fixed allowlisted proposal and run real checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .muse-proof
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          import { generateMuseProposal, verifyMuseProposal } from './scripts/muse-proposal-lab.mjs';
+          const generated = generateMuseProposal({
+            repository: 'gem-cybersecurity-monitoring-assist/btcc-copy-manager',
+            taskId: '12cf3456-1234-4a56-8bcd-123456789abc',
+            instruction: 'Create a review-only GEM Muse task-summary helper. Do not modify production code, secrets, or trading logic.'
+          });
+          const verified = await verifyMuseProposal(generated);
+          if (!verified.verified || verified.modelUsed || verified.sandboxedArbitraryCode || verified.contentHash !== generated.plan.contentHash) throw Error('proposal_not_verified');
+          await writeFile('.muse-proof/proposal.mjs', generated.proposal.content, { mode: 0o600 });
+          await writeFile('.muse-proof/sha256.txt', verified.contentHash + '\n', { mode: 0o600 });
+          console.log('Deterministic proposal generated, syntax and functional checks passed; content hash:', verified.contentHash);
+          NODE
+      - name: Publish verified sample branch only, respecting repository PR policy
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_PROMPT_DISABLED: '1'
+        run: |
+          set -euo pipefail
+          repo='gem-cybersecurity-monitoring-assist/btcc-copy-manager'
+          branch='muse/verified-sample-20261114'
+          path='scripts/muse-proposals/task-12cf3456.mjs'
+          if gh api "repos/$repo/git/ref/heads/$branch" >/dev/null 2>&1; then
+            echo "Branch exists; skipping to avoid duplicate or overwriting source."
+            exit 0
+          fi
+          base="$(gh api "repos/$repo/branches/main" --jq '.commit.sha')"
+          if [[ ! "$base" =~ ^[a-f0-9]{40}$ ]]; then echo 'Invalid base commit' >&2; exit 1; fi
+          gh api "repos/$repo/git/refs" -X POST -f ref="refs/heads/$branch" -f sha="$base" >/dev/null
+          content="$(base64 -w 0 .muse-proof/proposal.mjs)"
+          gh api "repos/$repo/contents/$path" -X PUT -f message='muse: isolated verified deterministic proposal [draft only]' -f content="$content" -f branch="$branch" >/dev/null
+          echo "Verified proposal branch created."
+          echo "Validated branch ready. Draft PR must be opened through an authorized GitHub account. Repository-wide Actions PR creation remains disabled."
