@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "taskId": "2e98a61d-cc12-4ca7-930f-54a33b4cd502",
+  "repository": "gem-cybersecurity-monitoring-assist/btcc-copy-manager",
+  "kind": "clamp_function",
+  "instruction": "Generate one pure clamp(value,min,max) JavaScript function returning Math.min(Math.max(value,min),max), with no imports or additional statements."
+}
