@@ -87,13 +87,15 @@ jobs:
           }
           const cli=await locate('.muse-task');
           if(!cli)throw Error('inference_runtime_missing');
-          const prompt='Write only a JavaScript function declaration named add that accepts a and b and returns their arithmetic sum. User task: '+task.instruction+' No markdown, no imports, no explanation.';
+          const prompt = task.kind==='clamp_function'
+            ? 'Write exactly one JavaScript function declaration named clamp(value,min,max), with body: return Math.min(Math.max(value,min),max); No additional code or prose. User task: '+task.instruction
+            : 'Write only a JavaScript function declaration named add that accepts a and b and returns their arithmetic sum. User task: '+task.instruction+' No markdown, no imports, no explanation.';
           const proc=spawnSync(cli,['-m','.muse-task/model.gguf','-p',prompt,'-n','90','-c','1024','--temp','0','--no-display-prompt'],{
             encoding:'utf8',timeout:110000,maxBuffer:100000,
             env:{PATH:process.env.PATH||'/usr/bin:/bin',LD_LIBRARY_PATH:join(process.cwd(),cli.slice(0,cli.lastIndexOf('/')))}
           });
           if(proc.status!==0)throw Error('model_execution_failed');
-          const result=validateMuseModelOutput(proc.stdout);
+          const result=validateMuseModelOutput(proc.stdout,{kind:task.kind});
           if(!result.verified||!result.modelUsed||result.generalSandbox)throw Error('model_code_not_approved');
           await writeFile('.muse-task/verified.mjs',result.source,{mode:0o600});
           await writeFile('.muse-task/sha256.txt',result.sha256+'\n',{mode:0o600});
@@ -143,7 +145,7 @@ jobs:
           const task=validateMusePublicTask(JSON.parse(await readFile('.muse-task/request.json','utf8')));
           const source=await readFile('.muse-task/verified.mjs','utf8');
           const sha=(await readFile('.muse-task/sha256.txt','utf8')).trim();
-          const result=validateMuseModelOutput(source);
+          const result=validateMuseModelOutput(source,{kind:task.kind});
           if(!result.verified||result.sha256!==sha||result.source!==source)throw Error('artifact_integrity_failure');
           await writeFile('.muse-task/branch.txt',task.branch+'\n',{mode:0o600});
           await writeFile('.muse-task/path.txt',task.path+'\n',{mode:0o600});
