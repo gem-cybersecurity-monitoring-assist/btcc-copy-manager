@@ -41,7 +41,7 @@ jobs:
           test "$size" -gt 300000000
           test "$size" -lt 600000000
           head -c 4 .muse-ai/model.gguf | grep -q GGUF
-          sha256sum .muse-ai/model.gguf | awk '{print "Model SHA-256: "$1}'
+          echo '0128e77564e43d40682f82d7ebe8a9abdf0c24c8f55fa85629f8cc156b1b6560  .muse-ai/model.gguf' | sha256sum --check --status
       - name: Generate actual model code as untrusted text
         shell: bash
         run: |
