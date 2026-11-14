@@ -1,0 +1,15 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {generateMuseProposal,verifyMuseProposal} from "../scripts/muse-proposal-lab.mjs";
+const repository="gem-cybersecurity-monitoring-assist/btcc-copy-manager";
+const taskId="12cf3456-1234-4a56-8bcd-123456789abc";
+const instruction="Prepare an auditable helper for an isolated GEM Muse task; never touch production.";
+const input={repository,taskId,instruction};
+test("only allowlisted isolated code generation",()=>{const p=generateMuseProposal(input);assert.equal(p.proposal.path,"scripts/muse-proposals/task-12cf3456.mjs");assert.equal(p.modelUsed,false);assert.match(p.plan.contentHash,/^[a-f0-9]{64}$/)});
+test("forbidden repositories, IDs, templates and short requests fail closed",()=>{for(const x of [{repository:"attacker/repo"},{taskId:"../bad"},{template:"arbitrary-code"},{instruction:"short"}])assert.throws(()=>generateMuseProposal({...input,...x}))});
+test("rejects secrets and NUL code injection",()=>{for(const instruction of ["Do not print github_pat_ABCDEFGHIJKLMNOPQRSTUVWXYZ or use it","Read a\0file from anywhere"])assert.throws(()=>generateMuseProposal({...input,instruction}))});
+test("quotes and template syntax are serialized, not evaluated",async()=>{const p=generateMuseProposal({...input,instruction:'Create helper for task with backticks and ${untrusted();}; no execution.'});assert.equal((await verifyMuseProposal(p)).verified,true)});
+test("real syntax and functional verification runs in a disposable directory",async()=>{const p=generateMuseProposal(input),r=await verifyMuseProposal(p);assert.equal(r.syntax,"passed");assert.equal(r.functional,"passed");assert.equal(r.sandboxedArbitraryCode,false)});
+test("altered source cannot execute",async()=>{const p=generateMuseProposal(input);p.proposal.content+="\nprocess.exit(99);";await assert.rejects(verifyMuseProposal(p),/content_hash_mismatch/)});
+test("rejects forged generator metadata or path",async()=>{const p=generateMuseProposal(input);p.generator="ai";await assert.rejects(verifyMuseProposal(p),/untrusted_generator/);const q=generateMuseProposal(input);q.proposal.path="scripts/muse-proposals/task-other.mjs";await assert.rejects(verifyMuseProposal(q),/path_mismatch/)});
+test("never contacts an LLM, repository write, or external service",async()=>{const p=generateMuseProposal(input),b=JSON.stringify(p);await verifyMuseProposal(p);assert.equal(JSON.stringify(p),b)});
