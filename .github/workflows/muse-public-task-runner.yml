@@ -24,16 +24,21 @@ jobs:
           package-manager-cache: false
       - name: Validate exactly one new public task request
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p .muse-task
           node --input-type=module <<'NODE'
           import {readFile,writeFile} from 'node:fs/promises';
           import {validateMusePublicTask} from './scripts/muse-public-task-guard.mjs';
-          const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
-          if(!Array.isArray(event.commits)||event.commits.length!==1)throw Error('multiple_commits_not_supported');
-          const c=event.head_commit;
-          const changed=[...(c?.added||[]),...(c?.modified||[]),...(c?.removed||[])];
+          const response=await fetch('https://api.github.com/repos/gem-cybersecurity-monitoring-assist/btcc-copy-manager/commits/'+process.env.GITHUB_SHA,{
+            headers:{'Authorization':'Bearer '+process.env.GH_TOKEN,'User-Agent':'gem-muse-verified-task','Accept':'application/vnd.github+json'}
+          });
+          if(!response.ok)throw Error('github_commit_read_failed_'+response.status);
+          const commit=await response.json();
+          if(commit.sha!==process.env.GITHUB_SHA||!Array.isArray(commit.files))throw Error('commit_file_list_missing');
+          const changed=commit.files.map(f=>f.filename);
           console.log('Request commit changed paths:',JSON.stringify(changed));
           if(changed.length!==1||!/^\.github\/muse-public-tasks\/[a-f0-9-]+\.json$/.test(changed[0]))throw Error('unexpected_commit_content');
           const raw=await readFile(changed[0],'utf8');
