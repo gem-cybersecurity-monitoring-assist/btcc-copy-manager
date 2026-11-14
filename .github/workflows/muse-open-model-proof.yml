@@ -1,0 +1,62 @@
+name: GEM Muse isolated open-weight model proof
+on:
+  push:
+    branches:
+      - muse/coding-agent-draft-pr-pilot-20261113
+    paths:
+      - .github/workflows/muse-open-model-proof.yml
+permissions:
+  contents: read
+jobs:
+  offline-model:
+    if: github.repository == 'gem-cybersecurity-monitoring-assist/btcc-copy-manager'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout without credentials
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Download integrity-pinned CPU inference runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .muse-offline
+          curl --fail --location --silent --show-error --retry 2 --max-time 100 \
+            'https://github.com/ggml-org/llama.cpp/releases/download/b12248/llama-b12248-bin-ubuntu-x64.tar.gz' \
+            -o .muse-offline/runtime.tar.gz
+          echo '6b3a530b44f6b0a4ae4872d3b3c8d1edc2ac6bba7d8bd211329a4ba644c0dc65  .muse-offline/runtime.tar.gz' | sha256sum --check --status
+          tar -xzf .muse-offline/runtime.tar.gz -C .muse-offline
+          find .muse-offline -type f -name llama-cli -print
+      - name: Download public quantized 0.5B coding model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 2 --max-time 180 \
+            'https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf?download=true' \
+            -o .muse-offline/model.gguf
+          bytes=$(stat -c%s .muse-offline/model.gguf)
+          test "$bytes" -gt 300000000
+          test "$bytes" -lt 600000000
+          head -c 4 .muse-offline/model.gguf | grep -q GGUF
+          echo "Public model file downloaded and GGUF header verified: $bytes bytes. No paid inference API used."
+      - name: Run isolated CPU inference; treat output as untrusted text
+        shell: bash
+        run: |
+          set -euo pipefail
+          cli="$(find .muse-offline -type f -name llama-cli | head -n 1)"
+          test -n "$cli"
+          chmod +x "$cli"
+          export LD_LIBRARY_PATH="$(dirname "$cli"):${LD_LIBRARY_PATH:-}"
+          timeout 110s "$cli" -m .muse-offline/model.gguf \
+            -p 'Write exactly this pure JavaScript function with no explanation: function add(a,b){return a+b;}' \
+            -n 65 -c 1024 --temp 0 --no-display-prompt \
+            > .muse-offline/model-output.txt 2> .muse-offline/inference.log
+          python3 - <<'PY'
+          from pathlib import Path
+          content=Path('.muse-offline/model-output.txt').read_text(errors='replace').strip()
+          if len(content)<10:
+              raise SystemExit('model_output_missing')
+          print('Independent offline model inference completed.',len(content),'output characters.')
+          print('Output was NOT executed or published: untrusted model content requires a sandbox and owner approval.')
+          PY
