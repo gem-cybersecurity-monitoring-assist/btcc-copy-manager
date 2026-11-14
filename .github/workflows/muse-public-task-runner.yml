@@ -98,6 +98,12 @@ jobs:
           await writeFile('.muse-task/sha256.txt',result.sha256+'\n',{mode:0o600});
           console.log('Independent model code validated:',task.id,result.sha256,'source:',JSON.stringify(result.source));
           NODE
+      - name: Execute allowlisted generated code inside network-disabled read-only Docker container
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/muse-container-proof.test.mjs
+          node scripts/muse-container-proof.mjs
       - name: Deliver only validated result to publisher
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
