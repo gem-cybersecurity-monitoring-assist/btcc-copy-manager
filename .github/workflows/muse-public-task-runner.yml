@@ -28,10 +28,12 @@ jobs:
           set -euo pipefail
           mkdir -p .muse-task
           node --input-type=module <<'NODE'
-          import {execFileSync} from 'node:child_process';
           import {readFile,writeFile} from 'node:fs/promises';
           import {validateMusePublicTask} from './scripts/muse-public-task-guard.mjs';
-          const changed=execFileSync('git',['show','--format=','--name-only','HEAD'],{encoding:'utf8'}).trim().split('\n').filter(Boolean);
+          const event=JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH,'utf8'));
+          if(!Array.isArray(event.commits)||event.commits.length!==1)throw Error('multiple_commits_not_supported');
+          const c=event.head_commit;
+          const changed=[...(c?.added||[]),...(c?.modified||[]),...(c?.removed||[])];
           console.log('Request commit changed paths:',JSON.stringify(changed));
           if(changed.length!==1||!/^\.github\/muse-public-tasks\/[a-f0-9-]+\.json$/.test(changed[0]))throw Error('unexpected_commit_content');
           const raw=await readFile(changed[0],'utf8');
