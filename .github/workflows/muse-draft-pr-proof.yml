@@ -7,7 +7,6 @@ on:
       - .github/workflows/muse-draft-pr-proof.yml
 permissions:
   contents: write
-  pull-requests: write
 concurrency:
   group: gem-muse-pilot-publisher
   cancel-in-progress: false
@@ -47,7 +46,7 @@ jobs:
           await writeFile('.muse-proof/sha256.txt', verified.contentHash + '\n', { mode: 0o600 });
           console.log('Deterministic proposal generated, syntax and functional checks passed; content hash:', verified.contentHash);
           NODE
-      - name: Publish only the verified sample as an unmerged draft PR
+      - name: Publish verified sample branch only, respecting repository PR policy
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,5 +66,4 @@ jobs:
           content="$(base64 -w 0 .muse-proof/proposal.mjs)"
           gh api "repos/$repo/contents/$path" -X PUT -f message='muse: isolated verified deterministic proposal [draft only]' -f content="$content" -f branch="$branch" >/dev/null
           echo "Verified proposal branch created."
-          pr="$(gh api "repos/$repo/pulls" -X POST -f title='GEM Muse independent verified proposal [draft, no production changes]' -f head="$branch" -f base=main -F draft=true -f body='Generated from a fixed, allowlisted deterministic task in a read-only CI test environment. Passed syntax, functional, and security checks. Isolated scripts/muse-proposals/ file only. No AI model used, no merge, deployment, or financial action authorized. Requires owner review.' --jq '.html_url')"
-          echo "Draft pull request created: $pr"
+          echo "Validated branch ready. Draft PR must be opened through an authorized GitHub account. Repository-wide Actions PR creation remains disabled."
