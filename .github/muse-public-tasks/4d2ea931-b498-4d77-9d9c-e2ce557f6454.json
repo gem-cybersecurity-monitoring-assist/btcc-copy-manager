@@ -5,3 +5,4 @@
   "kind": "add_function",
   "instruction": "As a GEM Muse coding worker, generate and verify a small pure JavaScript function that adds two numbers. Keep all changes isolated from production."
 }
+
