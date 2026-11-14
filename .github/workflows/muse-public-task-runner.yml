@@ -65,6 +65,7 @@ jobs:
           size=$(stat -c%s .muse-task/model.gguf)
           test "$size" -gt 300000000 && test "$size" -lt 600000000
           head -c 4 .muse-task/model.gguf | grep -q GGUF
+          echo '0128e77564e43d40682f82d7ebe8a9abdf0c24c8f55fa85629f8cc156b1b6560  .muse-task/model.gguf' | sha256sum --check --status
       - name: Generate and strictly test source from requested public task
         shell: bash
         run: |
