@@ -59,3 +59,13 @@ Verified 14 November 2026:
 - The existing Vercel private task tracker is still available, but a richer tracker deployment hit the Vercel free daily API-deployment cap (HTTP 402, 24-hour retry). Do not claim it was deployed or authorize payment.
 
 **Boundary:** These tests establish a concrete, cost-controlled model-generated code pipeline for one strictly accepted function. They do not certify Docker as a universal escape-proof sandbox, validate model reasoning on arbitrary repositories, authorize production merges, or connect a native ChatGPT `@GEM Muse` write-enabled MCP plugin on Plus.
+
+
+## Expanded controlled tasks and reproducibility (14 November 2026)
+- **Second supported code task:** `clamp_function` in addition to `add_function`. Public request `2e98a61d-cc12-4ca7-930f-54a33b4cd502` generated a JavaScript `clamp(value,min,max)` helper and tested low, high, in-range, and equal-boundary values.
+- Independent model workflow: [#43592735192](https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/actions/runs/43592735192), **both stages succeeded**, including read-only network-disabled container execution. The review branch `muse/ai-task-2e98a61d-20261114` contains the generated file.
+- Draft review PR [#99](https://github.com/gem-cybersecurity-monitoring-assist/btcc-copy-manager/pull/99): open, unmerged; branch repository CI and production smoke checks passed. No deployment followed those checks.
+- New private Neon evidence record `31be1c7b-e460-4d1f-aa88-27d09352fca7` recorded by ChatGPT from GitHub's completed workflow; **the Neon worker did not generate the code itself**.
+- **Pinned model binary weights SHA-256:** `0128e77564e43d40682f82d7ebe8a9abdf0c24c8f55fa85629f8cc156b1b6560`. The GGUF was compared with this hash after download, before inference. Existing llama.cpp runtime checksum pin remains in place.
+- Strict kind dispatch and validated source extraction in `scripts/muse-model-code-guard.mjs`; both kinds are checked in `scripts/muse-container-proof.mjs` with model output treated as untrusted.
+- Verified model success for two controlled examples **does not imply general-purpose or production-grade coding autonomy**.
