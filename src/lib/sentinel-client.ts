@@ -87,28 +87,72 @@ export function sentinelBaseUrl() {
   return (process.env.SENTINEL_URL || DEFAULT_SENTINEL_URL).replace(/\/$/, "");
 }
 
-export async function sentinelRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${sentinelBaseUrl()}${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "content-type": "application/json",
-      ...(process.env.SENTINEL_CONTROL_TOKEN
-        ? {
-            authorization: `Bearer ${process.env.SENTINEL_CONTROL_TOKEN}`,
-            "x-sentinel-control": process.env.SENTINEL_CONTROL_TOKEN,
-          }
-        : {}),
-      ...(init?.headers || {}),
-    },
-    signal: AbortSignal.timeout(10_000),
-  });
-  const text = await response.text();
-  const body = text ? JSON.parse(text) : null;
-  if (!response.ok) {
-    throw new Error(`Sentinel ${path} failed (${response.status}): ${JSON.stringify(body)}`);
+// Bound every upstream response, including chunked bodies without Content-Length.
+// Sentinel can return account data; never include upstream bodies in errors.
+const MAX_SENTINEL_RESPONSE_BYTES = 1_048_576;
+
+async function readSentinelJson(response: Response): Promise<unknown> {
+  const declaredLength = response.headers.get("content-length");
+  if (declaredLength && Number(declaredLength) > MAX_SENTINEL_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error("Sentinel response exceeds the supported size.");
   }
-  return body as T;
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = "";
+  try {
+    while (true) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try { chunk = await reader.read(); }
+      catch { throw new Error("Sentinel response could not be read."); }
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > MAX_SENTINEL_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new Error("Sentinel response exceeds the supported size.");
+      }
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+  if (!text) return null;
+  try { return JSON.parse(text); }
+  catch { throw new Error("Sentinel returned an invalid JSON response."); }
+}
+
+export async function sentinelRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  // Caller paths are internal constants. Reject malformed paths before sending a
+  // control token; an upstream redirect must never forward it to another host.
+  if (!path.startsWith("/") || path.startsWith("//") || /[?#\\]/.test(path)) {
+    throw new Error("Invalid Sentinel request path.");
+  }
+  const headers = new Headers(init?.headers);
+  headers.set("content-type", "application/json");
+  if (process.env.SENTINEL_CONTROL_TOKEN) {
+    headers.set("authorization", `Bearer ${process.env.SENTINEL_CONTROL_TOKEN}`);
+    headers.set("x-sentinel-control", process.env.SENTINEL_CONTROL_TOKEN);
+  }
+  let response: Response;
+  try {
+    response = await fetch(`${sentinelBaseUrl()}${path}`, {
+      ...init,
+      cache: "no-store",
+      redirect: "error",
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new Error("Sentinel request failed or timed out.");
+  }
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => {});
+    throw new Error(`Sentinel request failed (${response.status}).`);
+  }
+  return await readSentinelJson(response) as T;
 }
 
 export async function getSentinelHealth() {
